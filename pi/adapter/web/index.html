@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NookBot</title>
+<link rel="icon" href="icon.svg">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="color-scheme" content="light dark">
+<style>
+:root{--bg:#F6F5F2;--panel:#FFFFFF;--soft:#EDECE8;--line:#DEDCD6;--hover:#E6E4DF;--text:#17161A;--text2:#45444A;--mut:#7A7980;
+  --accent:#FF3B4E;--amber:#F5A524;--green:#2FBF71;--blue:#3B8CFF;--violet:#9B6BFF;--radius:14px;
+  font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+@media (prefers-color-scheme:dark){:root{--bg:#0E0E10;--panel:#17171A;--soft:#1C1C1F;--line:#2C2C30;--hover:#26262A;--text:#F3F2EF;--text2:#C9C8CD;--mut:#8D8C93}}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text)}
+button{font:inherit;color:inherit;cursor:pointer;border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:6px 12px}
+button:hover{background:var(--hover)}
+button.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+button.pri:hover{filter:brightness(1.08)}
+button.klein{padding:3px 9px;font-size:13px}
+button.text{border:none;background:none;padding:4px 6px;color:var(--mut)}
+input,textarea,select{font:inherit;color:var(--text);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 10px;width:100%}
+textarea{resize:vertical}
+a{color:var(--blue)}
+.app{display:grid;grid-template-columns:270px 1fr;height:100vh}
+aside{background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.marke{display:flex;align-items:center;gap:10px;padding:16px 16px 10px;font-weight:700;font-size:18px}
+.marke .pkt{width:12px;height:12px;border-radius:50%;background:var(--accent)}
+.liste{overflow:auto;flex:1;padding:4px 8px 12px}
+.gruppe{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:14px 8px 4px}
+.eintrag{display:flex;gap:10px;align-items:center;padding:8px;border-radius:10px;cursor:pointer;min-width:0}
+.eintrag:hover{background:var(--hover)}.eintrag.aktiv{background:var(--soft)}
+.eintrag .n{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.eintrag .s{font-size:13px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.eintrag .t{min-width:0;flex:1}
+.ava{width:30px;height:30px;border-radius:50%;flex:none;display:grid;place-items:center;color:#fff;font-weight:700;font-size:13px}
+.ava.kapsel{border-radius:9px;width:22px;height:32px}.ava.quadrat{border-radius:7px}.ava.wolke{border-radius:45% 55% 50% 50%}
+.ava.dreieck{clip-path:polygon(50% 4%,98% 94%,2% 94%);border-radius:0}
+.lauf{width:8px;height:8px;border-radius:50%;background:var(--green);flex:none;animation:p 1s infinite alternate}
+@keyframes p{to{opacity:.3}}
+.badge{background:var(--accent);color:#fff;border-radius:9px;font-size:11px;padding:0 6px;font-weight:700}
+main{display:flex;flex-direction:column;min-width:0;min-height:0}
+header.kopf{display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--line);background:var(--panel)}
+header.kopf h1{font-size:17px;margin:0;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header.kopf .sub{font-size:13px;color:var(--mut);font-weight:400}
+.menue-knopf{display:none}
+#verlauf{flex:1;overflow:auto;padding:20px;display:flex;flex-direction:column;gap:12px}
+.bl{max-width:780px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+.m{max-width:88%;padding:10px 14px;border-radius:var(--radius);background:var(--panel);border:1px solid var(--line);overflow-wrap:anywhere}
+.m.user{align-self:flex-end;background:var(--soft);border-color:transparent;white-space:pre-wrap}
+.m.bot{align-self:flex-start}
+.m.error{border-color:var(--accent);color:var(--accent)}
+.m.zus{border-color:var(--violet)}
+.m .wer{font-size:12px;color:var(--mut);margin-bottom:2px;font-weight:600}
+.werkzeug{align-self:flex-start;font-size:12.5px;color:var(--mut);padding:2px 10px;border-radius:20px;background:var(--soft)}
+.karte{align-self:stretch;border:1px solid var(--line);border-left:4px solid var(--blue);border-radius:var(--radius);background:var(--panel);padding:12px 14px}
+.karte.ged{border-left-color:var(--violet);padding:8px 12px;display:flex;gap:10px;align-items:center;font-size:14px}
+.karte.ged.zurueck{opacity:.5;text-decoration:line-through}
+.karte.abl{border-left-color:var(--amber)}
+.karte.frei{border-left-color:var(--accent)}
+.karte .titel{font-weight:700;margin-bottom:6px}
+.karte .knoepfe{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.karte pre.schritte{white-space:pre-wrap;font:13px/1.45 ui-monospace,Menlo,monospace;background:var(--soft);padding:10px;border-radius:10px;max-height:300px;overflow:auto;margin:6px 0 0}
+.teil{display:flex;gap:10px;align-items:center;padding:6px 0;border-top:1px solid var(--line);font-size:14px}
+.teil:first-of-type{border-top:none}
+.teil .st{font-size:12px;border-radius:8px;padding:1px 8px;background:var(--soft);white-space:nowrap}
+.st.fertig{color:var(--green)}.st.fehler{color:var(--accent)}.st.laeuft{color:var(--amber)}
+.denkt{align-self:flex-start;color:var(--mut);font-size:14px}
+.md p{margin:.35em 0}.md h1,.md h2,.md h3,.md h4{margin:.6em 0 .3em;font-size:1.05em}
+.md ul,.md ol{margin:.3em 0;padding-left:1.4em}
+.md code{font:13px ui-monospace,Menlo,monospace;background:var(--soft);padding:1px 5px;border-radius:5px}
+.md pre{background:var(--soft);padding:10px;border-radius:10px;overflow:auto}.md pre code{background:none;padding:0}
+.md table{border-collapse:collapse;margin:.5em 0;font-size:14px;display:block;overflow:auto}
+.md th,.md td{border:1px solid var(--line);padding:4px 8px;text-align:left}
+.md blockquote{margin:.4em 0;padding-left:10px;border-left:3px solid var(--line);color:var(--text2)}
+footer.eingabe{padding:12px 20px 16px;border-top:1px solid var(--line);background:var(--panel)}
+footer.eingabe .zeile{max-width:780px;margin:0 auto;display:flex;gap:10px;align-items:flex-end}
+footer.eingabe textarea{min-height:44px;max-height:240px}
+.hinweis{max-width:780px;margin:6px auto 0;font-size:12px;color:var(--mut)}
+.seite{flex:1;overflow:auto;padding:20px}
+.seite .bl{gap:14px}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px}
+.box h3{margin:0 0 8px;font-size:15px}
+.zeilen{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.mut{color:var(--mut);font-size:13px}
+.ziehen{outline:3px dashed var(--blue);outline-offset:-10px}
+#login{max-width:420px;margin:12vh auto;padding:24px}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:8px 16px;border-radius:10px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:9}
+#toast.an{opacity:1}
+dialog{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);color:var(--text);max-width:560px;width:calc(100% - 32px)}
+dialog::backdrop{background:#0006}
+@media (max-width:760px){
+  .app{grid-template-columns:1fr}
+  aside{position:fixed;inset:0 25% 0 0;z-index:5;transform:translateX(-105%);transition:transform .2s}
+  aside.offen{transform:none;box-shadow:0 0 40px #0005}
+  .menue-knopf{display:inline-block}
+  #verlauf,.seite{padding:14px 16px}
+  header.kopf,footer.eingabe{padding-left:16px;padding-right:16px}
+  .m{max-width:94%}
+}
+</style>
+</head>
+<body>
+<div id="login" hidden>
+  <div class="box">
+    <h3>NookBot</h3>
+    <p class="mut">Schlüssel eingeben – derselbe wie in der App (Einstellungen → Schlüssel). Er bleibt nur in diesem Browser gespeichert.</p>
+    <form id="loginForm"><input id="tok" type="password" autocomplete="current-password" placeholder="nb_…" required>
+    <div class="zeilen" style="margin-top:10px"><button class="pri">Anmelden</button><span id="loginFehler" class="mut"></span></div></form>
+  </div>
+</div>
+<div class="app" id="app" hidden>
+  <aside id="seite">
+    <div class="marke"><span class="pkt"></span>NookBot <span class="mut" id="ver" style="font-weight:400;font-size:12px"></span></div>
+    <div class="liste" id="nav"></div>
+  </aside>
+  <main id="haupt"></main>
+</div>
+<dialog id="dlg"></dialog>
+<div id="toast"></div>
+<script>
+'use strict';
+const $ = (s, el = document) => el.querySelector(s);
+const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+const store = {get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch { /* privat */ } }};
+let TOKEN = store.get('nb_token') || '';
+const S = {bots: [], sessions: [], routinen: [], ablaeufe: [], gedaechtnis: [], seq: 0, ansicht: {art: 'chat', id: null}, offen: null, freigaben: {}, webFreigaben: false};
+
+function toast(t) { const e = $('#toast'); e.textContent = t; e.classList.add('an'); clearTimeout(toast.t); toast.t = setTimeout(() => e.classList.remove('an'), 2600); }
+
+async function api(method, p, body) {
+  const r = await fetch(p, {method, headers: {'Authorization': 'Bearer ' + TOKEN, 'Content-Type': 'application/json'}, body: body ? JSON.stringify(body) : undefined});
+  if (r.status === 401) { abmelden(); throw new Error('Schlüssel abgelehnt'); }
+  const o = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(o.error || ('HTTP ' + r.status));
+  return o;
+}
+function abmelden() { store.set('nb_token', null); TOKEN = ''; $('#app').hidden = true; $('#login').hidden = false; }
+
+// ── Markdown (sicher: erst escapen, dann formatieren) ──
+function md(src) {
+  const blocks = []; let t = esc(src);
+  t = t.replace(/```[\w-]*\n([\s\S]*?)```/g, (_, c) => { blocks.push('<pre><code>' + c + '</code></pre>'); return '\u0000' + (blocks.length - 1) + '\u0000'; });
+  const inl = (x) => x.replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<i>$2</i>')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+    .replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, '$1<a href="$2" target="_blank" rel="noopener noreferrer">$2</a>');
+  const out = []; const lines = t.split('\n'); let i = 0;
+  while (i < lines.length) {
+    const l = lines[i];
+    if (/^\u0000\d+\u0000$/.test(l.trim())) { out.push(blocks[+l.trim().slice(1, -1)]); i++; continue; }
+    if (/^\s*\|.*\|\s*$/.test(l) && i + 1 < lines.length && /^\s*\|?\s*:?-{2,}/.test(lines[i + 1])) {
+      const row = (x) => x.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim());
+      let h = '<table><tr>' + row(l).map((c) => '<th>' + inl(c) + '</th>').join('') + '</tr>'; i += 2;
+      while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) { h += '<tr>' + row(lines[i]).map((c) => '<td>' + inl(c) + '</td>').join('') + '</tr>'; i++; }
+      out.push(h + '</table>'); continue;
+    }
+    let m;
+    if ((m = l.match(/^(#{1,4})\s+(.*)$/))) { out.push(`<h${m[1].length + 1}>${inl(m[2])}</h${m[1].length + 1}>`); i++; continue; }
+    if (/^\s*([-*•]|\d+[.)])\s+/.test(l)) {
+      const ol = /^\s*\d/.test(l); let h = ol ? '<ol>' : '<ul>';
+      while (i < lines.length && /^\s*([-*•]|\d+[.)])\s+/.test(lines[i])) { h += '<li>' + inl(lines[i].replace(/^\s*([-*•]|\d+[.)])\s+/, '')) + '</li>'; i++; }
+      out.push(h + (ol ? '</ol>' : '</ul>')); continue;
+    }
+    if (/^&gt;\s?/.test(l)) { out.push('<blockquote>' + inl(l.replace(/^&gt;\s?/, '')) + '</blockquote>'); i++; continue; }
+    if (!l.trim()) { i++; continue; }
+    const para = [l]; i++;
+    while (i < lines.length && lines[i].trim() && !/^(#{1,4}\s|\s*([-*•]|\d+[.)])\s|\s*\||&gt;|\u0000)/.test(lines[i])) para.push(lines[i++]);
+    out.push('<p>' + inl(para.join('<br>')) + '</p>');
+  }
+  return out.join('');
+}
+
+// ── Daten ──
+const bot = (id) => S.bots.find((b) => b.id === id);
+const botName = (id) => bot(id)?.name || id || '';
+function ava(b, gr = 30) {
+  const f = b?.form || 'kreis';
+  return `<span class="ava ${esc(f)}" style="background:${esc(b?.farbe || '#888')};${f === 'kapsel' ? '' : `width:${gr}px;height:${gr}px`}">${f === 'dreieck' ? '' : esc((b?.name || '?')[0])}</span>`;
+}
+async function laden() {
+  const o = await api('GET', '/api/state');
+  Object.assign(S, {bots: o.bots, sessions: o.sessions, routinen: o.routinen, ablaeufe: o.ablaeufe || [], gedaechtnis: o.gedaechtnis || [], seq: o.seq, webFreigaben: !!o.freigaben_web});
+  $('#ver').textContent = o.version;
+  S.bots.sort((a, b) => (b.kapitaen ? 1 : 0) - (a.kapitaen ? 1 : 0) || a.name.localeCompare(b.name));
+}
+
+// ── Ereignisse (SSE über fetch, damit der Schlüssel im Header bleibt) ──
+async function ereignisse() {
+  for (;;) {
+    try {
+      const r = await fetch('/api/events?since=' + S.seq, {headers: {'Authorization': 'Bearer ' + TOKEN}});
+      if (r.status === 401) return abmelden();
+      const rd = r.body.getReader(); const dec = new TextDecoder(); let buf = '';
+      for (;;) {
+        const {value, done} = await rd.read(); if (done) break;
+        buf += dec.decode(value, {stream: true});
+        let k; while ((k = buf.indexOf('\n\n')) >= 0) {
+          const chunk = buf.slice(0, k); buf = buf.slice(k + 2);
+          const d = chunk.split('\n').filter((x) => x.startsWith('data: ')).map((x) => x.slice(6)).join('\n');
+          if (d) { try { ereignis(JSON.parse(d)); } catch (e) { console.warn(e); } }
+        }
+      }
+    } catch (e) { console.warn('SSE', e); }
+    await new Promise((r) => setTimeout(r, 3000));
+  }
+}
+let navT;
+function ereignis(e) {
+  if (e.seq) S.seq = Math.max(S.seq, e.seq);
+  const neuZeichnen = () => { clearTimeout(navT); navT = setTimeout(nav, 120); };
+  if (e.t === 'reset') { S.seq = e.seq; laden().then(() => { nav(); zeigen(); }); return; }
+  if (e.t === 'session') { const i = S.sessions.findIndex((x) => x.id === e.s.id); if (i >= 0) S.sessions[i] = e.s; else S.sessions.unshift(e.s); neuZeichnen(); }
+  if (e.t === 'session_del') { S.sessions = S.sessions.filter((x) => x.id !== e.s); neuZeichnen(); }
+  if (e.t === 'busy') { const x = S.sessions.find((y) => y.id === e.s); if (x) x.laeuft = e.v; neuZeichnen(); if (S.offen?.id === e.s) { S.offen.laeuft = e.v; chatZeichnen(); } }
+  if (e.t === 'msg' && S.offen?.id === e.s) {
+    const i = S.offen.msgs.findIndex((m) => m.id === e.m.id);
+    if (i >= 0) S.offen.msgs[i] = {...S.offen.msgs[i], ...e.m}; else S.offen.msgs.push(e.m);
+    chatZeichnen();
+  }
+  if (e.t === 'del' && S.offen?.id === e.s) { S.offen.msgs = S.offen.msgs.filter((m) => m.id !== e.id); chatZeichnen(); }
+  if (['bots', 'routinen', 'ablaeufe', 'gedaechtnis'].includes(e.t)) laden().then(() => { nav(); if (S.ansicht.art !== 'chat') zeigen(); });
+}
+
+// ── Navigation ──
+function nav() {
+  const sess = (id) => S.sessions.find((x) => x.id === id);
+  const a = S.ansicht;
+  let h = '<div class="gruppe">Bots</div>';
+  for (const b of S.bots) {
+    const s = sess(b.sitzung) || {};
+    h += `<div class="eintrag ${a.art === 'chat' && a.id === b.sitzung ? 'aktiv' : ''}" data-chat="${esc(b.sitzung)}">${ava(b)}
+      <div class="t"><div class="n">${esc(b.name)} <span class="mut">${esc(b.rolle || '')}</span></div><div class="s">${esc(s.letzte || '')}</div></div>
+      ${s.laeuft ? '<span class="lauf"></span>' : s.ungelesen ? `<span class="badge">${s.ungelesen}</span>` : ''}</div>`;
+  }
+  const runden = S.sessions.filter((x) => x.art === 'runde').slice(0, 8);
+  h += '<div class="gruppe">Runden</div>';
+  h += `<div class="eintrag" data-seite="runde"><span class="ava" style="background:var(--violet)">+</span><div class="t"><div class="n">Neue Runde</div></div></div>`;
+  for (const r of runden) h += `<div class="eintrag ${a.id === r.id ? 'aktiv' : ''}" data-chat="${esc(r.id)}"><span class="ava" style="background:var(--violet)">R</span><div class="t"><div class="n">${esc(r.titel)}</div><div class="s">${esc(r.letzte)}</div></div>${r.laeuft ? '<span class="lauf"></span>' : ''}</div>`;
+  const entw = S.ablaeufe.filter((x) => x.status === 'entwurf').length;
+  h += '<div class="gruppe">Mehr</div>';
+  for (const [k, n, z] of [['ablaeufe', 'Abläufe', entw], ['gedaechtnis', 'Gedächtnis', 0], ['freigaben', 'Freigaben', 0], ['routinen', 'Routinen', 0]]) {
+    h += `<div class="eintrag ${a.art === k ? 'aktiv' : ''}" data-seite="${k}"><div class="t"><div class="n">${n}</div></div>${z ? `<span class="badge">${z}</span>` : ''}</div>`;
+  }
+  h += `<div class="eintrag" data-aus="1"><div class="t"><div class="s">Abmelden</div></div></div>`;
+  $('#nav').innerHTML = h;
+}
+$('#nav').addEventListener('click', (ev) => {
+  const el = ev.target.closest('.eintrag'); if (!el) return;
+  $('#seite').classList.remove('offen');
+  if (el.dataset.aus) return abmelden();
+  if (el.dataset.chat) { S.ansicht = {art: 'chat', id: el.dataset.chat}; store.set('nb_ansicht', el.dataset.chat); }
+  else S.ansicht = {art: el.dataset.seite, id: null};
+  nav(); zeigen();
+});
+
+function kopf(titel, sub, rechts = '') {
+  return `<header class="kopf"><button class="text menue-knopf" data-menue>☰</button><h1>${titel}${sub ? ` <span class="sub">${sub}</span>` : ''}</h1>${rechts}</header>`;
+}
+document.addEventListener('click', (ev) => { if (ev.target.closest('[data-menue]')) $('#seite').classList.toggle('offen'); });
+
+async function zeigen() {
+  const a = S.ansicht;
+  if (a.art === 'chat') return chatOeffnen(a.id || S.bots[0]?.sitzung);
+  S.offen = null;
+  ({ablaeufe: seiteAblaeufe, gedaechtnis: seiteGedaechtnis, freigaben: seiteFreigaben, routinen: seiteRoutinen, runde: seiteRunde}[a.art] || (() => {}))();
+}
+
+// ── Chat ──
+async function chatOeffnen(sid) {
+  if (!sid) return;
+  S.ansicht = {art: 'chat', id: sid};
+  const s = await api('GET', '/api/sessions/' + encodeURIComponent(sid));
+  S.offen = s;
+  const b = bot(s.bot);
+  const runde = s.art === 'runde';
+  $('#haupt').innerHTML = kopf(runde ? esc(s.titel) : `${esc(b?.name || '')}`, runde ? 'Runde' : esc(b?.rolle || ''),
+    runde || s.art === 'intern' ? '' : `<button class="klein" id="alsAblauf" title="Den Weg aus diesem Gespräch als wiederverwendbaren Ablauf speichern">Als Ablauf speichern</button>
+     <button class="klein text" id="neuBeginnen" title="Neue Unterhaltung, die alte bleibt im Archiv">Neu beginnen</button>`)
+    + '<div id="verlauf"><div class="bl" id="bl"></div></div>'
+    + (runde || s.art === 'intern' ? '' : `<footer class="eingabe"><div class="zeile"><textarea id="txt" rows="1" placeholder="Nachricht an ${esc(b?.name || 'Bot')} …"></textarea><button class="pri" id="senden">Senden</button></div>
+      <div class="hinweis">Enter sendet, Umschalt+Enter für eine neue Zeile. Dateien hierher ziehen → Wissen von ${esc(b?.name || '')}.</div></footer>`);
+  chatZeichnen(true);
+  const txt = $('#txt');
+  if (txt) {
+    const entwurf = store.get('nb_entwurf_' + sid); if (entwurf) txt.value = entwurf;
+    const groesse = () => { txt.style.height = 'auto'; txt.style.height = Math.min(240, txt.scrollHeight + 2) + 'px'; };
+    txt.addEventListener('input', () => { groesse(); store.set('nb_entwurf_' + sid, txt.value || null); });
+    txt.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); senden(); } });
+    $('#senden').onclick = senden; groesse(); txt.focus();
+    $('#alsAblauf').onclick = async () => {
+      const hinweis = prompt('Als Ablauf speichern – optional ein Hinweis (z. B. „immer für die letzten 7 Tage“):', '');
+      if (hinweis === null) return;
+      try { await api('POST', `/api/sessions/${sid}/ablauf`, {hinweis}); toast('Der Bot schreibt einen Ablauf-Entwurf …'); } catch (e) { toast(e.message); }
+    };
+    $('#neuBeginnen').onclick = async () => {
+      if (!confirm('Neue Unterhaltung beginnen? Die bisherige bleibt im Archiv (App → Menü).')) return;
+      const o = await api('POST', `/api/bots/${s.bot}/neu`); await laden(); S.ansicht = {art: 'chat', id: o.sitzung}; nav(); zeigen();
+    };
+    const vl = $('#verlauf');
+    vl.addEventListener('dragover', (e) => { e.preventDefault(); vl.classList.add('ziehen'); });
+    vl.addEventListener('dragleave', () => vl.classList.remove('ziehen'));
+    vl.addEventListener('drop', async (e) => { e.preventDefault(); vl.classList.remove('ziehen'); for (const f of e.dataTransfer.files) await wissenHoch(s.bot, f); });
+  }
+  if (s.ungelesen) laden().then(nav);
+}
+async function senden() {
+  const txt = $('#txt'); const t = txt.value.trim(); if (!t || !S.offen) return;
+  txt.value = ''; txt.style.height = 'auto'; store.set('nb_entwurf_' + S.offen.id, null);
+  try { await api('POST', `/api/sessions/${S.offen.id}/senden`, {text: t}); } catch (e) { toast(e.message); txt.value = t; }
+}
+async function wissenHoch(bid, f) {
+  if (f.size > 15e6) return toast(f.name + ': zu groß');
+  try {
+    if (/\.pdf$/i.test(f.name)) {
+      const b64 = await new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1]); r.onerror = no; r.readAsDataURL(f); });
+      await api('POST', '/api/wissen/' + bid, {name: f.name, b64});
+    } else await api('POST', '/api/wissen/' + bid, {name: f.name, text: await f.text()});
+    toast(f.name + ' → Wissen von ' + botName(bid));
+  } catch (e) { toast(f.name + ': ' + e.message); }
+}
+
+const FREI = /\bF-[0-9a-f]{6}\b/g;
+function chatZeichnen(unten) {
+  const s = S.offen; if (!s) return;
+  const vl = $('#verlauf'); const amEnde = unten || (vl.scrollHeight - vl.scrollTop - vl.clientHeight < 80);
+  let h = ''; let tools = [];
+  const toolsRaus = () => { if (tools.length) { h += `<div class="werkzeug">🔧 ${esc([...new Set(tools.join(',').split(','))].join(', '))}</div>`; tools = []; } };
+  for (const m of s.msgs) {
+    if (m.role === 'thought') continue;
+    if (m.role === 'tool') { tools.push(m.text || 'werkzeug'); continue; }
+    toolsRaus();
+    if (m.role === 'user') h += `<div class="m user">${esc(m.text)}</div>`;
+    else if (m.role === 'error') h += `<div class="m error">${esc(m.text)}</div>`;
+    else if (m.role === 'info') h += karte(m);
+    else if (m.role === 'bot' && m.text?.trim()) {
+      const wer = s.art === 'runde' ? `<div class="wer">${esc(botName(m.bot))}${m.zusammenfassung ? ' · Zusammenfassung' : ''}</div>` : '';
+      h += `<div class="m bot md ${m.zusammenfassung ? 'zus' : ''}">${wer}${md(m.text)}</div>`;
+      for (const fid of new Set(m.text.match(FREI) || [])) h += freigabeKarte(fid);
+    }
+  }
+  toolsRaus();
+  if (s.laeuft) h += '<div class="denkt">… arbeitet</div>';
+  $('#bl').innerHTML = h;
+  if (amEnde) vl.scrollTop = vl.scrollHeight;
+}
+function karte(m) {
+  if (m.art === 'gedaechtnis') return `<div class="karte ged ${m.zurueck ? 'zurueck' : ''}"><span style="flex:1">${esc(m.text)}</span>${m.zurueck ? '' : `<button class="klein text" data-vergessen="${esc(m.ref)}">Rückgängig</button>`}</div>`;
+  if (m.art === 'ablauf') {
+    const st = m.status || 'entwurf';
+    const a = S.ablaeufe.find((x) => x.id === m.ref);
+    return `<div class="karte abl"><div class="titel">📋 Ablauf: ${esc(m.titel || a?.name || '')} <span class="mut">${st === 'aktiv' ? '· gespeichert ✓' : st === 'verworfen' ? '· verworfen' : '· Entwurf'}</span></div>
+      ${a ? `<pre class="schritte">${esc(a.schritte)}</pre>` : ''}
+      ${st === 'entwurf' && a ? `<div class="knoepfe"><button class="pri klein" data-abl-ok="${esc(a.id)}">Speichern</button><button class="klein" data-abl-edit="${esc(a.id)}">Ändern</button><button class="klein text" data-abl-weg="${esc(a.id)}">Verwerfen</button></div>` : ''}</div>`;
+  }
+  if (m.art === 'auftraege') {
+    return `<div class="karte"><div class="titel">🧭 Aufträge verteilt</div>${m.ziel ? `<div class="mut">${esc(m.ziel)}</div>` : ''}
+      ${(m.teile || []).map((t) => `<div class="teil">${ava(bot(t.bot), 22)}<div style="flex:1;min-width:0"><b>${esc(t.name)}</b> <span class="mut">${esc(t.auftrag.slice(0, 140))}</span></div>
+        <span class="st ${esc(t.status)}">${{laeuft: 'läuft …', fertig: 'fertig', fehler: 'Fehler'}[t.status] || esc(t.status)}</span><button class="klein text" data-intern="${esc(t.sitzung)}">ansehen</button></div>`).join('')}</div>`;
+  }
+  return `<div class="karte">${esc(m.text)}</div>`;
+}
+function freigabeKarte(fid) {
+  const f = S.freigaben[fid];
+  if (!S.webFreigaben) return `<div class="karte frei"><b>Freigabe ${fid}</b> <span class="mut">– in der App entscheiden</span></div>`;
+  if (f === undefined) { S.freigaben[fid] = null; freigabenLaden(); }
+  if (!f) return `<div class="karte frei"><b>Freigabe ${fid}</b> <span class="mut">lädt …</span></div>`;
+  const st = {offen: 'wartet auf dich', ausgefuehrt: 'ausgeführt ✓', abgelehnt: 'abgelehnt', fehler: 'Fehler', abgelaufen: 'abgelaufen', laeuft: 'wird ausgeführt …'}[f.status] || f.status;
+  return `<div class="karte frei"><div class="titel">Freigabe ${fid} <span class="mut">· ${esc(st)}</span></div><div class="md">${md(f.text || '')}</div>
+    ${f.ergebnis ? `<div class="mut" style="margin-top:6px">${esc(f.ergebnis)}</div>` : ''}
+    ${f.status === 'offen' ? `<div class="knoepfe"><button class="pri klein" data-frei="${fid}" data-ja="1">Ausführen</button><button class="klein" data-frei="${fid}">Ablehnen</button></div>` : ''}</div>`;
+}
+async function freigabenLaden() {
+  try { const o = await api('GET', '/api/freigaben'); for (const f of o.freigaben || []) S.freigaben[f.id] = f; } catch (e) { console.warn(e); }
+  if (S.offen) chatZeichnen(); if (S.ansicht.art === 'freigaben') seiteFreigaben();
+}
+document.addEventListener('click', async (ev) => {
+  const t = ev.target.closest('button'); if (!t) return;
+  try {
+    if (t.dataset.vergessen) { await api('DELETE', '/api/gedaechtnis/' + t.dataset.vergessen); toast('Vergessen'); }
+    if (t.dataset.ablOk) { await api('PUT', '/api/ablaeufe/' + t.dataset.ablOk, {status: 'aktiv'}); toast('Ablauf gespeichert – die Bots kennen ihn jetzt'); }
+    if (t.dataset.ablWeg) { if (confirm('Entwurf verwerfen?')) await api('DELETE', '/api/ablaeufe/' + t.dataset.ablWeg); }
+    if (t.dataset.ablEdit) ablaufDialog(S.ablaeufe.find((x) => x.id === t.dataset.ablEdit));
+    if (t.dataset.intern) internZeigen(t.dataset.intern);
+    if (t.dataset.frei) {
+      t.disabled = true;
+      const f = await api('POST', '/api/freigaben/' + t.dataset.frei, {entscheidung: t.dataset.ja ? 'ja' : 'nein'});
+      S.freigaben[f.id || t.dataset.frei] = f; toast(t.dataset.ja ? 'Ausgeführt' : 'Abgelehnt'); if (S.offen) chatZeichnen(); else seiteFreigaben();
+    }
+  } catch (e) { toast(e.message); t.disabled = false; }
+});
+async function internZeigen(sid) {
+  const d = $('#dlg');
+  try {
+    const s = await api('GET', '/api/sessions/' + encodeURIComponent(sid));
+    const txt = s.msgs.filter((m) => m.role === 'bot' && m.text.trim()).map((m) => md(m.text)).join('<hr>') || '<p class="mut">Noch keine Antwort.</p>';
+    d.innerHTML = `<h3 style="margin-top:0">${esc(s.titel)}</h3><div class="md" style="max-height:60vh;overflow:auto">${txt}</div><div class="knoepfe" style="margin-top:12px"><button onclick="this.closest('dialog').close()">Schließen</button></div>`;
+  } catch (e) { d.innerHTML = `<p>${esc(e.message)}</p><button onclick="this.closest('dialog').close()">Schließen</button>`; }
+  d.showModal();
+}
+
+// ── Abläufe ──
+function seiteAblaeufe() {
+  const liste = [...S.ablaeufe].sort((a, b) => (a.status === 'entwurf' ? -1 : 1) - (b.status === 'entwurf' ? -1 : 1) || a.name.localeCompare(b.name));
+  $('#haupt').innerHTML = kopf('Abläufe', 'aus Gesprächen gelernt') + `<div class="seite"><div class="bl">
+    <p class="mut">Im Chat „Als Ablauf speichern“ tippen oder dem Bot sagen „mach das ab jetzt immer so“. Erst nach deinem OK wird ein Ablauf zum Skill.</p>
+    ${liste.map((a) => `<div class="box"><h3>${esc(a.name)} <span class="mut">· ${a.status === 'aktiv' ? 'aktiv' : 'Entwurf'} · ${a.fuer === 'global' ? 'alle Bots' : esc(botName(a.fuer))}</span></h3>
+      ${a.beschreibung ? `<div class="mut">${esc(a.beschreibung)}</div>` : ''}<pre class="schritte" style="white-space:pre-wrap;font:13px/1.45 ui-monospace,Menlo,monospace;background:var(--soft);padding:10px;border-radius:10px;max-height:260px;overflow:auto">${esc(a.schritte)}</pre>
+      <div class="zeilen">${a.status === 'entwurf' ? `<button class="pri klein" data-abl-ok="${a.id}">Speichern</button>` : `<button class="klein" data-abl-jetzt="${a.id}">Jetzt ausführen</button><button class="klein" data-abl-plan="${a.id}">Planen</button>`}
+      <button class="klein" data-abl-edit="${a.id}">Ändern</button><button class="klein text" data-abl-weg="${a.id}">Löschen</button></div></div>`).join('') || '<div class="box mut">Noch keine Abläufe.</div>'}
+  </div></div>`;
+  $('#haupt').querySelectorAll('[data-abl-jetzt]').forEach((b) => b.onclick = async () => {
+    try { const o = await api('POST', `/api/ablaeufe/${b.dataset.ablJetzt}/jetzt`, {}); S.ansicht = {art: 'chat', id: o.sitzung}; nav(); zeigen(); } catch (e) { toast(e.message); }
+  });
+  $('#haupt').querySelectorAll('[data-abl-plan]').forEach((b) => b.onclick = () => planDialog(S.ablaeufe.find((x) => x.id === b.dataset.ablPlan)));
+}
+function ablaufDialog(a) {
+  if (!a) return; const d = $('#dlg');
+  d.innerHTML = `<h3 style="margin-top:0">Ablauf ändern</h3><label class="mut">Name</label><input id="aN" value="${esc(a.name)}">
+    <label class="mut">Wann passt er?</label><input id="aB" value="${esc(a.beschreibung || '')}">
+    <label class="mut">Schritte</label><textarea id="aS" rows="12">${esc(a.schritte)}</textarea>
+    <label class="mut">Für</label><select id="aF"><option value="global">alle Bots</option>${S.bots.map((b) => `<option value="${b.id}" ${a.fuer === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select>
+    <div class="knoepfe" style="display:flex;gap:8px;margin-top:12px"><button class="pri" id="aOk">${a.status === 'entwurf' ? 'Speichern und aktivieren' : 'Speichern'}</button><button onclick="this.closest('dialog').close()">Abbrechen</button></div>`;
+  if (a.fuer === 'global') $('#aF').value = 'global';
+  $('#aOk').onclick = async () => {
+    try { await api('PUT', '/api/ablaeufe/' + a.id, {name: $('#aN').value, beschreibung: $('#aB').value, schritte: $('#aS').value, fuer: $('#aF').value, status: 'aktiv'}); d.close(); toast('Gespeichert'); } catch (e) { toast(e.message); }
+  };
+  d.showModal();
+}
+function planDialog(a) {
+  const d = $('#dlg'); const tage = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+  d.innerHTML = `<h3 style="margin-top:0">„${esc(a.name)}“ planen</h3><label class="mut">Uhrzeit</label><input id="pZ" type="time" value="08:00">
+    <div class="zeilen" style="margin:10px 0">${tage.map((t, i) => `<label><input type="checkbox" value="${i + 1}" ${i === 0 ? 'checked' : ''} style="width:auto"> ${t}</label>`).join('')}</div>
+    <div class="zeilen"><button class="pri" id="pOk">Als Routine anlegen</button><button onclick="this.closest('dialog').close()">Abbrechen</button></div>`;
+  $('#pOk').onclick = async () => {
+    const t = [...d.querySelectorAll('input[type=checkbox]:checked')].map((x) => +x.value);
+    try { await api('POST', `/api/ablaeufe/${a.id}/planen`, {zeit: $('#pZ').value, tage: t}); d.close(); toast('Routine angelegt'); } catch (e) { toast(e.message); }
+  };
+  d.showModal();
+}
+
+// ── Gedächtnis ──
+function seiteGedaechtnis() {
+  const gr = [['global', 'Über dich (alle Bots)'], ...S.bots.map((b) => [b.id, b.name])];
+  $('#haupt').innerHTML = kopf('Gedächtnis', 'was die Bots sich merken') + `<div class="seite"><div class="bl">
+    <div class="box"><h3>Neu</h3><div class="zeilen"><input id="gT" placeholder="z. B. Zahlen immer mit Vorjahresvergleich" style="flex:1;min-width:200px">
+      <select id="gF" style="width:auto">${gr.map(([id, n]) => `<option value="${id}">${esc(n)}</option>`).join('')}</select><button class="pri" id="gOk">Merken</button></div></div>
+    ${gr.map(([id, n]) => { const l = S.gedaechtnis.filter((e) => e.fuer === id); const b = bot(id);
+      return `<div class="box"><h3>${esc(n)}${b && b.merken === false ? ' <span class="mut">· merkt sich nichts selbst</span>' : ''}</h3>${l.map((e) => `<div class="teil"><span style="flex:1">${esc(e.text)}</span>
+        <span class="mut">${e.von === 'app' ? 'du' : esc(botName(e.von))}${e.quelle === 'direkt' ? ' · direkt' : ''}</span><button class="klein text" data-vergessen="${e.id}">✕</button></div>`).join('') || '<div class="mut">Nichts gemerkt.</div>'}</div>`; }).join('')}
+  </div></div>`;
+  $('#gOk').onclick = async () => { const t = $('#gT').value.trim(); if (!t) return; try { await api('POST', '/api/gedaechtnis', {text: t, fuer: $('#gF').value}); $('#gT').value = ''; } catch (e) { toast(e.message); } };
+}
+
+// ── Freigaben ──
+async function seiteFreigaben() {
+  if (!S.webFreigaben) { $('#haupt').innerHTML = kopf('Freigaben') + '<div class="seite"><div class="bl"><div class="box mut">Freigaben gehen im Browser noch nicht – bitte in der App entscheiden.</div></div></div>'; return; }
+  if (!seiteFreigaben.l) { seiteFreigaben.l = true; await freigabenLaden(); seiteFreigaben.l = false; }
+  const l = Object.values(S.freigaben).filter(Boolean).sort((a, b) => (b.status === 'offen') - (a.status === 'offen') || b.erstellt - a.erstellt).slice(0, 30);
+  $('#haupt').innerHTML = kopf('Freigaben', 'Schreibaktionen der Bots') + `<div class="seite"><div class="bl">${l.map((f) => freigabeKarte(f.id)).join('') || '<div class="box mut">Keine Freigaben.</div>'}</div></div>`;
+}
+
+// ── Routinen (nur ansehen; bearbeiten in der App) ──
+function seiteRoutinen() {
+  const tage = ['', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+  $('#haupt').innerHTML = kopf('Routinen', 'Zeitpläne der Bots') + `<div class="seite"><div class="bl">${S.routinen.map((r) => `<div class="box"><h3>${esc(r.name)} <span class="mut">· ${esc(botName(r.bot))} · ${r.datum ? 'am ' + esc(r.datum) : (r.tage || []).map((t) => tage[t]).join(' ')} ${esc(r.zeit)}${r.aktiv ? '' : ' · aus'}</span></h3>
+    <div class="mut" style="white-space:pre-wrap">${esc(r.auftrag)}</div><div class="zeilen" style="margin-top:8px"><button class="klein" data-rjetzt="${r.id}">Jetzt ausführen</button></div></div>`).join('') || '<div class="box mut">Keine Routinen.</div>'}
+    <p class="mut">Anlegen und ändern geht in der App oder per Chat („mach das jeden Montag um 8“).</p></div></div>`;
+  $('#haupt').querySelectorAll('[data-rjetzt]').forEach((b) => b.onclick = async () => { try { await api('POST', `/api/routinen/${b.dataset.rjetzt}/jetzt`); toast('Läuft'); } catch (e) { toast(e.message); } });
+}
+
+// ── Runde ──
+function seiteRunde() {
+  $('#haupt').innerHTML = kopf('Neue Runde', 'mehrere Bots, eine Frage') + `<div class="seite"><div class="bl"><div class="box">
+    <textarea id="rF" rows="4" placeholder="Frage an die Runde …"></textarea>
+    <div class="zeilen" style="margin:10px 0">${S.bots.filter((b) => !b.kapitaen).map((b) => `<label><input type="checkbox" value="${b.id}" checked style="width:auto"> ${esc(b.name)}</label>`).join('')}</div>
+    <button class="pri" id="rOk">Runde starten</button><p class="mut">Jeder Bot antwortet aus seiner Rolle, der Kapitän fasst zusammen.</p></div></div></div>`;
+  $('#rOk').onclick = async () => {
+    const bots = [...document.querySelectorAll('#haupt input[type=checkbox]:checked')].map((x) => x.value);
+    try { const s = await api('POST', '/api/runden', {frage: $('#rF').value, bots}); S.ansicht = {art: 'chat', id: s.id}; await laden(); nav(); zeigen(); } catch (e) { toast(e.message); }
+  };
+}
+
+// ── Start ──
+async function start() {
+  if (!TOKEN) { $('#login').hidden = false; return; }
+  try { await laden(); } catch (e) { $('#login').hidden = false; $('#loginFehler').textContent = e.message; return; }
+  $('#login').hidden = true; $('#app').hidden = false;
+  const letzte = store.get('nb_ansicht');
+  S.ansicht = {art: 'chat', id: S.sessions.some((x) => x.id === letzte) || S.bots.some((b) => b.sitzung === letzte) ? letzte : S.bots[0]?.sitzung};
+  nav(); zeigen(); ereignisse();
+  setInterval(() => { if (S.webFreigaben && Object.values(S.freigaben).some((f) => f && (f.status === 'offen' || f.status === 'laeuft'))) freigabenLaden(); }, 20000);
+}
+$('#loginForm').addEventListener('submit', (e) => { e.preventDefault(); TOKEN = $('#tok').value.trim(); store.set('nb_token', TOKEN); $('#loginFehler').textContent = ''; start(); });
+start();
+</script>
+</body>
+</html>

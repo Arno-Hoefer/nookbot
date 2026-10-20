@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -48,6 +49,7 @@ import de.hoefer.nookbot.data.Sitzung
 import de.hoefer.nookbot.data.freigabeIds
 import de.hoefer.nookbot.data.toolLine
 import de.hoefer.nookbot.net.Freigabe
+import org.json.JSONObject
 
 // ── Start ─────────────────────────────────────────────────────────
 
@@ -219,6 +221,7 @@ fun ChatScreen(vm: NookViewModel, sid: String) {
     var neu by remember { mutableStateOf(false) }
     var anhang by remember { mutableStateOf(false) }
     var notiz by remember { mutableStateOf(false) }
+    var ablauf by remember { mutableStateOf(false) }
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val wissenPick = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         val bid = sitz.firstOrNull { it.id == sid }?.bot
@@ -260,6 +263,7 @@ fun ChatScreen(vm: NookViewModel, sid: String) {
                 RoundIcon(Icons.Default.MoreVert, "Mehr") { menu = true }
                 DropdownMenu(menu, { menu = false }, containerColor = P.card) {
                     DropdownMenuItem({ Text("Einstellungen von ${b.name}", color = P.fg) }, { menu = false; vm.go(Route.BotEdit(b.id)) })
+                    DropdownMenuItem({ Text("Als Ablauf speichern …", color = P.fg) }, { menu = false; ablauf = true })
                     DropdownMenuItem({ Text("Neu beginnen …", color = P.fg) }, { menu = false; neu = true })
                 }
             }
@@ -282,7 +286,8 @@ fun ChatScreen(vm: NookViewModel, sid: String) {
                 }
             }
             items(msgs, key = { it.id }) { m ->
-                MessageView(m, if (m.id in names || m.zusammenfassung) bots.firstOrNull { it.id == m.bot } else null)
+                if (m.role == "info") InfoKarte(vm, m)
+                else MessageView(m, if (m.id in names || m.zusammenfassung) bots.firstOrNull { it.id == m.bot } else null)
                 if (m.role == "bot") freigabeIds(m.text).forEach { id ->
                     fr.firstOrNull { it.id == id }?.let { f -> FreigabeCard(f, f.id in frBusy, onChange = { w -> vm.aendern(f, w) }) { ja -> vm.decide(f, ja) } }
                 }
@@ -335,6 +340,123 @@ fun ChatScreen(vm: NookViewModel, sid: String) {
         }
     }
     ChatDialoge(vm, b, neu, notiz, { neu = false }, { notiz = false })
+    if (ablauf && b != null) {
+        var hinweis by remember { mutableStateOf("") }
+        AlertDialog(onDismissRequest = { ablauf = false }, containerColor = P.card,
+            title = { Text("Als Ablauf speichern", color = P.fg) },
+            text = {
+                Column {
+                    Text("${b.name} fasst den Weg aus diesem Gespräch als Ablauf zusammen. Du siehst ihn als Entwurf und speicherst ihn erst dann.",
+                        color = P.fg2, fontSize = 14.sp)
+                    Field("Hinweis (optional), z. B. „immer für die letzten 7 Tage“", hinweis, lines = 3) { hinweis = it }
+                }
+            },
+            confirmButton = { TextButton({ ablauf = false; vm.alsAblauf(sid, hinweis) }) { Text("Entwurf erstellen", color = A.accent) } },
+            dismissButton = { TextButton({ ablauf = false }) { Text("Abbrechen", color = P.fg2) } })
+    }
+}
+
+/** Karten vom Adapter im Chat: Gedächtnis-Hinweis, Ablauf-Entwurf, verteilte Aufträge. */
+@Composable
+private fun InfoKarte(vm: NookViewModel, m: Msg) {
+    val ablaeufe by vm.ablaeufe.collectAsState()
+    when (m.art) {
+        "gedaechtnis" -> Row(Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(12.dp)).background(P.card)
+            .border(1.dp, A.violet.copy(alpha = 0.5f), RoundedCornerShape(12.dp)).padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            Text(m.text, color = if (m.zurueck) P.mut else P.fg2, fontSize = 13.sp, modifier = Modifier.weight(1f),
+                textDecoration = if (m.zurueck) androidx.compose.ui.text.style.TextDecoration.LineThrough else null)
+            if (!m.zurueck) TextButton({ vm.vergessen(m.ref) }) { Text("Rückgängig", color = P.mut, fontSize = 13.sp) }
+        }
+        "ablauf" -> {
+            val a = ablaeufe.firstOrNull { it.id == m.ref }
+            var aendern by remember { mutableStateOf(false) }
+            Card(Modifier.padding(vertical = 8.dp), border = if (m.status == "entwurf" && a != null) A.amber.copy(alpha = 0.6f) else P.line) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Badge("ABLAUF", if (m.status == "aktiv") A.green else A.amber)
+                    Text(a?.name ?: m.titel, color = P.fg, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(start = 8.dp).weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(when { a == null || m.status == "verworfen" -> "verworfen"; m.status == "aktiv" -> "gespeichert ✓"; else -> "Entwurf" },
+                        color = P.mut, fontSize = 12.sp)
+                }
+                if (a != null) {
+                    if (a.beschreibung.isNotBlank()) Text(a.beschreibung, color = P.fg2, fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
+                    SelectionContainer {
+                        Text(markdown(a.schritte, P.fg2), color = P.fg, fontSize = 13.sp, lineHeight = 19.sp, maxLines = 18, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(top = 8.dp).fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(P.field).padding(10.dp))
+                    }
+                    if (a.entwurf && m.status == "entwurf") Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        MainButton("Speichern") { vm.ablaufAendern(a.id, JSONObject().put("status", "aktiv"), "Ablauf gespeichert – die Bots kennen ihn jetzt") }
+                        Spacer(Modifier.width(10.dp))
+                        SideButton("Ändern") { aendern = true }
+                        Spacer(Modifier.width(4.dp))
+                        TextButton({ vm.ablaufLoeschen(a.id) }) { Text("Verwerfen", color = P.mut) }
+                    }
+                }
+            }
+            if (aendern && a != null) AblaufDialog(vm, a) { aendern = false }
+        }
+        "auftraege" -> {
+            var zeigen by remember { mutableStateOf<String?>(null) }
+            Card(Modifier.padding(vertical = 8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Badge("TEAM", A.blue)
+                    Text(m.ziel.ifBlank { "Aufträge verteilt" }, color = P.fg2, fontSize = 13.sp, modifier = Modifier.padding(start = 8.dp).weight(1f),
+                        maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+                m.teile.forEach { t ->
+                    Row(Modifier.fillMaxWidth().padding(top = 10.dp).clickable { vm.internText(t.sitzung) { zeigen = it } },
+                        verticalAlignment = Alignment.CenterVertically) {
+                        BotFigure(vm.bot(t.bot), 26.dp)
+                        Column(Modifier.weight(1f).padding(start = 8.dp)) {
+                            Text(t.name, color = P.fg, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                            Text(t.auftrag, color = P.mut, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        }
+                        Text(when (t.status) { "fertig" -> "fertig ✓"; "fehler" -> "Fehler"; else -> "läuft …" },
+                            color = when (t.status) { "fertig" -> A.green; "fehler" -> A.accent; else -> A.amber }, fontSize = 12.sp)
+                    }
+                }
+            }
+            zeigen?.let { t ->
+                AlertDialog(onDismissRequest = { zeigen = null }, containerColor = P.card,
+                    text = { Column(Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState())) {
+                        SelectionContainer { Text(markdown(t, P.fg2), color = P.fg, fontSize = 14.sp, lineHeight = 20.sp) } } },
+                    confirmButton = { TextButton({ zeigen = null }) { Text("Schließen", color = P.fg2) } })
+            }
+        }
+        else -> Text(m.text, color = P.fg2, fontSize = 13.sp, modifier = Modifier.padding(vertical = 4.dp))
+    }
+}
+
+@Composable
+fun AblaufDialog(vm: NookViewModel, a: de.hoefer.nookbot.data.Ablauf, onClose: () -> Unit) {
+    val bots by vm.bots.collectAsState()
+    var name by remember(a.id) { mutableStateOf(a.name) }
+    var beschreibung by remember(a.id) { mutableStateOf(a.beschreibung) }
+    var schritte by remember(a.id) { mutableStateOf(a.schritte) }
+    var fuer by remember(a.id) { mutableStateOf(a.fuer) }
+    AlertDialog(onDismissRequest = onClose, containerColor = P.card,
+        title = { Text("Ablauf ändern", color = P.fg) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                Field("Name", name) { name = it }
+                Field("Wann passt er?", beschreibung, lines = 2) { beschreibung = it }
+                Field("Schritte", schritte, lines = 12) { schritte = it }
+                Section("Für")
+                Row(Modifier.horizontalScroll(rememberScrollState())) {
+                    Chip("Alle Bots", fuer == "global") { fuer = "global" }
+                    bots.forEach { b -> Chip(b.name, fuer == b.id) { fuer = b.id } }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton({
+                onClose()
+                vm.ablaufAendern(a.id, JSONObject().put("name", name).put("beschreibung", beschreibung).put("schritte", schritte)
+                    .put("fuer", fuer).put("status", "aktiv"), if (a.entwurf) "Ablauf gespeichert" else "Gespeichert")
+            }, enabled = name.isNotBlank() && schritte.isNotBlank()) { Text(if (a.entwurf) "Speichern und aktivieren" else "Speichern", color = A.accent) }
+        },
+        dismissButton = { TextButton(onClose) { Text("Abbrechen", color = P.fg2) } })
 }
 
 @Composable

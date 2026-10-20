@@ -55,6 +55,11 @@ fun MehrScreen(vm: NookViewModel) {
             Entry("🔔", "Erinnerungen", "${vm.erinnerungen.collectAsState().value.count { !it.erledigt }} offen – Hinweise zur Uhrzeit, auch von den Bots gestellt") {
                 vm.go(Route.Erinnerungen)
             }
+            val abl by vm.ablaeufe.collectAsState()
+            val ged by vm.gedaechtnis.collectAsState()
+            Entry("📋", "Abläufe", abl.count { it.entwurf }.let { e -> "${abl.count { !it.entwurf }} gespeichert" + (if (e > 0) " · $e Entwurf" else "") +
+                " – aus Gesprächen gelernt" }) { vm.go(Route.Ablaeufe) }
+            Entry("🧠", "Gedächtnis", "${ged.size} Einträge – was sich die Bots über dich merken") { vm.go(Route.Gedaechtnis) }
             Entry("🗂️", "Ältere Unterhaltungen", "Archiv nach „Neu beginnen“ und frühere Chats") { vm.go(Route.Archiv) }
             Entry("🗄️", "Datenbanken", "Beschreibung, Schema-Notizen, feste Abfragen") { vm.go(Route.Datenbanken) }
             Entry("📚", "Wissen", "Dateien für alle Bots") { vm.go(Route.Wissen) }
@@ -617,5 +622,118 @@ fun ArchivScreen(vm: NookViewModel) {
                 }
             }
         }
+    }
+}
+
+
+// ── Abläufe ───────────────────────────────────────────────────────
+
+@Composable
+fun AblaeufeScreen(vm: NookViewModel) {
+    val abl by vm.ablaeufe.collectAsState()
+    var aendern by remember { mutableStateOf<de.hoefer.nookbot.data.Ablauf?>(null) }
+    var planen by remember { mutableStateOf<de.hoefer.nookbot.data.Ablauf?>(null) }
+    var loeschen by remember { mutableStateOf<de.hoefer.nookbot.data.Ablauf?>(null) }
+    Column(Modifier.fillMaxSize()) {
+        TopBar("Abläufe", { vm.back() })
+        LazyColumn(Modifier.weight(1f).padding(horizontal = 16.dp)) {
+            item { Hint("Im Chat ⋮ → „Als Ablauf speichern“ oder dem Bot sagen „mach das ab jetzt immer so“. Erst nach deinem OK wird ein Ablauf " +
+                "zum Skill – dann reicht „Mach den Wochenbericht“, oder du planst ihn als Routine.", Modifier.padding(bottom = 10.dp)) }
+            if (abl.isEmpty()) item { Hint("Noch keine Abläufe.", Modifier.padding(vertical = 8.dp)) }
+            items(abl.sortedWith(compareBy({ !it.entwurf }, { it.name })), key = { it.id }) { a ->
+                Card(Modifier.padding(vertical = 5.dp), border = if (a.entwurf) A.amber.copy(alpha = 0.6f) else null) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Badge(if (a.entwurf) "ENTWURF" else "AKTIV", if (a.entwurf) A.amber else A.green)
+                        Text(a.name, color = P.fg, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 8.dp).weight(1f))
+                        Text(if (a.fuer == "global") "alle Bots" else vm.bot(a.fuer)?.name ?: a.fuer, color = P.mut, fontSize = 12.sp)
+                    }
+                    if (a.beschreibung.isNotBlank()) Text(a.beschreibung, color = P.fg2, fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
+                    Text(markdown(a.schritte, P.fg2), color = P.fg, fontSize = 13.sp, lineHeight = 19.sp, maxLines = 8, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 8.dp))
+                    Row(Modifier.padding(top = 10.dp).horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
+                        if (a.entwurf) MainButton("Speichern") { vm.ablaufAendern(a.id, org.json.JSONObject().put("status", "aktiv"), "Ablauf gespeichert") }
+                        else { MainButton("Jetzt") { vm.ablaufJetzt(a.id) }; Spacer(Modifier.width(8.dp)); SideButton("Planen") { planen = a } }
+                        Spacer(Modifier.width(8.dp))
+                        SideButton("Ändern") { aendern = a }
+                        TextButton({ loeschen = a }) { Text("Löschen", color = P.mut) }
+                    }
+                }
+            }
+            item { Spacer(Modifier.height(24.dp)) }
+        }
+    }
+    aendern?.let { a -> AblaufDialog(vm, a) { aendern = null } }
+    planen?.let { a ->
+        var zeit by remember(a.id) { mutableStateOf("08:00") }
+        var tage by remember(a.id) { mutableStateOf(setOf(1)) }
+        val ok = Regex("^([01]\\d|2[0-3]):[0-5]\\d$").matches(zeit) && tage.isNotEmpty()
+        AlertDialog(onDismissRequest = { planen = null }, containerColor = P.card,
+            title = { Text("„${a.name}“ planen", color = P.fg) },
+            text = {
+                Column {
+                    Field("Uhrzeit (HH:MM)", zeit, modifier = Modifier.width(160.dp)) { zeit = it.take(5) }
+                    Row(Modifier.padding(top = 6.dp).horizontalScroll(rememberScrollState())) {
+                        TAGE.forEachIndexed { i, t -> Chip(t, (i + 1) in tage) { tage = if ((i + 1) in tage) tage - (i + 1) else tage + (i + 1) } }
+                    }
+                    Hint("Wird eine Routine – das Ergebnis kommt in die Unterhaltung des Bots.")
+                }
+            },
+            confirmButton = { TextButton({ vm.ablaufPlanen(a.id, zeit, tage.sorted()) { planen = null } }, enabled = ok) { Text("Als Routine anlegen", color = A.accent) } },
+            dismissButton = { TextButton({ planen = null }) { Text("Abbrechen", color = P.fg2) } })
+    }
+    loeschen?.let { a ->
+        AlertDialog(onDismissRequest = { loeschen = null }, containerColor = P.card, title = { Text("„${a.name}“ löschen?", color = P.fg) },
+            text = { Text("Die Bots kennen den Ablauf danach nicht mehr. Routinen, die ihn nennen, bleiben – bitte dort mit löschen.", color = P.fg2) },
+            confirmButton = { TextButton({ vm.ablaufLoeschen(a.id); loeschen = null }) { Text("Löschen", color = A.accent) } },
+            dismissButton = { TextButton({ loeschen = null }) { Text("Abbrechen", color = P.fg2) } })
+    }
+}
+
+// ── Gedächtnis ────────────────────────────────────────────────────
+
+@Composable
+fun GedaechtnisScreen(vm: NookViewModel) {
+    val ged by vm.gedaechtnis.collectAsState()
+    val bots by vm.bots.collectAsState()
+    var neu by remember { mutableStateOf("") }
+    var fuer by remember { mutableStateOf("global") }
+    var bearbeiten by remember { mutableStateOf<de.hoefer.nookbot.data.Merk?>(null) }
+    Column(Modifier.fillMaxSize()) {
+        TopBar("Gedächtnis", { vm.back() })
+        LazyColumn(Modifier.weight(1f).padding(horizontal = 16.dp)) {
+            item {
+                Hint("Was sich die Bots dauerhaft merken. Sie merken sich nur, was du selbst sagst – nie etwas aus Mails, Slack oder Webseiten. " +
+                    "Tippen zum Ändern.", Modifier.padding(bottom = 8.dp))
+                Field("Neu, z. B. „Zahlen immer mit Vorjahresvergleich“", neu, lines = 2) { neu = it }
+                Row(Modifier.horizontalScroll(rememberScrollState()).padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Chip("Alle Bots", fuer == "global") { fuer = "global" }
+                    bots.forEach { b -> Chip(b.name, fuer == b.id) { fuer = b.id } }
+                }
+                MainButton("Merken", enabled = neu.isNotBlank()) { vm.merken(neu, fuer); neu = "" }
+            }
+            val gruppen = listOf("global" to "Über dich – alle Bots") + bots.map { it.id to it.name }
+            gruppen.forEach { (id, titel) ->
+                val l = ged.filter { it.fuer == id }
+                item(key = "h-$id") { Section(titel + if (l.isEmpty()) " · leer" else "") }
+                items(l, key = { it.id }) { e ->
+                    Row(Modifier.fillMaxWidth().clickable { bearbeiten = e }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(e.text, color = P.fg, fontSize = 14.sp)
+                            Text((if (e.von == "app") "von dir" else "von ${vm.bot(e.von)?.name ?: e.von}") + (if (e.quelle == "direkt") " · selbst notiert" else "") +
+                                " · " + whenText(e.ts), color = P.mut, fontSize = 11.sp)
+                        }
+                        TextButton({ vm.vergessen(e.id) }) { Text("✕", color = P.mut) }
+                    }
+                }
+            }
+            item { Spacer(Modifier.height(24.dp)) }
+        }
+    }
+    bearbeiten?.let { e ->
+        var t by remember(e.id) { mutableStateOf(e.text) }
+        AlertDialog(onDismissRequest = { bearbeiten = null }, containerColor = P.card, title = { Text("Eintrag ändern", color = P.fg) },
+            text = { Field("Text", t, lines = 4) { t = it } },
+            confirmButton = { TextButton({ vm.gedaechtnisAendern(e, t); bearbeiten = null }, enabled = t.isNotBlank()) { Text("Speichern", color = A.accent) } },
+            dismissButton = { TextButton({ bearbeiten = null }) { Text("Abbrechen", color = P.fg2) } })
     }
 }

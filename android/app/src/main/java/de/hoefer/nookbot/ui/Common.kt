@@ -103,7 +103,7 @@ fun Section(t: String, hint: String? = null) {
 @Composable
 fun Field(label: String, value: String, secret: Boolean = false, lines: Int = 1, mono: Boolean = false, number: Boolean = false,
           modifier: Modifier = Modifier.fillMaxWidth(), onChange: (String) -> Unit) {
-    OutlinedTextField(value, onChange, label = { Text(label, fontSize = 12.sp) }, singleLine = lines == 1, minLines = if (lines > 1) 3 else 1,
+    OutlinedTextField(value, onChange, label = { Text(label, fontSize = 12.sp) }, singleLine = lines == 1, minLines = if (lines > 1) minOf(3, lines) else 1,
         maxLines = if (lines > 1) lines else 1,
         textStyle = LocalTextStyleMono(mono),
         visualTransformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None,

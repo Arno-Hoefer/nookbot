@@ -7,13 +7,14 @@ import org.json.JSONObject
 data class Bot(
     val id: String, val name: String, val rolle: String, val farbe: Long, val form: String, val kapitaen: Boolean,
     val zugriffe: Boolean, val persoenlichkeit: String, val fokus: String, val modell: String, val laeuft: Boolean,
-    val wissen: List<WissenDatei>, val sitzung: String = "",
+    val wissen: List<WissenDatei>, val sitzung: String = "", val merken: Boolean = true,
 ) {
     companion object {
         fun from(o: JSONObject) = Bot(
             o.optString("id"), o.optString("name"), o.optString("rolle"), parseColor(o.optString("farbe")), o.optString("form", "kreis"),
             o.optBoolean("kapitaen"), o.optBoolean("zugriffe"), o.optString("persoenlichkeit"), o.optString("fokus"),
             o.optString("modell"), o.optBoolean("laeuft"), WissenDatei.list(o.optJSONArray("wissen")), o.optString("sitzung"),
+            o.optBoolean("merken", true),
         )
     }
 }
@@ -63,13 +64,54 @@ data class Erinnerung(val id: String, val text: String, val wann: String, val wi
     }
 }
 
-/** Eine Nachricht. role: user, bot, thought (Denkschritte), tool (Werkzeuge, Namen kommagetrennt), error. */
-data class Msg(val id: String, val role: String, val text: String, val ts: Long, val bot: String?, val zusammenfassung: Boolean = false) {
+/**
+ * Eine Nachricht. role: user, bot, thought (Denkschritte), tool (Werkzeuge, Namen kommagetrennt), error,
+ * info (Karte vom Adapter – art: gedaechtnis | ablauf | auftraege).
+ */
+data class Msg(
+    val id: String, val role: String, val text: String, val ts: Long, val bot: String?, val zusammenfassung: Boolean = false,
+    val art: String = "", val ref: String = "", val status: String = "", val titel: String = "", val zurueck: Boolean = false,
+    val ziel: String = "", val teile: List<Teilauftrag> = emptyList(),
+) {
     companion object {
         fun from(o: JSONObject) = Msg(
             o.optString("id"), o.optString("role"), o.optString("text"), (o.optDouble("ts", 0.0) * 1000).toLong(),
             o.optString("bot").takeIf { it.isNotBlank() }, o.optBoolean("zusammenfassung"),
+            o.optString("art"), o.optString("ref"), o.optString("status"), o.optString("titel"), o.optBoolean("zurueck"),
+            o.optString("ziel"), o.optJSONArray("teile")?.let { a -> (0 until a.length()).map { Teilauftrag.from(a.getJSONObject(it)) } } ?: emptyList(),
         )
+    }
+}
+
+/** Ein Teil von „Aufträge verteilen“: welcher Bot, was, Stand, in welcher (internen) Unterhaltung. */
+data class Teilauftrag(val bot: String, val name: String, val auftrag: String, val status: String, val sitzung: String) {
+    companion object {
+        fun from(o: JSONObject) = Teilauftrag(o.optString("bot"), o.optString("name"), o.optString("auftrag"), o.optString("status"), o.optString("sitzung"))
+    }
+}
+
+/** Ein Ablauf: aus einem Gespräch gelernt, nach dem OK ein Skill für die Bots. fuer = "global" oder Bot-id. */
+data class Ablauf(val id: String, val name: String, val beschreibung: String, val schritte: String, val fuer: String, val status: String,
+                  val von: String, val erstellt: Long) {
+    val entwurf: Boolean get() = status != "aktiv"
+
+    companion object {
+        fun from(o: JSONObject) = Ablauf(o.optString("id"), o.optString("name"), o.optString("beschreibung"), o.optString("schritte"),
+            o.optString("fuer", "global"), o.optString("status"), o.optString("von"), (o.optDouble("erstellt", 0.0) * 1000).toLong())
+
+        fun list(a: JSONArray?): List<Ablauf> = if (a == null) emptyList() else (0 until a.length()).map { from(a.getJSONObject(it)) }
+    }
+}
+
+/** Ein Gedächtnis-Eintrag. fuer = "global" (alle Bots) oder Bot-id; von = Bot-id oder "app". */
+data class Merk(val id: String, val text: String, val fuer: String, val von: String, val quelle: String, val ts: Long) {
+    fun json(): JSONObject = JSONObject().put("id", id).put("text", text).put("fuer", fuer).put("von", von).put("quelle", quelle).put("ts", ts / 1000.0)
+
+    companion object {
+        fun from(o: JSONObject) = Merk(o.optString("id"), o.optString("text"), o.optString("fuer", "global"), o.optString("von"),
+            o.optString("quelle"), (o.optDouble("ts", 0.0) * 1000).toLong())
+
+        fun list(a: JSONArray?): List<Merk> = if (a == null) emptyList() else (0 until a.length()).map { from(a.getJSONObject(it)) }
     }
 }
 
@@ -170,6 +212,12 @@ private val TOOL_TEXT = linkedMapOf(
     "bot_anlegen" to "Neuen Bot angelegt", "bot_aendern" to "Bot angepasst",
     "routine_anlegen" to "Routine angelegt", "routinen_liste" to "Routinen angesehen", "routine_loeschen" to "Routine gelöscht",
     "read_file" to "Wissen/Notiz gelesen", "write_file" to "Notiz geschrieben", "edit_file" to "Notiz geändert", "append_file" to "Notiz ergänzt",
+    "seite_lesen" to "Seite gelesen", "paket_hinzufuegen" to "Paket eingetragen", "pakete" to "Pakete angesehen",
+    "merken" to "Etwas gemerkt", "vergessen" to "Etwas vergessen", "ablauf_vorschlagen" to "Ablauf vorgeschlagen",
+    "auftraege_verteilen" to "Aufträge verteilt", "drive_suche" to "Drive durchsucht", "drive_lesen" to "Datei aus Drive gelesen",
+    "sheets_lesen" to "Tabelle gelesen", "sheets_schreiben" to "Tabelle ändern – zur Freigabe", "sheets_anhaengen" to "Zeilen anhängen – zur Freigabe",
+    "sheet_anlegen" to "Neue Tabelle – zur Freigabe", "doc_anlegen" to "Neues Dokument – zur Freigabe", "doc_anhaengen" to "Dokument ergänzen – zur Freigabe",
+    "statistik" to "Besucherstatistik gelesen",
     "list_dir" to "Ordner angesehen", "spawn" to "Teilaufgabe gestartet", "subagent" to "Teilaufgabe gestartet", "cron" to "Zeitplan bearbeitet",
 )
 

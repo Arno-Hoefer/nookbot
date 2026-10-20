@@ -5,7 +5,9 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import de.hoefer.nookbot.AppState
 import de.hoefer.nookbot.Benachrichtigung
+import de.hoefer.nookbot.data.Ablauf
 import de.hoefer.nookbot.data.Bot
+import de.hoefer.nookbot.data.Merk
 import de.hoefer.nookbot.data.Erinnerung
 import de.hoefer.nookbot.ErinnerungAlarm
 import de.hoefer.nookbot.data.Datenbank
@@ -45,6 +47,8 @@ sealed class Route {
     data object Mehr : Route()
     data object Erinnerungen : Route()
     data object Archiv : Route()
+    data object Ablaeufe : Route()
+    data object Gedaechtnis : Route()
     data object Settings : Route()
 }
 
@@ -63,6 +67,8 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
     val busy = MutableStateFlow<Set<String>>(emptySet())
     val routinen = MutableStateFlow<List<Routine>>(emptyList())
     val erinnerungen = MutableStateFlow<List<Erinnerung>>(emptyList())
+    val ablaeufe = MutableStateFlow<List<Ablauf>>(emptyList())
+    val gedaechtnis = MutableStateFlow<List<Merk>>(emptyList())
     val datenbanken = MutableStateFlow<List<Datenbank>>(emptyList())
     val wissenGlobal = MutableStateFlow<List<WissenDatei>>(emptyList())
     val modelle = MutableStateFlow<List<String>>(emptyList())
@@ -141,6 +147,8 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
             busy.value = sitzungen.value.filter { it.laeuft }.map { it.id }.toSet()
             routinen.value = arr(st.optJSONArray("routinen")).map { Routine.from(it) }
             erinnerungen.value = Erinnerung.list(st.optJSONArray("erinnerungen"))
+            ablaeufe.value = Ablauf.list(st.optJSONArray("ablaeufe"))
+            gedaechtnis.value = Merk.list(st.optJSONArray("gedaechtnis"))
             ErinnerungAlarm.planen(getApplication(), erinnerungen.value)
             ntfy.value = st.optBoolean("ntfy")
         }
@@ -170,7 +178,7 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
                 if (s.art != "intern") sitzungen.value = (listOf(s) + sitzungen.value.filterNot { it.id == s.id }).sortedByDescending { it.aktualisiert }
             }
             "session_del" -> sitzungen.value = sitzungen.value.filterNot { it.id == ev.optString("s") }
-            "bots", "routinen", "erinnerungen" -> io { loadStateNow() }
+            "bots", "routinen", "erinnerungen", "ablaeufe", "gedaechtnis" -> io { loadStateNow() }
         }
     }
 
@@ -226,6 +234,61 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
         val sid = api.post("/api/bots/$botId/neu").optString("sitzung")
         loadStateNow()
         withContext(Dispatchers.Main) { stack.value = listOf(Route.Home); openChat(sid) }
+    }
+
+    // ── Abläufe ──
+
+    /** „Als Ablauf speichern“: der Bot fasst das Gespräch als Entwurf zusammen (Karte im Chat, erst nach OK ein Skill). */
+    fun alsAblauf(sid: String, hinweis: String) = io {
+        busy.value = busy.value + sid
+        api.post("/api/sessions/$sid/ablauf", JSONObject().put("hinweis", hinweis.trim()))
+    }
+
+    fun ablaufAendern(id: String, d: JSONObject, msg: String = "Gespeichert") = io {
+        api.put("/api/ablaeufe/$id", d)
+        loadStateNow()
+        toast.value = msg
+    }
+
+    fun ablaufLoeschen(id: String) = io { api.delete("/api/ablaeufe/$id"); loadStateNow() }
+
+    fun ablaufJetzt(id: String) = io {
+        val sid = api.post("/api/ablaeufe/$id/jetzt").optString("sitzung")
+        withContext(Dispatchers.Main) { stack.value = listOf(Route.Home); openChat(sid) }
+    }
+
+    fun ablaufPlanen(id: String, zeit: String, tage: List<Int>, done: () -> Unit) = io {
+        api.post("/api/ablaeufe/$id/planen", JSONObject().put("zeit", zeit).put("tage", JSONArray(tage)))
+        loadStateNow()
+        toast.value = "Routine angelegt"
+        withContext(Dispatchers.Main) { done() }
+    }
+
+    // ── Gedächtnis ──
+
+    fun merken(text: String, fuer: String) = io {
+        api.post("/api/gedaechtnis", JSONObject().put("text", text.trim()).put("fuer", fuer))
+        loadStateNow()
+    }
+
+    fun vergessen(id: String) = io {
+        api.delete("/api/gedaechtnis/$id")
+        loadStateNow()
+        toast.value = "Vergessen"
+    }
+
+    fun gedaechtnisAendern(m: Merk, text: String) = io {
+        val l = gedaechtnis.value.map { if (it.id == m.id) it.copy(text = text.trim()) else it }
+        api.put("/api/gedaechtnis", JSONObject().put("eintraege", JSONArray().apply { l.forEach { put(it.json()) } }))
+        loadStateNow()
+    }
+
+    /** Ergebnis eines Teilauftrags (interne Unterhaltung) als Text. */
+    fun internText(sid: String, onText: (String) -> Unit) = io {
+        val s = api.get("/api/sessions/$sid")
+        val t = arr(s.optJSONArray("msgs")).filter { it.optString("role") == "bot" && it.optString("text").isNotBlank() }
+            .joinToString("\n\n---\n\n") { it.optString("text") }
+        withContext(Dispatchers.Main) { onText(t.ifBlank { "Noch keine Antwort." }) }
     }
 
     // ── Erinnerungen ──

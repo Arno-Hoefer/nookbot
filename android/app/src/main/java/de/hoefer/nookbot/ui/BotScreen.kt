@@ -76,6 +76,8 @@ fun BotScreen(vm: NookViewModel, id: String?) {
     var persoenlichkeit by remember(b?.id) { mutableStateOf(b?.persoenlichkeit ?: "") }
     var fokus by remember(b?.id) { mutableStateOf(b?.fokus ?: "") }
     var zugriffe by remember(b?.id) { mutableStateOf(b?.zugriffe ?: false) }
+    var merken by remember(b?.id) { mutableStateOf(b?.merken ?: true) }
+    val gedaechtnis by vm.gedaechtnis.collectAsState()
     var modellMenu by remember { mutableStateOf(false) }
     var loeschen by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
@@ -135,6 +137,24 @@ fun BotScreen(vm: NookViewModel, id: String?) {
                 }
             }
 
+            Section("Gedächtnis", "Was sich der Bot dauerhaft merkt – Vorlieben, Arbeitsweisen, Fakten über dich. Nur aus deinen eigenen Nachrichten.")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Darf sich selbst etwas merken", color = P.fg, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                Switch(merken, { merken = it }, colors = SwitchDefaults.colors(checkedTrackColor = A.accent))
+            }
+            if (b != null) {
+                val eigene = gedaechtnis.filter { it.fuer == b.id }
+                if (eigene.isEmpty()) Hint("Noch nichts gemerkt.", Modifier.padding(vertical = 4.dp))
+                eigene.forEach { e ->
+                    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("🧠", fontSize = 14.sp)
+                        Text(e.text, color = P.fg, fontSize = 14.sp, modifier = Modifier.padding(start = 8.dp).weight(1f))
+                        TextButton({ vm.vergessen(e.id) }) { Text("✕", color = P.mut) }
+                    }
+                }
+                Hint("Was alle Bots wissen sollen: Menü → Gedächtnis.")
+            }
+
             if (b != null) {
                 Section("Eigenes Wissen", "Dateien nur für ${b.name}. Globales Wissen für alle: Menü → Wissen.")
                 WissenList(b.wissen, onDelete = { vm.deleteWissen(b.id, it) })
@@ -145,7 +165,7 @@ fun BotScreen(vm: NookViewModel, id: String?) {
                 MainButton(if (saving) "Speichere …" else if (neu) "Bot anlegen" else "Speichern", enabled = name.isNotBlank() && !saving) {
                     saving = true
                     val d = JSONObject().put("name", name).put("rolle", rolle).put("farbe", colorHex(farbe)).put("form", form).put("modell", modell)
-                        .put("persoenlichkeit", persoenlichkeit).put("fokus", fokus).put("zugriffe", zugriffe)
+                        .put("persoenlichkeit", persoenlichkeit).put("fokus", fokus).put("zugriffe", zugriffe).put("merken", merken)
                     vm.saveBot(id, d) { saving = false; vm.back() }
                 }
                 Spacer(Modifier.width(10.dp))

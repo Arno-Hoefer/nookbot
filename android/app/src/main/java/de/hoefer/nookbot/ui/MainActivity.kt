@@ -77,6 +77,8 @@ class MainActivity : ComponentActivity() {
                             Route.Settings -> SettingsScreen(vm)
                             Route.Erinnerungen -> ErinnerungenScreen(vm)
                             Route.Archiv -> ArchivScreen(vm)
+                            Route.Ablaeufe -> AblaeufeScreen(vm)
+                            Route.Gedaechtnis -> GedaechtnisScreen(vm)
                         }
                     }
                 }
