@@ -1,0 +1,4 @@
+# Kopie als local.properties anlegen (wird nicht ins Repo übernommen)
+sdk.dir=/Pfad/zum/Android/sdk
+nookbot.server=https://<pi>.<tailnet>.ts.net:8444
+nookbot.mcp=https://<pi>.<tailnet>.ts.net

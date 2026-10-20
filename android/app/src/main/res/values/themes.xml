@@ -1,0 +1,7 @@
+<resources>
+    <style name="Theme.NookBot" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">#FF0E0E10</item>
+        <item name="android:windowBackground">#FF0E0E10</item>
+    </style>
+</resources>
