@@ -198,6 +198,10 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
         if (fg) {
             if (stream?.isActive != true && settings.configured) connect()
             refreshFreigaben()
+            // Gesundheitsdaten nebenbei auffrischen, wenn der letzte Abgleich über 6 Stunden her ist
+            if (settings.configured && settings.gesundheitStand > 0 && System.currentTimeMillis() - settings.gesundheitStand > 6 * 3_600_000L) {
+                viewModelScope.launch(Dispatchers.IO) { runCatching { de.hoefer.nookbot.Gesundheit.abgleichen(getApplication()) } }
+            }
         }
     }
 
@@ -497,6 +501,37 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
         claude.value = api.post("/api/claude/stand", JSONObject().put("usd", usd ?: JSONObject.NULL).put("datum", datum)
             .put("aufladung_usd", aufUsd ?: 0).put("aufladung_tag", aufTag ?: 0))
         toast.value = "Gespeichert"
+    }
+
+    // ── Gesundheit (Health Connect → Pi) ──
+
+    /** verfuegbar, erlaubt (Anzahl Datenarten), hintergrund, letzter Abgleich, Stand auf dem Pi */
+    val gesundheit = MutableStateFlow<JSONObject?>(null)
+
+    fun gesundheitLaden() = viewModelScope.launch {
+        val app = getApplication<Application>()
+        val o = JSONObject().put("verfuegbar", de.hoefer.nookbot.Gesundheit.verfuegbar(app))
+        if (o.getBoolean("verfuegbar")) runCatching {
+            val darf = de.hoefer.nookbot.Gesundheit.erlaubt(app)
+            o.put("erlaubt", darf.count { it.startsWith("android.permission.health.READ_") && !it.endsWith("BACKGROUND") && !it.endsWith("HISTORY") })
+            o.put("hintergrund", darf.any { it.endsWith("READ_HEALTH_DATA_IN_BACKGROUND") })
+        }
+        o.put("stand", settings.gesundheitStand)
+        withContext(Dispatchers.IO) { runCatching { o.put("pi", api.get("/api/gesundheit/info")) } }
+        gesundheit.value = o
+    }
+
+    fun gesundheitErlaubt(darf: Set<String>) {
+        val app = getApplication<Application>()
+        if (darf.any { it.endsWith("READ_HEALTH_DATA_IN_BACKGROUND") }) de.hoefer.nookbot.Gesundheit.planen(app)
+        if (darf.any { it.startsWith("android.permission.health.READ_") }) gesundheitAbgleichen() else gesundheitLaden()
+    }
+
+    fun gesundheitAbgleichen() = viewModelScope.launch {
+        toast.value = "Gesundheitsdaten werden gelesen …"
+        val r = runCatching { withContext(Dispatchers.IO) { de.hoefer.nookbot.Gesundheit.abgleichen(getApplication()) } }
+        toast.value = r.getOrElse { "Abgleich fehlgeschlagen: ${it.message}" }
+        gesundheitLaden()
     }
 
     // ── Zugriffe, Guthaben, Benachrichtigung ──

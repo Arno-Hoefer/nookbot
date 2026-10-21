@@ -40,6 +40,11 @@ class Settings(ctx: Context) {
         get() = prefs.getBoolean("listen", true)
         set(v) = prefs.edit().putBoolean("listen", v).apply()
 
+    /** Letzter Health-Connect-Abgleich (0 = noch nie → beim ersten Mal mehr Tage) */
+    var gesundheitStand: Long
+        get() = prefs.getLong("gesundheitStand", 0L)
+        set(v) = prefs.edit().putLong("gesundheitStand", v).apply()
+
     var chatToken: String
         get() = secret("chatToken")
         set(v) = putSecret("chatToken", clean(v))

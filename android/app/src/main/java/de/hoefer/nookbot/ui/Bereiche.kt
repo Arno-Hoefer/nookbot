@@ -488,6 +488,7 @@ fun SettingsScreen(vm: NookViewModel) {
                 Text("${"%.2f".format(it.rest)} $ von ${"%.0f".format(it.gesamt)} $ übrig (${it.genutztProzent} % genutzt) · neu ab ${it.bis}", color = P.fg2, fontSize = 14.sp)
             }
             ClaudeBereich(vm)
+            GesundheitBereich(vm)
 
             Section("Pi (NookBot-Adapter)")
             Field("Adresse", server) { server = it }
@@ -796,4 +797,57 @@ private fun ClaudeBereich(vm: NookViewModel) {
         Spacer(Modifier.width(8.dp))
         SideButton("Abbrechen") { bearbeiten = false }
     }
+}
+
+
+// ── Gesundheit (Health Connect) in den Einstellungen ──────────────
+
+@Composable
+private fun GesundheitBereich(vm: NookViewModel) {
+    val g by vm.gesundheit.collectAsState()
+    val ctx = LocalContext.current
+    LaunchedEffect(Unit) { vm.gesundheitLaden() }
+    val anfrage = rememberLauncherForActivityResult(androidx.health.connect.client.PermissionController.createRequestPermissionResultContract()) { darf ->
+        vm.gesundheitErlaubt(darf)
+    }
+    Section("Gesundheit (Health Connect)", "Liest Schritte, Schlaf, Puls, Training, Gewicht usw. – alles, was Uhr, Fitbit, Samsung Health & Co. in " +
+        "Health Connect schreiben. Zum Pi gehen nur Tageswerte (nur NookBot, nur im Tailnet). Welche Bots sie sehen, stellst du je Bot unter Zugriffe ein.")
+    val o = g ?: run { Hint("prüfe …"); return }
+    if (!o.optBoolean("verfuegbar")) {
+        Hint("Health Connect ist auf diesem Handy nicht verfügbar (ab Android 14 eingebaut, davor als App aus dem Play Store).")
+        return
+    }
+    val erlaubt = o.optInt("erlaubt")
+    val pi = o.optJSONObject("pi")
+    Text(if (erlaubt == 0) "Noch kein Zugriff erlaubt." else "$erlaubt Datenarten erlaubt" + if (o.optBoolean("hintergrund")) " · Abgleich 2× täglich im Hintergrund" else " · Abgleich beim Öffnen/auf Knopfdruck",
+        color = P.fg, fontSize = 14.sp)
+    if (o.optLong("stand") > 0) Text("Zuletzt abgeglichen: " + java.text.SimpleDateFormat("dd.MM. HH:mm", java.util.Locale.GERMANY).format(java.util.Date(o.optLong("stand"))),
+        color = P.fg2, fontSize = 13.sp)
+    if (pi != null && pi.optInt("tage") > 0) {
+        Text("Auf dem Pi: ${pi.optInt("tage")} Tage (${datumText(pi.optString("von"))} – ${datumText(pi.optString("bis"))})", color = P.fg2, fontSize = 13.sp)
+        val q = pi.optJSONObject("quellen")
+        if (q != null && q.length() > 0) Text("Quellen: " + q.keys().asSequence().sortedByDescending { q.optInt(it) }.joinToString(", ") { quelleName(it) },
+            color = P.fg2, fontSize = 13.sp)
+    }
+    Row(Modifier.padding(top = 8.dp)) {
+        MainButton(if (erlaubt == 0) "Zugriff erlauben" else "Zugriffe ändern") { anfrage.launch(de.hoefer.nookbot.Gesundheit.BERECHTIGUNGEN) }
+        Spacer(Modifier.width(8.dp))
+        if (erlaubt > 0) SideButton("Jetzt abgleichen") { vm.gesundheitAbgleichen() }
+    }
+    Hint("Im Health-Connect-Dialog am besten „Alle zulassen“ – plus „Im Hintergrund“ und „Verlauf“, dann gleicht NookBot selbst ab und holt beim ersten Mal 90 Tage.",
+        Modifier.padding(top = 6.dp))
+}
+
+/** Bekannte Apps lesbar benennen – sonst der Paketname. */
+fun quelleName(p: String): String = when {
+    p.contains("egym", true) -> "EGYM"
+    p == "com.google.android.apps.fitness" -> "Google Fit"
+    p.startsWith("com.fitbit") -> "Fitbit"
+    p.startsWith("com.sec.android.app.shealth") -> "Samsung Health"
+    p.startsWith("com.garmin") -> "Garmin"
+    p.startsWith("com.ouraring") -> "Oura"
+    p.startsWith("com.withings") -> "Withings"
+    p.startsWith("com.google.android.apps.healthdata") -> "Health Connect"
+    p == "android" || p.isBlank() -> "Handy"
+    else -> p
 }

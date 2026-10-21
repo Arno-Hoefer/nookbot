@@ -95,6 +95,10 @@ class MainActivity : ComponentActivity() {
     /** nookbot://chat/<id> – aus Benachrichtigungen (ntfy) direkt in die Unterhaltung. */
     private fun handle(i: Intent?) {
         if (i?.getStringExtra("ziel") == "erinnerungen") { vm.go(Route.Erinnerungen); return }
+        // Health Connect fragt „Wofür nutzt die App die Daten?“ → Einstellungen mit dem Abschnitt Gesundheit
+        if (i?.action == "androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" || i?.action == "android.intent.action.VIEW_PERMISSION_USAGE") {
+            vm.go(Route.Settings); return
+        }
         val u = i?.data ?: return
         if (u.scheme == "nookbot" && u.host == "chat") u.lastPathSegment?.let { vm.openChat(it) }
     }

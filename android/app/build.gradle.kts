@@ -20,8 +20,8 @@ android {
         applicationId = "de.hoefer.nookbot"
         minSdk = 29
         targetSdk = 36
-        versionCode = 14
-        versionName = "0.7.0"
+        versionCode = 15
+        versionName = "0.8.0"
         buildConfigField("String", "SERVER", "\"${lokal.getProperty("nookbot.server", "")}\"")
         buildConfigField("String", "MCP", "\"${lokal.getProperty("nookbot.mcp", "")}\"")
         // Sprachnotizen: whisper.cpp lokal auf dem Handy (wie in Echo), nur 64-bit-ARM
@@ -78,6 +78,9 @@ dependencies {
     // Text in Fotos erkennen – auf dem Handy, Modell ist in der App (kein Google-Dienst nötig)
     implementation("com.google.mlkit:text-recognition:16.0.1")
     implementation("androidx.core:core-ktx:1.16.0")
+    // Health Connect (nur lesen) und täglicher Abgleich im Hintergrund
+    implementation("androidx.health.connect:connect-client:1.1.0")
+    implementation("androidx.work:work-runtime-ktx:2.12.0")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
 }

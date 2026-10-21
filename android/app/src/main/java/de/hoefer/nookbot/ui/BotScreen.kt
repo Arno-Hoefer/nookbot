@@ -271,4 +271,6 @@ fun RechteWahl(vm: NookViewModel, r: org.json.JSONObject, onChange: (org.json.JS
     }
     if (kat.optBoolean("statistik")) schalter("📈 Besucherstatistik", "statistik")
     schalter("📦 Pakete (aus Home)", "pakete")
+    schalter("❤️ Gesundheit (Health Connect)", "gesundheit")
+    Hint("Gesundheit gehört nie zu „Alles“ – nur mit eigenem Häkchen.")
 }
