@@ -73,6 +73,12 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
     val wissenGlobal = MutableStateFlow<List<WissenDatei>>(emptyList())
     val modelle = MutableStateFlow<List<String>>(emptyList())
     val claudeModelle = MutableStateFlow<List<String>>(emptyList())
+    /** Was der eine home-mcp-Schlüssel darf – daraus wählt man je Bot aus. */
+    val rechteKatalog = MutableStateFlow<JSONObject?>(null)
+
+    fun loadRechte(neu: Boolean = false) = viewModelScope.launch(Dispatchers.IO) {
+        runCatching { rechteKatalog.value = api.get("/api/rechte" + if (neu) "?neu=1" else "") }
+    }
     /** Claude auf dem Pi: eingerichtet, Ausgaben (mit Admin-Schlüssel), eingetragener Guthabenstand, „ca. übrig“. */
     val claude = MutableStateFlow<JSONObject?>(null)
     val guthaben = MutableStateFlow<Guthaben?>(null)
@@ -104,7 +110,7 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
             Route.Datenbanken -> loadDatenbanken()
             Route.Wissen -> loadWissen()
             Route.Zugriffe -> loadZugriffe()
-            is Route.BotEdit -> loadModelle()
+            is Route.BotEdit -> { loadModelle(); loadRechte() }
             else -> {}
         }
     }

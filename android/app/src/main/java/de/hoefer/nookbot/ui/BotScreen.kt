@@ -63,7 +63,7 @@ fun BotScreen(vm: NookViewModel, id: String?) {
     var modell by remember(b?.id) { mutableStateOf(b?.modell ?: "glm-5.3") }
     var persoenlichkeit by remember(b?.id) { mutableStateOf(b?.persoenlichkeit ?: "") }
     var fokus by remember(b?.id) { mutableStateOf(b?.fokus ?: "") }
-    var zugriffe by remember(b?.id) { mutableStateOf(b?.zugriffe ?: false) }
+    var rechte by remember(b?.id) { mutableStateOf(org.json.JSONObject((b?.rechte ?: org.json.JSONObject()).toString())) }
     var merken by remember(b?.id) { mutableStateOf(b?.merken ?: true) }
     val gedaechtnis by vm.gedaechtnis.collectAsState()
     var modellMenu by remember { mutableStateOf(false) }
@@ -120,16 +120,9 @@ fun BotScreen(vm: NookViewModel, id: String?) {
             Section("Fokus", "Wofür er zuständig ist und worauf er achtet. Der Kapitän sieht das und gibt passende Aufträge weiter.")
             Field("z. B. Recherche zu Produkten und Preisen, immer mit Quellen …", fokus, lines = 6) { fokus = it }
 
-            if (b?.kapitaen != true) {
-                Section("Zugriffe")
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Kalender, Mail, Slack, GitLab, Datenbank", color = P.fg, fontSize = 14.sp)
-                        Hint("Über home-mcp mit den Rechten des Bots „nookbot“. Schreiben nur mit deiner Freigabe. Aus: nur Websuche und Wissen.")
-                    }
-                    Switch(zugriffe, { zugriffe = it }, colors = SwitchDefaults.colors(checkedTrackColor = A.accent))
-                }
-            }
+            Section("Zugriffe", "Was ${b?.name ?: "der Bot"} sehen darf – Auswahl aus dem, was home-mcp für „nookbot“ freigibt. " +
+                "Schreiben (Entwürfe, Termine, Tabellen) nur mit deiner Freigabe. Ohne Häkchen: nur Websuche und Wissen.")
+            RechteWahl(vm, rechte) { rechte = it }
 
             Section("Gedächtnis", "Was sich der Bot dauerhaft merkt – Vorlieben, Arbeitsweisen, Fakten über dich. Nur aus deinen eigenen Nachrichten.")
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -159,7 +152,7 @@ fun BotScreen(vm: NookViewModel, id: String?) {
                 MainButton(if (saving) "Speichere …" else if (neu) "Bot anlegen" else "Speichern", enabled = name.isNotBlank() && !saving) {
                     saving = true
                     val d = JSONObject().put("name", name).put("rolle", rolle).put("farbe", colorHex(farbe)).put("form", form).put("modell", modell)
-                        .put("persoenlichkeit", persoenlichkeit).put("fokus", fokus).put("zugriffe", zugriffe).put("merken", merken)
+                        .put("persoenlichkeit", persoenlichkeit).put("fokus", fokus).put("rechte", rechte).put("merken", merken)
                     vm.saveBot(id, d) { saving = false; vm.back() }
                 }
                 Spacer(Modifier.width(10.dp))
@@ -196,4 +189,86 @@ fun WissenList(files: List<WissenDatei>, onDelete: (String) -> Unit) {
             confirmButton = { TextButton({ onDelete(n); del = null }) { Text("Entfernen", color = A.accent) } },
             dismissButton = { TextButton({ del = null }) { Text("Abbrechen", color = P.fg2) } })
     }
+}
+
+
+/** Zugriffe im Einzelnen: Konten je Art, Kalender-Grenze, Slack-Kanäle und Direktnachrichten, GitLab, Datenbanken, Statistik, Pakete. */
+@Composable
+fun RechteWahl(vm: NookViewModel, r: org.json.JSONObject, onChange: (org.json.JSONObject) -> Unit) {
+    val k by vm.rechteKatalog.collectAsState()
+    val kat = k
+    if (kat == null) { Hint("lade, was home-mcp freigibt …"); return }
+    fun liste(key: String): Set<String> = r.optJSONArray(key)?.let { a -> (0 until a.length()).map { a.getString(it) }.toSet() } ?: emptySet()
+    fun konten(art: String): List<String> = kat.optJSONObject("konten")?.optJSONArray(art)?.let { a -> (0 until a.length()).map { a.getString(it) } } ?: emptyList()
+    val alle = r.optBoolean("alle")
+    // „alle“ (alter Schalter) in einzelne Häkchen auflösen, sobald man etwas ändert
+    fun basis(): org.json.JSONObject = if (!alle) org.json.JSONObject(r.toString()) else org.json.JSONObject().apply {
+        for (art in listOf("mail", "kalender", "drive")) put(art, org.json.JSONArray(konten(art)))
+        put("db", kat.optJSONArray("db") ?: org.json.JSONArray())
+        put("slack", kat.optBoolean("slack")); put("slack_dm", kat.optBoolean("slack")); put("slack_kanaele", org.json.JSONArray())
+        put("gitlab", kat.optBoolean("gitlab")); put("statistik", kat.optBoolean("statistik")); put("pakete", true); put("nur_haupt", false)
+    }
+    fun setze(block: org.json.JSONObject.() -> Unit) = onChange(basis().apply { remove("alle"); block() })
+    fun umschalten(key: String, wert: String) = setze {
+        val s = (optJSONArray(key)?.let { a -> (0 until a.length()).map { a.getString(it) } } ?: emptyList()).toMutableSet()
+        if (!s.add(wert)) s.remove(wert)
+        put(key, org.json.JSONArray(s.toList()))
+    }
+    val r2 = if (alle) basis() else r
+    fun hat(key: String, wert: String) = r2.optJSONArray(key)?.let { a -> (0 until a.length()).any { a.getString(it) == wert } } == true
+
+    Row(Modifier.padding(bottom = 4.dp)) {
+        Chip("Alles", alle) { onChange(org.json.JSONObject().put("alle", true)) }
+        Chip("Nichts", !alle && r2.keys().asSequence().none { key -> r2.opt(key).let { it == true || (it is org.json.JSONArray && it.length() > 0) } }) {
+            onChange(org.json.JSONObject())
+        }
+    }
+    val kontenAlle = (konten("mail") + konten("kalender") + konten("drive")).distinct()
+    kontenAlle.forEach { konto ->
+        Text(konto, color = P.fg, fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
+        Row {
+            if (konto in konten("mail")) Chip("✉️ Mail", hat("mail", konto)) { umschalten("mail", konto) }
+            if (konto in konten("kalender")) Chip("📅 Kalender", hat("kalender", konto)) { umschalten("kalender", konto) }
+            if (konto in konten("drive")) Chip("📁 Drive", hat("drive", konto)) { umschalten("drive", konto) }
+        }
+    }
+    if (konten("kalender").isNotEmpty() && (r2.optJSONArray("kalender")?.length() ?: 0) > 0) Row(verticalAlignment = Alignment.CenterVertically) {
+        Checkbox(r2.optBoolean("nur_haupt"), { v -> setze { put("nur_haupt", v) } })
+        Text("nur Hauptkalender (keine abonnierten/fremden)", color = P.fg2, fontSize = 13.sp)
+    }
+    if (kat.optBoolean("slack")) {
+        val slack = r2.optBoolean("slack")
+        Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("💬 Slack", color = P.fg, fontSize = 14.sp, modifier = Modifier.weight(1f))
+            Switch(slack, { v -> setze { put("slack", v); if (!v) { put("slack_dm", false); put("slack_kanaele", org.json.JSONArray()) } } },
+                colors = SwitchDefaults.colors(checkedTrackColor = A.accent))
+        }
+        if (slack) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(r2.optBoolean("slack_dm"), { v -> setze { put("slack_dm", v) } })
+                Text("Direktnachrichten, Gruppen und Erwähnungen", color = P.fg2, fontSize = 13.sp)
+            }
+            val kanaele = kat.optJSONArray("kanaele")?.let { a -> (0 until a.length()).map { a.getJSONObject(it) } }?.filter { !it.optBoolean("dm") } ?: emptyList()
+            if (kanaele.isEmpty()) Hint("Kanäle: in home-mcp ist für „nookbot“ noch keiner freigegeben (Verwaltung → Slack → Whitelist).")
+            else {
+                val gewaehlt = liste("slack_kanaele")
+                Hint(if (gewaehlt.isEmpty()) "Kanäle: alle freigegebenen – oder einzelne antippen" else "Kanäle: nur die markierten")
+                androidx.compose.foundation.layout.FlowRow {
+                    kanaele.forEach { c -> Chip(c.optString("label"), c.optString("id") in gewaehlt) { umschalten("slack_kanaele", c.optString("id")) } }
+                }
+            }
+        }
+    }
+    @Composable fun schalter(titel: String, key: String) = Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(titel, color = P.fg, fontSize = 14.sp, modifier = Modifier.weight(1f))
+        Switch(r2.optBoolean(key), { v -> setze { put(key, v) } }, colors = SwitchDefaults.colors(checkedTrackColor = A.accent))
+    }
+    if (kat.optBoolean("gitlab")) schalter("🦊 GitLab", "gitlab")
+    val dbs = kat.optJSONArray("db")?.let { a -> (0 until a.length()).map { a.getString(it) } } ?: emptyList()
+    if (dbs.isNotEmpty()) Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text("🗄️ Datenbank", color = P.fg, fontSize = 14.sp, modifier = Modifier.padding(end = 10.dp))
+        dbs.forEach { d -> Chip(d, hat("db", d)) { umschalten("db", d) } }
+    }
+    if (kat.optBoolean("statistik")) schalter("📈 Besucherstatistik", "statistik")
+    schalter("📦 Pakete (aus Home)", "pakete")
 }

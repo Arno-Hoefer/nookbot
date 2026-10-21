@@ -8,13 +8,15 @@ data class Bot(
     val id: String, val name: String, val rolle: String, val farbe: Long, val form: String, val kapitaen: Boolean,
     val zugriffe: Boolean, val persoenlichkeit: String, val fokus: String, val modell: String, val laeuft: Boolean,
     val wissen: List<WissenDatei>, val sitzung: String = "", val merken: Boolean = true,
+    /** Zugriffe im Einzelnen (vom Adapter): mail/kalender/drive = Konten, slack…, gitlab, db, statistik, pakete; „alle“ = alles */
+    val rechte: JSONObject = JSONObject(),
 ) {
     companion object {
         fun from(o: JSONObject) = Bot(
             o.optString("id"), o.optString("name"), o.optString("rolle"), parseColor(o.optString("farbe")), o.optString("form", "kreis"),
             o.optBoolean("kapitaen"), o.optBoolean("zugriffe"), o.optString("persoenlichkeit"), o.optString("fokus"),
             o.optString("modell"), o.optBoolean("laeuft"), WissenDatei.list(o.optJSONArray("wissen")), o.optString("sitzung"),
-            o.optBoolean("merken", true),
+            o.optBoolean("merken", true), o.optJSONObject("rechte") ?: JSONObject(),
         )
     }
 }

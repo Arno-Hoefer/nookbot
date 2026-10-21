@@ -30,6 +30,7 @@ dieselbe Frage beantworten, der Kapitän fasst zusammen. Alles läuft auf einem 
 - **Gedächtnis**: Bots merken sich Vorlieben und Absprachen (`merken`/`vergessen`) – nur aus den eigenen Nachrichten des Nutzers, nie aus Mails oder Webseiten. Jeder Eintrag erscheint im Chat (mit „Rückgängig“) und ist in der App bearbeitbar.
 - **Abläufe**: „Speicher das als Ablauf“ – der Bot fasst den Weg aus dem Gespräch als Entwurf zusammen; erst nach dem OK in der App wird daraus ein Skill, auf Wunsch auch als Routine geplant.
 - **Kontext lesen**: öffentliche Webseiten und PDFs (`seite_lesen`, ohne Anmeldung, nie Adressen aus Heimnetz oder Tailnet; Seiten, die erst im Browser entstehen, über einen Headless-Browser auf dem Pi).
+- **Zugriffe je Bot**: ein MCP-Schlüssel für alle, die Feinsteuerung macht der Adapter – je Bot Konten für Mail/Kalender/Drive, „nur Hauptkalender“, Slack-Kanäle und Direktnachrichten, GitLab, einzelne Datenbanken. Ein Bot kann keinen anderen beauftragen, der mehr darf als er.
 - **Schreiben nur mit Freigabe**: Termine, Einladungen und Mail-Entwürfe werden erst ausgeführt, wenn man in der App zustimmt.
 - **Zahlen nur aus SQL**: feste, beschriebene Abfragen (Bereich *Datenbanken* in der App), Rechnen und Prognosen per SQL – das Modell rechnet nicht im Kopf.
 - **Routinen** (ein Bot erledigt etwas zu einer Uhrzeit) und **Erinnerungen** (pünktlich als Wecker auf dem Handy) – beides auch vom Bot selbst angelegt.
