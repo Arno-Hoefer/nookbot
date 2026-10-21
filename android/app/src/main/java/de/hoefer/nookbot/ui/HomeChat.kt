@@ -1,8 +1,6 @@
 package de.hoefer.nookbot.ui
 
 import android.app.Activity
-import android.content.Intent
-import android.speech.RecognizerIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -225,6 +223,30 @@ fun ChatScreen(vm: NookViewModel, sid: String) {
     var ablauf by remember { mutableStateOf(false) }
     var sprache by remember { mutableStateOf(false) }
     val ctx = androidx.compose.ui.platform.LocalContext.current
+    // Diktat mit whisper.cpp auf dem Handy: tippen = Aufnahme, nochmal tippen = Text ins Eingabefeld
+    val notizStatus by vm.notizStatus.collectAsState()
+    var diktat by remember { mutableStateOf<de.hoefer.nookbot.whisper.WavRecorder?>(null) }
+    var diktatPegel by remember { mutableFloatStateOf(0f) }
+    var diktatSek by remember { mutableIntStateOf(0) }
+    val diktatWav = remember { java.io.File(ctx.cacheDir, "diktat.wav") }
+    fun diktatStart() {
+        if (de.hoefer.nookbot.whisper.WhisperModels.installedPreferred(ctx) == null) {
+            vm.say("Einmalig wird das Sprachmodell geladen (60 MB) – danach diktierst du ohne Internet.")
+            vm.modellLaden(de.hoefer.nookbot.whisper.WhisperModel.BASE)
+            return
+        }
+        runCatching { de.hoefer.nookbot.whisper.WavRecorder(diktatWav) { diktatPegel = it }.also { it.start() } }
+            .onSuccess { diktat = it; diktatSek = 0 }.onFailure { vm.say(it.message ?: "Mikrofon nicht verfügbar") }
+    }
+    fun diktatStopp() {
+        diktat?.stop(); diktat = null
+        vm.transkribieren(diktatWav) { t -> input = (input.trimEnd() + " " + t).trim() }
+    }
+    val mikroErlaubnis = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        if (ok) diktatStart() else vm.say("Ohne Mikrofon kein Diktat")
+    }
+    LaunchedEffect(diktat) { while (diktat != null) { kotlinx.coroutines.delay(1000); diktatSek++ } }
+    DisposableEffect(Unit) { onDispose { diktat?.stop() } }
     val wissenPick = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         val bid = sitz.firstOrNull { it.id == sid }?.bot
         if (uri != null && bid != null) uploadWissenDatei(ctx, vm, bid, uri)
@@ -245,11 +267,6 @@ fun ChatScreen(vm: NookViewModel, sid: String) {
     val b = vm.bot(s?.bot)
     val busy = sid in busySet
     val runde = s?.art == "runde"
-    val speech = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
-        if (r.resultCode == Activity.RESULT_OK) {
-            r.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.let { input = (input + " " + it).trim() }
-        }
-    }
 
     LaunchedEffect(msgs.size, msgs.lastOrNull()?.text?.length, busy) {
         if (msgs.isNotEmpty()) list.animateScrollToItem(msgs.size)
@@ -272,8 +289,6 @@ fun ChatScreen(vm: NookViewModel, sid: String) {
                     }
                 }
             }
-            if (!runde && b != null) Box(Modifier.padding(end = 8.dp).size(44.dp).clip(CircleShape).background(P.field)
-                .clickable(enabled = online) { sprache = true }, contentAlignment = Alignment.Center) { Text("🗣", fontSize = 20.sp) }
             if (!runde && b != null) Box {
                 RoundIcon(Icons.Default.MoreVert, "Mehr") { menu = true }
                 DropdownMenu(menu, { menu = false }, containerColor = P.card) {
@@ -350,26 +365,35 @@ fun ChatScreen(vm: NookViewModel, sid: String) {
             Spacer(Modifier.width(8.dp))
             TextField(
                 value = input, onValueChange = { input = it },
-                placeholder = { Text("Nachricht an ${b?.name ?: "Bot"}", color = P.mut) },
+                placeholder = { Text(when {
+                    diktat != null -> "Aufnahme %d:%02d – tippe ■ zum Beenden".format(diktatSek / 60, diktatSek % 60)
+                    notizStatus != null -> notizStatus ?: ""
+                    else -> "Nachricht an ${b?.name ?: "Bot"}"
+                }, color = if (diktat != null) A.accent else P.mut) },
                 modifier = Modifier.weight(1f).clip(RoundedCornerShape(24.dp)),
                 colors = TextFieldDefaults.colors(focusedContainerColor = P.field, unfocusedContainerColor = P.field,
                     focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent,
                     focusedTextColor = P.fg, unfocusedTextColor = P.fg, cursorColor = A.accent),
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                 trailingIcon = {
-                    Text("🎙", fontSize = 18.sp, modifier = Modifier.clip(CircleShape).clickable {
-                        runCatching {
-                            speech.launch(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-                                .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                                .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "de-DE"))
-                        }.onFailure { vm.say("Spracheingabe nicht verfügbar") }
+                    if (diktat != null) Box(Modifier.size((30 + diktatPegel * 12).dp).clip(CircleShape).background(A.accent)
+                        .clickable { diktatStopp() }, contentAlignment = Alignment.Center) { Text("■", color = Color.White, fontSize = 14.sp) }
+                    else if (notizStatus != null) CircularProgressIndicator(Modifier.size(20.dp), color = A.accent, strokeWidth = 2.dp)
+                    else Text("🎙", fontSize = 18.sp, modifier = Modifier.clip(CircleShape).clickable {
+                        if (ctx.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED) diktatStart()
+                        else mikroErlaubnis.launch(android.Manifest.permission.RECORD_AUDIO)
                     }.padding(8.dp))
                 },
                 maxLines = 6,
             )
             Spacer(Modifier.width(8.dp))
+            val leer = input.isBlank() && anhaenge.isEmpty() && diktat == null
             val can = (input.isNotBlank() || anhaenge.isNotEmpty()) && online && !anhangLaeuft
-            Box(Modifier.size(52.dp).clip(CircleShape).background(if (can) A.accent else P.field)
+            // Wie bei ChatGPT: leeres Feld → Sprachmodus, sonst Senden
+            if (leer) Box(Modifier.size(52.dp).clip(CircleShape).background(if (online) P.fg else P.field)
+                .clickable(enabled = online) { sprache = true }, contentAlignment = Alignment.Center) {
+                Text("🗣", fontSize = 22.sp)
+            } else Box(Modifier.size(52.dp).clip(CircleShape).background(if (can) A.accent else P.field)
                 .clickable(enabled = can) { vm.send(input); input = "" }, contentAlignment = Alignment.Center) {
                 Icon(Icons.AutoMirrored.Filled.Send, "Senden", tint = if (can) Color.White else P.mut, modifier = Modifier.size(22.dp))
             }

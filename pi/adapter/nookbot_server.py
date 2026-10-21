@@ -272,6 +272,8 @@ def agent_md(b: dict) -> str:
         parts.append("## Neue Bots\n\nBeschreibt %NUTZER% einen Bot, legst du ihn mit `bot_anlegen` an (Name, Rolle, Fokus, Persönlichkeit; "
                      "Fokus ausführlich und konkret). Mit `bot_aendern` passt du bestehende an. Zugriffe auf Kalender/Mail/Daten schaltet "
                      "nur %NUTZER% frei – sag ihm, wo (App → Bot → Zugriffe).\n")
+    if not b.get("zugriffe"):
+        others = [o for o in others if not o.get("zugriffe")]  # Bots mit Zugriffen darf er nicht beauftragen
     if others:
         parts.append("## Dein Team\n\nMit `bot_fragen` gibst du anderen Bots einen Auftrag und bekommst ihre Antwort:\n"
                      + "\n".join(f"- **{o['name']}** (`{o['id']}`): {o.get('rolle') or ''} – {(o.get('fokus') or '').strip()[:200]}" for o in others)
@@ -2074,6 +2076,8 @@ def verteilen(caller: dict, auftraege: list, ziel: str) -> str:
             raise ValueError(f"Unbekannter Bot „{x.get('bot')}“ – siehe bots_liste.")
         if not t:
             raise ValueError(f"Auftrag für {b['name']} fehlt.")
+        if b.get("zugriffe") and not caller.get("zugriffe"):
+            raise ValueError(f"{b['name']} hat Zugriffe, die du nicht hast – nicht beauftragbar.")
         if any(y[0]["id"] == b["id"] for y in liste):
             raise ValueError(f"{b['name']} kommt doppelt vor – pro Bot ein Auftrag.")
         liste.append((b, t))
@@ -2284,6 +2288,7 @@ def mcp_rpc(msg: dict, caller: dict):
                     text = f"{nb['name']} ist geändert und startet kurz neu."
             elif name == "bots_liste":
                 text = "\n".join(f"- {b['id']}: {b['name']} – {b.get('rolle') or ''}. Fokus: {(b.get('fokus') or '').strip()[:300]}"
+                                 + (" (hat Zugriffe – für dich nicht beauftragbar)" if b.get("zugriffe") and not caller.get("zugriffe") else "")
                                  for b in bots() if b["id"] != caller["id"]) or "Keine anderen Bots."
             elif name == "auftraege_verteilen":
                 if not caller.get("kapitaen"):
@@ -2333,6 +2338,10 @@ def mcp_rpc(msg: dict, caller: dict):
                 b = bot(str(a.get("bot", "")))
                 if not b or b["id"] == caller["id"]:
                     raise ValueError("Unbekannter Bot – siehe bots_liste.")
+                if b.get("zugriffe") and not caller.get("zugriffe"):
+                    # Sonst holt sich ein Bot ohne Zugriffe Mails/Slack/Daten über einen Bot mit Zugriffen
+                    raise ValueError(f"{b['name']} hat Zugriffe auf Kalender, Mail, Slack oder Daten – die du nicht hast. Solche Bots kannst du "
+                                     "nicht beauftragen. Sag %NUTZER%, dass er dir die Zugriffe in der App freischalten kann (Bot → Zugriffe).")
                 cs = caller_session(caller["id"]) or ""
                 if cs.startswith("auftrag-"):  # Schutz vor Ketten: wer gerade einen Auftrag erledigt, gibt keinen weiter
                     raise ValueError("Du erledigst gerade selbst einen Auftrag – bitte ohne weitere Bots antworten.")
@@ -2345,7 +2354,7 @@ def mcp_rpc(msg: dict, caller: dict):
                 return {"jsonrpc": "2.0", "id": mid, "error": {"code": -32602, "message": "Unbekanntes Werkzeug"}}
             return ok({"content": [{"type": "text", "text": n(text)}], "isError": False})
         except Exception as e:  # noqa: BLE001
-            return ok({"content": [{"type": "text", "text": str(e)}], "isError": True})
+            return ok({"content": [{"type": "text", "text": n(str(e))}], "isError": True})
     return {"jsonrpc": "2.0", "id": mid, "error": {"code": -32601, "message": "Methode unbekannt"}}
 
 
