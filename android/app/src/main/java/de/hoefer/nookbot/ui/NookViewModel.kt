@@ -532,6 +532,8 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
             val darf = de.hoefer.nookbot.Gesundheit.erlaubt(app)
             o.put("erlaubt", darf.count { it.startsWith("android.permission.health.READ_") && !it.endsWith("BACKGROUND") && !it.endsWith("HISTORY") })
             o.put("hintergrund", darf.any { it.endsWith("READ_HEALTH_DATA_IN_BACKGROUND") })
+            // Erlaubnis evtl. in den Android-Einstellungen erteilt → Hintergrund-Abgleich hier (nach)planen bzw. abbestellen
+            if (o.getBoolean("hintergrund")) de.hoefer.nookbot.Gesundheit.planen(app) else de.hoefer.nookbot.Gesundheit.stoppen(app)
         }
         o.put("stand", settings.gesundheitStand)
         withContext(Dispatchers.IO) { runCatching { o.put("pi", api.get("/api/gesundheit/info")) } }
