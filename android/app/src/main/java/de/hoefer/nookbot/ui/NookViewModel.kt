@@ -203,6 +203,7 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
 
     fun openChat(sid: String) {
         msgs.value = emptyList()
+        if (sid != current) anhaenge.value = emptyList()
         stack.value = stack.value.filterNot { it is Route.Chat } + Route.Chat(sid)
         loadSession(sid)
     }
@@ -350,9 +351,48 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
 
     fun send(text: String) {
         val sid = current ?: return
-        if (text.isBlank()) return
+        val mit = anhaenge.value
+        if (text.isBlank() && mit.isEmpty()) return
+        val voll = (text.trim() + if (mit.isEmpty()) "" else "\n\n" + mit.joinToString("\n") { it.zeile }).trim()
+        anhaenge.value = emptyList()
         busy.value = busy.value + sid
-        io { api.post("/api/sessions/$sid/senden", JSONObject().put("text", text.trim())) }
+        io { api.post("/api/sessions/$sid/senden", JSONObject().put("text", voll)) }
+    }
+
+    // ── Anhänge (Fotos, Dateien) für die nächste Nachricht ──
+
+    val anhaenge = MutableStateFlow<List<Anhang>>(emptyList())
+    val anhangLaeuft = MutableStateFlow(false)
+
+    fun anhaengen(uri: android.net.Uri, name: String? = null, danach: () -> Unit = {}) {
+        val sid = current ?: return
+        anhangLaeuft.value = true
+        viewModelScope.launch {
+            val r = runCatching {
+                val d = Dateien.lesen(getApplication(), uri, name)
+                val o = withContext(Dispatchers.IO) {
+                    api.post("/api/sessions/$sid/anhang", JSONObject().put("name", d.name).put("b64", d.b64).put("ocr", d.ocr))
+                }
+                Anhang(o.optString("name"), o.optString("zeile"), o.optString("art") == "bild") to o.optString("hinweis")
+            }
+            anhangLaeuft.value = false
+            danach()
+            r.onSuccess { (a, hinweis) -> anhaenge.value = anhaenge.value + a; if (hinweis.isNotBlank()) toast.value = hinweis }
+                .onFailure { toast.value = it.message ?: "Anhang fehlgeschlagen" }
+        }
+    }
+
+    fun anhangWeg(a: Anhang) { anhaenge.value = anhaenge.value - a }
+
+    /** Beliebige Datei als Wissen: Dokumente wandelt der Pi in Text um, bei Bildern zählt der auf dem Handy erkannte Text. */
+    fun wissenDatei(scope: String, uri: android.net.Uri) = viewModelScope.launch {
+        toast.value = "Datei wird gelesen …"
+        runCatching {
+            val d = Dateien.lesen(getApplication(), uri)
+            withContext(Dispatchers.IO) { api.post("/api/wissen/$scope", JSONObject().put("name", d.name).put("b64", d.b64).put("ocr", d.ocr)) }
+            d.name
+        }.onSuccess { n -> io { loadStateNow(); loadWissen() }; toast.value = "„$n“ als Wissen gespeichert" }
+            .onFailure { toast.value = it.message ?: "Fehlgeschlagen" }
     }
 
     fun deleteSession(sid: String) = io {
@@ -446,9 +486,11 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Guthabenstand aus der Claude Console eintragen – ab dann rechnet der Pi „ca. übrig“ mit den Ausgaben seit heute. */
-    fun claudeStand(usd: Double?) = io {
-        claude.value = api.post("/api/claude/stand", JSONObject().put("usd", usd ?: JSONObject.NULL))
-        toast.value = if (usd == null) "Guthabenstand entfernt" else "Guthabenstand gespeichert"
+    /** Startbetrag (Guthaben an einem Tag) und monatliche Aufladung – daraus rechnet der Pi „ca. übrig“. */
+    fun claudeStand(usd: Double?, datum: String, aufUsd: Double?, aufTag: Int?) = io {
+        claude.value = api.post("/api/claude/stand", JSONObject().put("usd", usd ?: JSONObject.NULL).put("datum", datum)
+            .put("aufladung_usd", aufUsd ?: 0).put("aufladung_tag", aufTag ?: 0))
+        toast.value = "Gespeichert"
     }
 
     // ── Zugriffe, Guthaben, Benachrichtigung ──

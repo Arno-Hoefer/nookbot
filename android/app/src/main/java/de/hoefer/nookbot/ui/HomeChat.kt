@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.speech.RecognizerIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -222,10 +223,22 @@ fun ChatScreen(vm: NookViewModel, sid: String) {
     var anhang by remember { mutableStateOf(false) }
     var notiz by remember { mutableStateOf(false) }
     var ablauf by remember { mutableStateOf(false) }
+    var sprache by remember { mutableStateOf(false) }
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val wissenPick = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         val bid = sitz.firstOrNull { it.id == sid }?.bot
         if (uri != null && bid != null) uploadWissenDatei(ctx, vm, bid, uri)
+    }
+    val anhaenge by vm.anhaenge.collectAsState()
+    val anhangLaeuft by vm.anhangLaeuft.collectAsState()
+    val dateiPick = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris -> uris.take(5).forEach { vm.anhaengen(it) } }
+    val bildPick = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(5)) { uris -> uris.forEach { vm.anhaengen(it) } }
+    var kameraZiel by remember { mutableStateOf<Pair<java.io.File, android.net.Uri>?>(null) }
+    val kamera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
+        val z = kameraZiel
+        if (ok && z != null) vm.anhaengen(z.second, "Foto " + java.text.SimpleDateFormat("dd.MM. HH:mm", java.util.Locale.GERMANY).format(java.util.Date()) + ".jpg") { z.first.delete() }
+        else z?.first?.delete()
+        kameraZiel = null
     }
     val list = rememberLazyListState()
     val s = sitz.firstOrNull { it.id == sid }
@@ -259,6 +272,8 @@ fun ChatScreen(vm: NookViewModel, sid: String) {
                     }
                 }
             }
+            if (!runde && b != null) Box(Modifier.padding(end = 8.dp).size(44.dp).clip(CircleShape).background(P.field)
+                .clickable(enabled = online) { sprache = true }, contentAlignment = Alignment.Center) { Text("🗣", fontSize = 20.sp) }
             if (!runde && b != null) Box {
                 RoundIcon(Icons.Default.MoreVert, "Mehr") { menu = true }
                 DropdownMenu(menu, { menu = false }, containerColor = P.card) {
@@ -301,14 +316,35 @@ fun ChatScreen(vm: NookViewModel, sid: String) {
             }
         }
 
+        if (!runde && (anhaenge.isNotEmpty() || anhangLaeuft)) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+            .padding(start = 16.dp, end = 16.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            anhaenge.forEach { a ->
+                Row(Modifier.padding(end = 8.dp).clip(RoundedCornerShape(14.dp)).background(P.chip).padding(start = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Text((if (a.bild) "🖼 " else "📎 ") + a.name, color = P.fg, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.widthIn(max = 200.dp))
+                    TextButton({ vm.anhangWeg(a) }) { Text("✕", color = P.mut, fontSize = 13.sp) }
+                }
+            }
+            if (anhangLaeuft) Text("lädt hoch …", color = P.mut, fontSize = 13.sp)
+        }
         if (!runde) Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp, top = 6.dp), verticalAlignment = Alignment.Bottom) {
             Box {
                 Box(Modifier.size(52.dp).clip(CircleShape).background(P.field).clickable { anhang = true }, contentAlignment = Alignment.Center) {
                     Icon(Icons.Default.Add, "Anhängen", tint = P.fg, modifier = Modifier.size(22.dp))
                 }
                 DropdownMenu(anhang, { anhang = false }, containerColor = P.card) {
+                    DropdownMenuItem({ Text("📷  Foto aufnehmen", color = P.fg) }, {
+                        anhang = false
+                        runCatching { Dateien.kameraUri(ctx).also { kameraZiel = it; kamera.launch(it.second) } }.onFailure { vm.say("Keine Kamera-App gefunden") }
+                    })
+                    DropdownMenuItem({ Text("🖼  Bilder aus der Galerie", color = P.fg) }, {
+                        anhang = false; bildPick.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    })
+                    DropdownMenuItem({ Text("📎  Datei anhängen", color = P.fg) }, { anhang = false; dateiPick.launch(arrayOf("*/*")) })
                     DropdownMenuItem({ Text("🎙  Sprachnotiz aufnehmen", color = P.fg) }, { anhang = false; notiz = true })
-                    DropdownMenuItem({ Text("📄  Datei als Wissen für ${b?.name ?: "den Bot"}", color = P.fg) }, { anhang = false; wissenPick.launch(WISSEN_MIME) })
+                    HorizontalDivider(color = P.line)
+                    DropdownMenuItem({ Text("📚  Datei als Wissen für ${b?.name ?: "den Bot"}", color = P.fg) }, { anhang = false; wissenPick.launch(WISSEN_MIME) })
                 }
             }
             Spacer(Modifier.width(8.dp))
@@ -332,7 +368,7 @@ fun ChatScreen(vm: NookViewModel, sid: String) {
                 maxLines = 6,
             )
             Spacer(Modifier.width(8.dp))
-            val can = input.isNotBlank() && online
+            val can = (input.isNotBlank() || anhaenge.isNotEmpty()) && online && !anhangLaeuft
             Box(Modifier.size(52.dp).clip(CircleShape).background(if (can) A.accent else P.field)
                 .clickable(enabled = can) { vm.send(input); input = "" }, contentAlignment = Alignment.Center) {
                 Icon(Icons.AutoMirrored.Filled.Send, "Senden", tint = if (can) Color.White else P.mut, modifier = Modifier.size(22.dp))
@@ -340,6 +376,7 @@ fun ChatScreen(vm: NookViewModel, sid: String) {
         }
     }
     ChatDialoge(vm, b, neu, notiz, { neu = false }, { notiz = false })
+    if (sprache) Sprachmodus(vm, sid, b) { sprache = false }
     if (ablauf && b != null) {
         var hinweis by remember { mutableStateOf("") }
         AlertDialog(onDismissRequest = { ablauf = false }, containerColor = P.card,

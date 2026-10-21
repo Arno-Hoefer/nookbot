@@ -27,24 +27,11 @@ import de.hoefer.nookbot.data.WissenDatei
 import de.hoefer.nookbot.data.colorHex
 import org.json.JSONObject
 
-private val ENDUNGEN = listOf(".md", ".txt", ".csv", ".json", ".sql", ".yaml", ".yml", ".pdf")
-val WISSEN_MIME = arrayOf("text/*", "application/json", "application/pdf", "application/octet-stream")
+val WISSEN_MIME = arrayOf("*/*")
 
-/** Wissen hochladen: Textdateien als Text, PDFs als Base64 (der Pi zieht den Text heraus). */
+/** Wissen hochladen: jede Datei – der Pi wandelt Dokumente in Text um, bei Fotos zählt der erkannte Text. */
 fun uploadWissenDatei(ctx: Context, vm: NookViewModel, scope: String, uri: Uri) {
-    var name = "datei"
-    ctx.contentResolver.query(uri, null, null, null, null)?.use { c ->
-        if (c.moveToFirst()) c.getColumnIndex(OpenableColumns.DISPLAY_NAME).takeIf { it >= 0 }?.let { name = c.getString(it) }
-    }
-    when {
-        name.lowercase().endsWith(".pdf") -> runCatching {
-            val bytes = ctx.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
-            if (bytes.size > 15_000_000) error("PDF zu groß (max. 15 MB)")
-            android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
-        }.onSuccess { vm.uploadWissen(scope, name, "", it) }.onFailure { vm.say(it.message) }
-        ENDUNGEN.none { name.lowercase().endsWith(it) } -> vm.say("Nur Text oder PDF: ${ENDUNGEN.joinToString(" ")}")
-        else -> readTextFile(ctx, uri).onSuccess { (n, t) -> vm.uploadWissen(scope, n, t) }.onFailure { vm.say(it.message) }
-    }
+    vm.wissenDatei(scope, uri)
 }
 
 /** Textdatei vom Gerät lesen (für Wissen und Import). Name + Inhalt, oder Fehlermeldung. */

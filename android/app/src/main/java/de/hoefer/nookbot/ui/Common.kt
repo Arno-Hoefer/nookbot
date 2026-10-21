@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -107,7 +108,12 @@ fun Field(label: String, value: String, secret: Boolean = false, lines: Int = 1,
         maxLines = if (lines > 1) lines else 1,
         textStyle = LocalTextStyleMono(mono),
         visualTransformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None,
-        keyboardOptions = if (number) KeyboardOptions(keyboardType = KeyboardType.Number) else KeyboardOptions.Default,
+        keyboardOptions = when {
+            // Schlüssel: keine Großschreibung am Anfang, keine Autokorrektur (sonst wird aus „nb_…“ „Nb_…“)
+            secret -> KeyboardOptions(keyboardType = KeyboardType.Password, capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false)
+            number -> KeyboardOptions(keyboardType = KeyboardType.Decimal)
+            else -> KeyboardOptions.Default
+        },
         modifier = modifier.padding(vertical = 4.dp),
         colors = OutlinedTextFieldDefaults.colors(focusedTextColor = P.fg, unfocusedTextColor = P.fg, focusedBorderColor = A.accent,
             unfocusedBorderColor = P.line, focusedLabelColor = P.fg2, unfocusedLabelColor = P.mut, cursorColor = A.accent))

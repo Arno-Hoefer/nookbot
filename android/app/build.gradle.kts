@@ -20,8 +20,8 @@ android {
         applicationId = "de.hoefer.nookbot"
         minSdk = 29
         targetSdk = 36
-        versionCode = 11
-        versionName = "0.5.2"
+        versionCode = 12
+        versionName = "0.6.0"
         buildConfigField("String", "SERVER", "\"${lokal.getProperty("nookbot.server", "")}\"")
         buildConfigField("String", "MCP", "\"${lokal.getProperty("nookbot.mcp", "")}\"")
         // Sprachnotizen: whisper.cpp lokal auf dem Handy (wie in Echo), nur 64-bit-ARM
@@ -75,6 +75,9 @@ dependencies {
     implementation("androidx.tracing:tracing:1.2.0")
     // WebSocket zum Bot (PicoClaw-Kanal „pico“)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // Text in Fotos erkennen – auf dem Handy, Modell ist in der App (kein Google-Dienst nötig)
+    implementation("com.google.mlkit:text-recognition:16.0.1")
+    implementation("androidx.core:core-ktx:1.16.0")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
 }

@@ -745,7 +745,6 @@ fun GedaechtnisScreen(vm: NookViewModel) {
 @Composable
 private fun ClaudeBereich(vm: NookViewModel) {
     val c by vm.claude.collectAsState()
-    var stand by remember { mutableStateOf("") }
     Section("Claude (Anthropic)")
     val o = c
     if (o == null || !o.optBoolean("eingerichtet")) {
@@ -753,19 +752,48 @@ private fun ClaudeBereich(vm: NookViewModel) {
         return
     }
     val st = o.optJSONObject("stand")
+    val auf = o.optJSONObject("aufladung")
     val admin = o.optBoolean("kosten")
-    if (admin) Text("Diesen Monat laut Anthropic: ${"%.2f".format(o.optDouble("monat_usd", 0.0))} $", color = P.fg, fontSize = 14.sp)
+    val heute = remember { java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.GERMANY).format(java.util.Date()) }
+    var start by remember(o) { mutableStateOf(st?.optDouble("usd")?.let { "%.2f".format(java.util.Locale.US, it) } ?: "") }
+    var datum by remember(o) { mutableStateOf(st?.optString("datum")?.takeIf { it.isNotBlank() } ?: heute) }
+    var aufUsd by remember(o) { mutableStateOf(auf?.optDouble("usd")?.let { "%.2f".format(java.util.Locale.US, it) } ?: "") }
+    var aufTag by remember(o) { mutableStateOf(auf?.optInt("tag")?.takeIf { it > 0 }?.toString() ?: "") }
+    var bearbeiten by remember { mutableStateOf(false) }
+
+    if (o.has("rest_usd")) Text("ca. ${"%.2f".format(o.optDouble("rest_usd"))} $ übrig", color = A.green, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+    if (o.has("rest_usd")) Text("Start ${"%.2f".format(st?.optDouble("usd") ?: 0.0)} $ am ${datumText(st?.optString("datum") ?: "")}" +
+        (if (o.optDouble("aufgeladen_usd", 0.0) > 0) " + ${"%.2f".format(o.optDouble("aufgeladen_usd"))} $ aufgeladen" else "") +
+        " − ${"%.2f".format(o.optDouble("seit_stand_usd"))} $ verbraucht", color = P.fg2, fontSize = 13.sp)
+    if (admin) Text("Diesen Monat laut Anthropic: ${"%.2f".format(o.optDouble("monat_usd", 0.0))} $", color = P.fg2, fontSize = 13.sp)
     Text("NookBot-Verbrauch: heute ${"%.2f".format(o.optDouble("eigen_heute_usd", 0.0))} $ · diesen Monat ${"%.2f".format(o.optDouble("eigen_monat_usd", 0.0))} $",
-        color = if (admin) P.fg2 else P.fg, fontSize = 14.sp)
-    if (o.has("rest_usd")) Text("ca. ${"%.2f".format(o.optDouble("rest_usd"))} $ übrig – Stand ${st?.optString("usd")} $ am ${datumText(st?.optString("datum") ?: "")}, " +
-        "seitdem ${"%.2f".format(o.optDouble("seit_stand_usd"))} $ verbraucht", color = A.green, fontSize = 14.sp, modifier = Modifier.padding(top = 4.dp))
-    Hint(if (admin) "Anthropic meldet Ausgaben, kein Restguthaben – trag ab und zu den Stand aus der Console ein (Billing → Credit balance)."
-        else "Gezählt wird alles, was die Bots über den Pi an Claude schicken (Listenpreise, ohne Steuer). Nutzt du denselben Schlüssel " +
-            "woanders, fehlt das hier. Trag ab und zu den Stand aus der Console ein (Billing → Credit balance) – dann rechnet der Pi „übrig“ weiter.",
-        Modifier.padding(top = 4.dp))
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Field("Guthaben laut Console ($)", stand, number = true, modifier = Modifier.width(200.dp)) { stand = it.replace(',', '.') }
-        Spacer(Modifier.width(10.dp))
-        SideButton("Speichern") { stand.toDoubleOrNull()?.let { vm.claudeStand(it); stand = "" } ?: vm.say("Betrag als Zahl, z. B. 42.50") }
+        color = P.fg2, fontSize = 13.sp)
+    if (auf != null && auf.optDouble("usd", 0.0) > 0) Text("Aufladung: ${"%.2f".format(auf.optDouble("usd"))} $ jeden Monat am ${auf.optInt("tag")}." +
+        (o.optString("naechste_aufladung").takeIf { it.isNotBlank() }?.let { " · nächste am ${datumText(it)}" } ?: ""), color = P.fg2, fontSize = 13.sp)
+
+    if (!bearbeiten) {
+        TextButton({ bearbeiten = true }) { Text(if (st == null) "Guthaben und Aufladung eintragen" else "Guthaben/Aufladung ändern", color = A.accent) }
+        Hint(if (admin) "Ausgaben laut Anthropic (Admin-Schlüssel)." else "Gezählt wird, was die Bots über den Pi an Claude schicken (Listenpreise). " +
+            "Nutzt du denselben Schlüssel woanders, fehlt das hier – dann ab und zu den Startbetrag neu eintragen.")
+        return
+    }
+    Hint("Startbetrag = Guthaben laut Console (Billing) an einem Tag. Ab dann zieht der Pi den Verbrauch ab und rechnet jede Aufladung dazu.")
+    Row {
+        Field("Startbetrag ($)", start, number = true, modifier = Modifier.width(150.dp).padding(end = 8.dp)) { start = it.replace(',', '.') }
+        Field("am (JJJJ-MM-TT)", datum, modifier = Modifier.width(170.dp)) { datum = it.take(10) }
+    }
+    Row {
+        Field("Aufladung ($)", aufUsd, number = true, modifier = Modifier.width(150.dp).padding(end = 8.dp)) { aufUsd = it.replace(',', '.') }
+        Field("am Tag (1–31)", aufTag, number = true, modifier = Modifier.width(170.dp)) { aufTag = it.filter { ch -> ch.isDigit() }.take(2) }
+    }
+    Hint("Aufladung leer lassen, wenn nichts automatisch dazukommt.")
+    val datumOk = Regex("^\\d{4}-\\d{2}-\\d{2}$").matches(datum)
+    Row(Modifier.padding(top = 6.dp)) {
+        MainButton("Speichern", enabled = start.toDoubleOrNull() != null && datumOk && (aufUsd.isBlank() || (aufUsd.toDoubleOrNull() != null && aufTag.toIntOrNull() in 1..31))) {
+            vm.claudeStand(start.toDouble(), datum, aufUsd.toDoubleOrNull(), aufTag.toIntOrNull())
+            bearbeiten = false
+        }
+        Spacer(Modifier.width(8.dp))
+        SideButton("Abbrechen") { bearbeiten = false }
     }
 }
