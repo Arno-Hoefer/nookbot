@@ -85,7 +85,7 @@ ProtectKernelTunables=yes
 ProtectKernelModules=yes
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 MemoryAccounting=yes
-MemoryMax=250M
+MemoryMax=900M
 
 [Install]
 WantedBy=multi-user.target

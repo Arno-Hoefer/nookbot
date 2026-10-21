@@ -213,7 +213,7 @@ def bot_public(b: dict) -> dict:
     cfg = read_json(os.path.join(b["home"], ".picoclaw", "config.json"), {})
     return {k: b.get(k) for k in ("id", "name", "rolle", "farbe", "form", "kapitaen", "zugriffe", "persoenlichkeit", "fokus")} | {"sitzung": bot_session(b["id"]),
         "rechte": rechte(b),
-        "merken": b.get("merken", True),
+        "merken": b.get("merken", True), "stimme": b.get("stimme") or STANDARD_STIMME,
         "modell": bot_model(cfg), "laeuft": unit_active(b["unit"]), "wissen": wissen_list(b["id"])}
 
 
@@ -703,6 +703,8 @@ def update_bot(bid: str, d: dict) -> dict:
             b.pop("rechte", None)  # Schalter an = alles, aus = nichts
         if "merken" in d:
             b["merken"] = bool(d["merken"])
+        if "stimme" in d and (not d["stimme"] or str(d["stimme"]).startswith(("pi:", "handy:"))):
+            b["stimme"] = str(d["stimme"] or "")[:120]
         save_bots(all_b)
     if d.get("modell"):
         set_model(b, str(d["modell"]))
@@ -1135,6 +1137,110 @@ def freigaben_proxy(method: str, p: str, body: dict | None = None) -> dict:
             return json.loads(r.read())
     except urllib.error.HTTPError as e:
         raise ValueError(f"home-mcp antwortet mit {e.code}") from None
+
+
+# ── Stimmen (Piper auf dem Pi) und Aussprache ─────────────────────
+# Piper liegt unter /opt/piper, Stimmen unter /opt/piper/stimmen (einrichtung/8-stimmen.sh). Eine Stimme bleibt geladen
+# (Prozess mit --json-input), damit jeder Satz schnell kommt. Vor dem Sprechen ersetzt das Aussprache-Wörterbuch Namen.
+
+PIPER = os.environ.get("NOOKBOT_PIPER", "/opt/piper")
+STIMMEN = [  # id, Anzeige, Beschreibung, Sprecher (bei Mehrsprecher-Modellen)
+    ("thorsten-high", "Thorsten", "männlich, am natürlichsten", None),
+    ("thorsten-medium", "Thorsten (schnell)", "männlich, etwas einfacher, antwortet flotter", None),
+    ("thorsten_emotional-medium:neutral", "Thorsten ruhig", "männlich, ruhig", "neutral"),
+    ("thorsten_emotional-medium:amused", "Thorsten heiter", "männlich, gut gelaunt", "amused"),
+    ("thorsten_emotional-medium:surprised", "Thorsten überrascht", "männlich, lebhaft", "surprised"),
+    ("thorsten_emotional-medium:whisper", "Thorsten flüsternd", "männlich, leise", "whisper"),
+    ("kerstin-low", "Kerstin", "weiblich", None),
+    ("ramona-low", "Ramona", "weiblich", None),
+    ("eva_k-x_low", "Eva", "weiblich, einfach", None),
+    ("karlsson-low", "Karlsson", "männlich", None),
+    ("pavoque-low", "Pavoque", "männlich", None),
+]
+STANDARD_STIMME = "pi:thorsten-high"
+AUSSPRACHE_START = {"Reacher": "Rietscher", "NookBot": "Nuck-Bot", "Sentry": "Sentri", "Scout": "Skaut", "Forge": "Fordsch",
+                    "Slack": "Släck", "GitLab": "Git-Läb", "Claude": "Klohd", "Ollama": "Olama", "Raspberry Pi": "Räsbärri Pei",
+                    "Pi": "Pei", "Home-MCP": "Hohm M C P", "home-mcp": "Hohm M C P", "Hoefer": "Höfer", "EGYM": "Ie-Dschim",
+                    "Health Connect": "Hels Konnekt", "Google": "Gugel", "Drive": "Draiw", "Sheets": "Schiets", "Docs": "Docks"}
+_piper: dict = {}  # (modell, tempo) → {"p": Popen, "lock": Lock, "zuletzt": t}
+_piper_lock = threading.Lock()
+
+
+def stimmen_liste() -> list:
+    da = set(os.listdir(os.path.join(PIPER, "stimmen"))) if os.path.isdir(os.path.join(PIPER, "stimmen")) else set()
+    return [{"id": "pi:" + i, "name": n, "beschreibung": b} for i, n, b, _ in STIMMEN if f"de_DE-{i.split(':')[0]}.onnx" in da]
+
+
+def aussprache() -> dict:
+    d = read_json(path("aussprache.json"), None)
+    if d is None:
+        d = dict(AUSSPRACHE_START)
+        write_json(path("aussprache.json"), d)
+    return d
+
+
+def aussprache_anwenden(text: str) -> str:
+    for wort, laut in sorted(aussprache().items(), key=lambda x: -len(x[0])):  # längere zuerst („Raspberry Pi“ vor „Pi“)
+        text = re.sub(r"(?<![\w-])" + re.escape(wort) + r"(?![\w-])", laut, text, flags=re.IGNORECASE)
+    return text
+
+
+def _piper_prozess(modell: str, tempo: float) -> dict:
+    with _piper_lock:
+        key = (modell, tempo)
+        pr = _piper.get(key)
+        if pr and pr["p"].poll() is None:
+            pr["zuletzt"] = time.time()
+            return pr
+        for k in list(_piper):  # nur eine Stimme warm halten – Speicher auf dem Pi
+            _piper.pop(k)["p"].kill()
+        p_ = subprocess.Popen([os.path.join(PIPER, "piper"), "-m", os.path.join(PIPER, "stimmen", f"de_DE-{modell}.onnx"),
+                               "--json-input", "--length_scale", f"{tempo:.2f}", "--sentence_silence", "0.15"],
+                              stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, cwd="/tmp", text=True, bufsize=1)
+        pr = {"p": p_, "lock": threading.Lock(), "zuletzt": time.time()}
+        _piper[key] = pr
+        return pr
+
+
+def sprechen(text: str, stimme: str, tempo: float = 1.0) -> bytes:
+    """Ein Stück Text (am besten ein Satz) mit einer Pi-Stimme → WAV-Bytes."""
+    sid = stimme.removeprefix("pi:") or STANDARD_STIMME.removeprefix("pi:")
+    eintrag = next((x for x in STIMMEN if x[0] == sid), None)
+    if not eintrag:
+        raise ValueError("Diese Stimme gibt es nicht.")
+    modell, _, sprecher = sid.partition(":")
+    tempo = min(max(float(tempo or 1.0), 0.6), 1.6)
+    text = aussprache_anwenden(" ".join(str(text).split()))[:1200]
+    if not text:
+        raise ValueError("Kein Text.")
+    ziel = f"/tmp/stimme-{secrets.token_hex(6)}.wav"
+    zeile = {"text": text, "output_file": ziel}
+    if sprecher:
+        cfg = read_json(os.path.join(PIPER, "stimmen", f"de_DE-{modell}.onnx.json"), {})
+        zeile["speaker_id"] = cfg.get("speaker_id_map", {}).get(sprecher, 0)
+    for versuch in (1, 2):
+        pr = _piper_prozess(modell, 1.0 / tempo)  # length_scale: größer = langsamer
+        with pr["lock"]:
+            try:
+                pr["p"].stdin.write(json.dumps(zeile, ensure_ascii=False) + "\n")
+                pr["p"].stdin.flush()
+                antwort = pr["p"].stdout.readline()
+            except (BrokenPipeError, OSError):
+                antwort = ""
+        if antwort.strip() and os.path.exists(ziel):
+            with open(ziel, "rb") as f:
+                data = f.read()
+            os.remove(ziel)
+            return data
+        pr["p"].kill()  # hängt oder ist abgestürzt → einmal neu starten
+    raise ValueError("Die Sprachausgabe auf dem Pi antwortet nicht.")
+
+
+def piper_aufraeumen():
+    with _piper_lock:
+        for k, pr in list(_piper.items()):
+            if time.time() - pr["zuletzt"] > 900:
+                _piper.pop(k)["p"].kill()
 
 
 # ── Gesundheit (Health Connect, vom Handy) ────────────────────────
@@ -1802,6 +1908,8 @@ def watchdog():
             LINKS.cleanup()
         if n % 1800 == 0:
             anhaenge_aufraeumen()
+        if n % 60 == 0:
+            piper_aufraeumen()
 
 
 # ── Runden ─────────────────────────────────────────────────────────
@@ -2810,6 +2918,8 @@ class Handler(BaseHTTPRequestHandler):
             k = katalog(neu=q.get("neu") == "1")
             return self._send(200, {"konten": k["konten"], "db": k["db"], "gitlab": k["gitlab"], "statistik": k["statistik"],
                                     "slack": k["slack"], "kanaele": k["kanaele"]})
+        if p == "/api/stimmen":
+            return self._send(200, {"stimmen": stimmen_liste(), "standard": STANDARD_STIMME, "aussprache": aussprache()})
         if p == "/api/gesundheit/info":
             return self._send(200, gesundheit_info())
         if p == "/api/claude":
@@ -3080,6 +3190,17 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, {"ok": True})
         if p == "/api/gesundheit":
             return self._send(200, gesundheit_speichern(d))
+        if p == "/api/sprechen":
+            data = sprechen(str(d.get("text") or ""), str(d.get("stimme") or STANDARD_STIMME), d.get("tempo") or 1.0)
+            self.send_response(200)
+            self.send_header("Content-Type", "audio/wav")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(data)
+            return None
+        if p == "/api/aussprache/anwenden":
+            return self._send(200, {"text": aussprache_anwenden(str(d.get("text") or ""))})
         if p == "/api/claude/stand":
             claude_stand_setzen(d.get("usd"), d.get("datum"), d.get("aufladung_usd"), d.get("aufladung_tag"))
             return self._send(200, claude_kosten())
@@ -3110,6 +3231,10 @@ class Handler(BaseHTTPRequestHandler):
             if p == "/api/datenbanken":
                 set_db_lib(d)
                 return self._send(200, db_lib())
+            if p == "/api/aussprache":
+                neu = {str(k).strip()[:60]: str(v).strip()[:80] for k, v in (d.get("aussprache") or {}).items() if str(k).strip() and str(v).strip()}
+                write_json(path("aussprache.json"), neu)
+                return self._send(200, {"aussprache": neu})
             if p == "/api/gedaechtnis":
                 return self._send(200, {"eintraege": ged_set(list(d.get("eintraege") or []))})
             m = re.match(r"^/api/ablaeufe/([a-z0-9]+)$", p)
