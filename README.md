@@ -26,11 +26,16 @@ dieselbe Frage beantworten, der Kapitän fasst zusammen. Alles läuft auf einem 
 - **Ein Bot, eine Unterhaltung** – jeder Bot hat Name, Rolle, Farbe, Form, Modell, **Persönlichkeit**, **Fokus** und eigenes **Wissen** (Text- und PDF-Dateien; dazu globales Wissen für alle).
 - **Der Kapitän legt Bots an**: „Leg einen Bot an, der mir jede Woche Rezepte vorschlägt“ – fertig.
 - **Bots arbeiten einander zu** (`bot_fragen`), mit Schutz gegen Endlosketten; **Runden** mit Zusammenfassung.
+- **Aufgaben verteilen**: Der Kapitän gibt bis zu vier Bots gleichzeitig je einen Teilauftrag (`auftraege_verteilen`) und fasst die Ergebnisse zusammen – im Chat als Karte mit dem Stand je Bot.
+- **Gedächtnis**: Bots merken sich Vorlieben und Absprachen (`merken`/`vergessen`) – nur aus den eigenen Nachrichten des Nutzers, nie aus Mails oder Webseiten. Jeder Eintrag erscheint im Chat (mit „Rückgängig“) und ist in der App bearbeitbar.
+- **Abläufe**: „Speicher das als Ablauf“ – der Bot fasst den Weg aus dem Gespräch als Entwurf zusammen; erst nach dem OK in der App wird daraus ein Skill, auf Wunsch auch als Routine geplant.
+- **Kontext lesen**: öffentliche Webseiten und PDFs (`seite_lesen`, ohne Anmeldung, nie Adressen aus Heimnetz oder Tailnet; Seiten, die erst im Browser entstehen, über einen Headless-Browser auf dem Pi).
 - **Schreiben nur mit Freigabe**: Termine, Einladungen und Mail-Entwürfe werden erst ausgeführt, wenn man in der App zustimmt.
 - **Zahlen nur aus SQL**: feste, beschriebene Abfragen (Bereich *Datenbanken* in der App), Rechnen und Prognosen per SQL – das Modell rechnet nicht im Kopf.
 - **Routinen** (ein Bot erledigt etwas zu einer Uhrzeit) und **Erinnerungen** (pünktlich als Wecker auf dem Handy) – beides auch vom Bot selbst angelegt.
 - **Sprachnotizen**: auf dem Handy aufnehmen und **lokal** transkribieren (whisper.cpp) – das Audio verlässt das Gerät nicht.
 - Hell/Dunkel, Schriftgröße, Suche über alle Unterhaltungen, Benachrichtigungen ohne Dauerverbindung.
+- **Web-Oberfläche** für den Rechner: dieselben Unterhaltungen im Browser (nur im Tailnet, gleicher Schlüssel wie die App).
 
 ## Aufbau
 
@@ -46,7 +51,9 @@ App (Kotlin/Compose)  ──HTTPS im Tailnet──▶  nookbot-adapter (Python, 
 ```
 
 - **Bots:** je ein [PicoClaw](https://github.com/sipeed/picoclaw)-Prozess (Go, v0.3.1). Ursprünglich OpenClaw – das brauchte im Leerlauf 1,3 GB RAM, PicoClaw etwa 8 MB.
-- **Adapter** (`pi/adapter/`): speichert jede Nachricht (nichts geht verloren, wenn die App zu ist), liefert Ereignisse per Server-Sent Events, verwaltet Bots, Wissen, Datenbank-Bibliothek, Routinen, Runden und Erinnerungen und stellt den Bots eigene MCP-Werkzeuge bereit (`bot_fragen`, `bot_anlegen`, `routine_anlegen`, `erinnerung_anlegen` …).
+- **Adapter** (`pi/adapter/`): speichert jede Nachricht (nichts geht verloren, wenn die App zu ist), liefert Ereignisse per Server-Sent Events, verwaltet Bots, Wissen, Datenbank-Bibliothek, Routinen, Runden und Erinnerungen und stellt den Bots eigene MCP-Werkzeuge bereit (`bot_fragen`, `auftraege_verteilen`, `bot_anlegen`, `routine_anlegen`, `erinnerung_anlegen`, `seite_lesen`, `merken`,
+  `ablauf_vorschlagen` …). Das Gedächtnis schreibt der Adapter als `memory/MEMORY.md`, bestätigte Abläufe als Skills `ablauf-<id>` –
+  PicoClaw liest beides bei jeder Antwort neu, ohne Neustart. Unter `/` liefert er die Web-Oberfläche (`pi/adapter/web/`).
 - **App** (`android/`): Kotlin + Jetpack Compose, Schlüssel im Android-Keystore, whisper.cpp per NDK (nur arm64).
 
 ### Eigenheiten von PicoClaw, die der Adapter ausgleicht
@@ -54,6 +61,7 @@ App (Kotlin/Compose)  ──HTTPS im Tailnet──▶  nookbot-adapter (Python, 
 - Ohne Drossel schickt PicoClaw bei jedem Zeichen den ganzen Text neu – die Verbindung zum Handy erstickt daran (`streaming.throttle_seconds 1`, `min_growth_chars 60`).
 - „typing.stop“ kommt auch zwischendurch (Werkzeuge, letzter Text danach) – fertig ist eine Antwort erst, wenn die letzte Nachricht Antworttext ist und 3 s Ruhe herrscht.
 - PicoClaws eigener Zeitplaner liefert nur an offene Verbindungen – Zeitpläne laufen deshalb über die Routinen des Adapters.
+- PicoClaw verbindet sich nur beim Start mit MCP-Servern – der Adapter lauscht deshalb, bevor er die Bots (neu) startet.
 
 ## Einrichten
 
