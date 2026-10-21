@@ -1246,12 +1246,25 @@ def piper_aufraeumen():
 # ── Gesundheit (Health Connect, vom Handy) ────────────────────────
 # gesundheit.json: {"tage": {"YYYY-MM-DD": {...}}, "quellen": {paket: n}, "arten": [...], "stand": ts}. Nur Tageswerte, gut ein Jahr.
 
+def gesundheit_verdichten(werte: dict) -> dict:
+    """Häufige Messreihen (z. B. HRV alle 5 Minuten von Fitbit) zu Tageswerten zusammenfassen: Ø, Min, Max, Anzahl."""
+    out = {}
+    for k, v in werte.items():
+        zahlen = [x.get("wert") for x in v if isinstance(x, dict) and isinstance(x.get("wert"), (int, float)) and not isinstance(x.get("wert"), bool)] \
+            if isinstance(v, list) else []
+        if isinstance(v, list) and len(v) > 6 and len(zahlen) == len(v):
+            out[k] = {"avg": round(sum(zahlen) / len(zahlen), 1), "min": min(zahlen), "max": max(zahlen), "anzahl": len(zahlen)}
+        else:
+            out[k] = v
+    return out
+
+
 def gesundheit_speichern(d: dict) -> dict:
     with _lock:
         g = read_json(path("gesundheit.json"), {"tage": {}, "quellen": {}})
         for tag, werte in (d.get("tage") or {}).items():
             if re.match(r"^\d{4}-\d{2}-\d{2}$", tag) and isinstance(werte, dict):
-                g["tage"][tag] = werte  # der Tag kommt immer vollständig neu
+                g["tage"][tag] = gesundheit_verdichten(werte)  # der Tag kommt immer vollständig neu
         for k in sorted(g["tage"])[:-400]:
             g["tage"].pop(k)
         for q, nq in (d.get("quellen") or {}).items():
