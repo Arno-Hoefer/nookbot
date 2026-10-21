@@ -1160,7 +1160,7 @@ STIMMEN = [  # id, Anzeige, Beschreibung, Sprecher (bei Mehrsprecher-Modellen)
 STANDARD_STIMME = "pi:thorsten-high"
 AUSSPRACHE_START = {"Reacher": "Rietscher", "NookBot": "Nuck-Bot", "Sentry": "Sentri", "Scout": "Skaut", "Forge": "Fordsch",
                     "Slack": "Släck", "GitLab": "Git-Läb", "Claude": "Klohd", "Ollama": "Olama", "Raspberry Pi": "Räsbärri Pei",
-                    "Pi": "Pei", "Home-MCP": "Hohm M C P", "home-mcp": "Hohm M C P", "Hoefer": "Höfer", "EGYM": "Ie-Dschim",
+                    "Pi": "Pei", "Home-MCP": "Hohm M C P", "home-mcp": "Hohm M C P", "EGYM": "Ie-Dschim",
                     "Health Connect": "Hels Konnekt", "Google": "Gugel", "Drive": "Draiw", "Sheets": "Schiets", "Docs": "Docks"}
 _piper: dict = {}  # (modell, tempo) → {"p": Popen, "lock": Lock, "zuletzt": t}
 _piper_lock = threading.Lock()

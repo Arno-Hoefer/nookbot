@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit
 import kotlin.reflect.KClass
 
 /**
- * Health Connect → Tageswerte → Pi (nur NookBot, nur im Tailnet). Gelesen wird alles, wofür Arno Lesen erlaubt hat;
+ * Health Connect → Tageswerte → Pi (nur NookBot, nur im Tailnet). Gelesen wird alles, wofür der Nutzer Lesen erlaubt hat;
  * zum Pi gehen zusammengefasste Werte je Tag (Summen, Min/Max/Ø, Schlaf- und Trainingseinheiten, Messungen), keine Minutenreihen.
  */
 object Gesundheit {
