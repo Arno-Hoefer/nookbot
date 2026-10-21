@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import de.hoefer.nookbot.data.WissenDatei
 import de.hoefer.nookbot.data.colorHex
 import org.json.JSONObject
+import kotlinx.coroutines.launch
 
 val WISSEN_MIME = arrayOf("*/*")
 
@@ -65,6 +66,7 @@ fun BotScreen(vm: NookViewModel, id: String?) {
     var fokus by remember(b?.id) { mutableStateOf(b?.fokus ?: "") }
     var rechte by remember(b?.id) { mutableStateOf(org.json.JSONObject((b?.rechte ?: org.json.JSONObject()).toString())) }
     var merken by remember(b?.id) { mutableStateOf(b?.merken ?: true) }
+    var stimme by remember(b?.id) { mutableStateOf(b?.stimme ?: "pi:thorsten-high") }
     val gedaechtnis by vm.gedaechtnis.collectAsState()
     var modellMenu by remember { mutableStateOf(false) }
     var loeschen by remember { mutableStateOf(false) }
@@ -115,6 +117,8 @@ fun BotScreen(vm: NookViewModel, id: String?) {
                 }
             }
 
+            StimmeWahl(vm, name.ifBlank { "dein Bot" }, stimme) { stimme = it }
+
             Section("Persönlichkeit", "Ton und Art – wie er klingt und auftritt.")
             Field("z. B. ruhig, gründlich, direkt; nüchtern und kritisch …", persoenlichkeit, lines = 6) { persoenlichkeit = it }
             Section("Fokus", "Wofür er zuständig ist und worauf er achtet. Der Kapitän sieht das und gibt passende Aufträge weiter.")
@@ -152,7 +156,7 @@ fun BotScreen(vm: NookViewModel, id: String?) {
                 MainButton(if (saving) "Speichere …" else if (neu) "Bot anlegen" else "Speichern", enabled = name.isNotBlank() && !saving) {
                     saving = true
                     val d = JSONObject().put("name", name).put("rolle", rolle).put("farbe", colorHex(farbe)).put("form", form).put("modell", modell)
-                        .put("persoenlichkeit", persoenlichkeit).put("fokus", fokus).put("rechte", rechte).put("merken", merken)
+                        .put("persoenlichkeit", persoenlichkeit).put("fokus", fokus).put("rechte", rechte).put("merken", merken).put("stimme", stimme)
                     vm.saveBot(id, d) { saving = false; vm.back() }
                 }
                 Spacer(Modifier.width(10.dp))
@@ -273,4 +277,36 @@ fun RechteWahl(vm: NookViewModel, r: org.json.JSONObject, onChange: (org.json.JS
     schalter("📦 Pakete (aus Home)", "pakete")
     schalter("❤️ Gesundheit (Health Connect)", "gesundheit")
     Hint("Gesundheit gehört nie zu „Alles“ – nur mit eigenem Häkchen.")
+}
+
+
+/** Stimme im Sprachmodus: Pi-Stimmen (Piper) oder Android-Stimmen, mit Hörprobe. */
+@Composable
+fun StimmeWahl(vm: NookViewModel, name: String, stimme: String, onChange: (String) -> Unit) {
+    val ctx = LocalContext.current
+    val st by vm.stimmen.collectAsState()
+    val vorleser = remember { Vorleser(ctx, vm) }
+    var handy by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+    var menu by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(Unit) { handy = vorleser.handyStimmen() }
+    DisposableEffect(Unit) { onDispose { vorleser.close() } }
+    val pi = st?.optJSONArray("stimmen")?.let { a -> (0 until a.length()).map { a.getJSONObject(it) } } ?: emptyList()
+    val anzeige = pi.firstOrNull { it.optString("id") == stimme }?.optString("name")?.let { "$it (Pi)" }
+        ?: stimme.removePrefix("handy:").takeIf { stimme.startsWith("handy:") }?.let { "Handy: $it" } ?: stimme
+    Section("Stimme", "Für den Sprachmodus. Pi-Stimmen klingen natürlicher; Namen spricht das Aussprache-Wörterbuch (Einstellungen) richtig aus.")
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box {
+            OutlinedButton(onClick = { menu = true }, shape = RoundedCornerShape(12.dp)) { Text("$anzeige  ▾", color = P.fg) }
+            DropdownMenu(menu, { menu = false }, containerColor = P.card, modifier = Modifier.heightIn(max = 420.dp)) {
+                DropdownMenuItem({ Text("Auf dem Pi (Piper)", color = P.mut, fontSize = 12.sp) }, {}, enabled = false)
+                pi.forEach { v -> DropdownMenuItem({ Column { Text(v.optString("name"), color = P.fg); Text(v.optString("beschreibung"), color = P.mut, fontSize = 12.sp) } },
+                    { onChange(v.optString("id")); menu = false }) }
+                if (handy.isNotEmpty()) DropdownMenuItem({ Text("Auf dem Handy (Android)", color = P.mut, fontSize = 12.sp) }, {}, enabled = false)
+                handy.forEach { (n, info) -> DropdownMenuItem({ Text(info, color = P.fg, fontSize = 14.sp) }, { onChange("handy:$n"); menu = false }) }
+            }
+        }
+        Spacer(Modifier.width(8.dp))
+        SideButton("▶ Probe") { scope.launch { vorleser.stopp(); vorleser.sprechen("Hallo, ich bin $name. So klinge ich im Sprachmodus.", stimme) } }
+    }
 }

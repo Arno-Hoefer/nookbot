@@ -73,6 +73,20 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
     val wissenGlobal = MutableStateFlow<List<WissenDatei>>(emptyList())
     val modelle = MutableStateFlow<List<String>>(emptyList())
     val claudeModelle = MutableStateFlow<List<String>>(emptyList())
+    /** Pi-Stimmen und Aussprache-Wörterbuch (GET /api/stimmen) */
+    val stimmen = MutableStateFlow<JSONObject?>(null)
+
+    fun loadStimmen() = viewModelScope.launch(Dispatchers.IO) { runCatching { stimmen.value = api.get("/api/stimmen") } }
+
+    fun ausspracheSpeichern(m: Map<String, String>) = io {
+        api.put("/api/aussprache", JSONObject().put("aussprache", JSONObject(m as Map<*, *>)))
+        stimmen.value = api.get("/api/stimmen")
+        toast.value = "Aussprache gespeichert"
+    }
+
+    /** Ein Satz mit einer Pi-Stimme als WAV (für Sprachmodus und Hörprobe). */
+    fun piSprechen(text: String, stimme: String): ByteArray = api.postBytes("/api/sprechen", JSONObject().put("text", text).put("stimme", stimme))
+
     /** Was der eine home-mcp-Schlüssel darf – daraus wählt man je Bot aus. */
     val rechteKatalog = MutableStateFlow<JSONObject?>(null)
 
@@ -111,7 +125,8 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
             Route.Datenbanken -> loadDatenbanken()
             Route.Wissen -> loadWissen()
             Route.Zugriffe -> loadZugriffe()
-            is Route.BotEdit -> { loadModelle(); loadRechte() }
+            is Route.BotEdit -> { loadModelle(); loadRechte(); loadStimmen() }
+            Route.Settings -> loadStimmen()
             else -> {}
         }
     }

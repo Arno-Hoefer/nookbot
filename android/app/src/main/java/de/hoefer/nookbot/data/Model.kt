@@ -10,13 +10,15 @@ data class Bot(
     val wissen: List<WissenDatei>, val sitzung: String = "", val merken: Boolean = true,
     /** Zugriffe im Einzelnen (vom Adapter): mail/kalender/drive = Konten, slack…, gitlab, db, statistik, pakete; „alle“ = alles */
     val rechte: JSONObject = JSONObject(),
+    /** Stimme im Sprachmodus: „pi:thorsten-high“ (Piper auf dem Pi) oder „handy:<Name der Android-Stimme>“ */
+    val stimme: String = "pi:thorsten-high",
 ) {
     companion object {
         fun from(o: JSONObject) = Bot(
             o.optString("id"), o.optString("name"), o.optString("rolle"), parseColor(o.optString("farbe")), o.optString("form", "kreis"),
             o.optBoolean("kapitaen"), o.optBoolean("zugriffe"), o.optString("persoenlichkeit"), o.optString("fokus"),
             o.optString("modell"), o.optBoolean("laeuft"), WissenDatei.list(o.optJSONArray("wissen")), o.optString("sitzung"),
-            o.optBoolean("merken", true), o.optJSONObject("rechte") ?: JSONObject(),
+            o.optBoolean("merken", true), o.optJSONObject("rechte") ?: JSONObject(), o.optString("stimme", "pi:thorsten-high").ifBlank { "pi:thorsten-high" },
         )
     }
 }

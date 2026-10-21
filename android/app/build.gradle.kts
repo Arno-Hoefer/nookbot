@@ -20,8 +20,8 @@ android {
         applicationId = "de.hoefer.nookbot"
         minSdk = 29
         targetSdk = 36
-        versionCode = 17
-        versionName = "0.8.2"
+        versionCode = 18
+        versionName = "0.9.0"
         buildConfigField("String", "SERVER", "\"${lokal.getProperty("nookbot.server", "")}\"")
         buildConfigField("String", "MCP", "\"${lokal.getProperty("nookbot.mcp", "")}\"")
         // Sprachnotizen: whisper.cpp lokal auf dem Handy (wie in Echo), nur 64-bit-ARM
@@ -47,7 +47,14 @@ android {
             // Zum Selbstinstallieren: Debug-Schlüssel dieses Macs (bleibt gleich, Updates gehen also)
             signingConfig = signingConfigs.getByName("debug")
         }
+        // Prüfversion: genau wie Release (R8, verkürzte Namen), aber mit Klartext für den Demo-Adapter im Emulator –
+        // damit Fehler, die nur in der Release-Version auftreten (z. B. JNI-Namen), vor dem Verschicken auffallen.
+        create("pruefung") {
+            initWith(getByName("release"))
+            matchingFallbacks += listOf("release")
+        }
     }
+    sourceSets.getByName("pruefung").manifest.srcFile("src/debug/AndroidManifest.xml")
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17

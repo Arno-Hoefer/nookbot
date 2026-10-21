@@ -2,8 +2,6 @@ package de.hoefer.nookbot.ui
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.speech.tts.TextToSpeech
-import android.speech.tts.UtteranceProgressListener
 import android.view.WindowManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -43,11 +41,8 @@ import de.hoefer.nookbot.whisper.WhisperSitzung
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
-import java.util.Locale
-import kotlin.coroutines.resume
 
 private enum class Phase { Laden, Hoert, Versteht, Denkt, Spricht, Stumm }
 
@@ -70,12 +65,13 @@ fun Sprachmodus(vm: NookViewModel, sid: String, b: Bot?, onClose: () -> Unit) {
     val perm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok -> erlaubt = ok; if (!ok) fehler = "Ohne Mikrofon geht der Sprachmodus nicht." }
     val modell = remember(fortschritt) { WhisperModels.installedPreferred(ctx) }
     val aufnahme = remember { Sprachaufnahme { level = it } }
-    val tts = remember { Vorleser(ctx) }
+    val tts = remember { Vorleser(ctx, vm) }
     val botFarbe = b?.let { Color(it.farbe) } ?: A.accent
     val name = b?.name ?: "Bot"
 
     // Bildschirm anlassen, solange der Sprachmodus offen ist
     val view = LocalView.current
+    LaunchedEffect(Unit) { vm.loadStimmen() }
     DisposableEffect(Unit) {
         view.keepScreenOn = true
         onDispose { view.keepScreenOn = false; aufnahme.abbrechen(); tts.close() }
@@ -107,7 +103,7 @@ fun Sprachmodus(vm: NookViewModel, sid: String, b: Bot?, onClose: () -> Unit) {
                 }
                 val antwort = vm.msgs.value.drop(vorher).lastOrNull { it.role == "bot" && it.text.isNotBlank() }?.text ?: continue
                 phase = Phase.Spricht
-                tts.sprechen(sprechtext(antwort)) { zeile = it }
+                tts.sprechen(sprechtext(antwort), b?.stimme ?: "pi:thorsten-high") { zeile = it }
             }
         } finally {
             withContext(Dispatchers.IO + kotlinx.coroutines.NonCancellable) { w.close() }
@@ -226,43 +222,3 @@ fun sprechtext(md: String): String {
     return t
 }
 
-/** Android-Sprachausgabe (Deutsch, auf dem Gerät) – Satz für Satz, damit die Anzeige mitläuft und Unterbrechen sofort greift. */
-private class Vorleser(ctx: android.content.Context) {
-    @Volatile private var bereit = false
-    private var aktuell: ((Boolean) -> Unit)? = null
-    private lateinit var tts: TextToSpeech
-
-    init {
-        tts = TextToSpeech(ctx) { status ->
-            if (status == TextToSpeech.SUCCESS) {
-                tts.language = Locale.GERMANY
-                tts.setSpeechRate(1.05f)
-                bereit = true
-            }
-        }
-        tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-            override fun onStart(id: String?) {}
-            override fun onDone(id: String?) { aktuell?.invoke(true) }
-            @Deprecated("alt") override fun onError(id: String?) { aktuell?.invoke(false) }
-            override fun onStop(id: String?, interrupted: Boolean) { aktuell?.invoke(false) }
-        })
-    }
-
-    suspend fun sprechen(text: String, onSatz: (String) -> Unit) {
-        withTimeoutOrNull(3000) { while (!bereit) delay(100) } ?: return
-        val saetze = text.split(Regex("(?<=[.!?:])\\s+|\\n+")).map { it.trim() }.filter { it.isNotEmpty() }
-        for ((i, satz) in saetze.withIndex()) {
-            onSatz(satz)
-            val weiter = suspendCancellableCoroutine { cont ->
-                aktuell = { ok -> aktuell = null; if (cont.isActive) cont.resume(ok) }
-                tts.speak(satz, TextToSpeech.QUEUE_FLUSH, null, "s$i")
-                cont.invokeOnCancellation { tts.stop() }
-            }
-            if (!weiter) return
-        }
-    }
-
-    fun stopp() { tts.stop(); aktuell?.invoke(false) }
-
-    fun close() { runCatching { tts.stop(); tts.shutdown() } }
-}

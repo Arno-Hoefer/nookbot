@@ -2015,7 +2015,11 @@ def run_routine(r: dict):
     write_json(path("routinen.json"), lst)
     EV.emit({"t": "routinen"})
     stamp = time.strftime("%a %d.%m. %H:%M")
-    threading.Thread(target=lambda: ask_sync(s["bot"], sid, f"[Routine „{r['name']}“, {stamp}]\n\n{r['auftrag']}"), daemon=True).start()
+    # Im Chat nur eine kleine Zeile – den vollständigen Auftrag bekommt der Bot, ohne dass er als Nachricht erscheint
+    SESS.upsert(sid, {"id": "rt-" + secrets.token_hex(4), "role": "info", "art": "routine", "ts": time.time(), "bot": s["bot"],
+                      "text": f"⏰ Routine „{r['name']}“ · {stamp}"})
+    threading.Thread(target=lambda: ask_sync(s["bot"], sid, f"[Routine „{r['name']}“, {stamp}]\n\n{r['auftrag']}", as_user=False),
+                     daemon=True).start()
 
 
 def scheduler():

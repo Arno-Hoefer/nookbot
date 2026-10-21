@@ -489,6 +489,7 @@ fun SettingsScreen(vm: NookViewModel) {
             }
             ClaudeBereich(vm)
             GesundheitBereich(vm)
+            AusspracheBereich(vm)
 
             Section("Pi (NookBot-Adapter)")
             Field("Adresse", server) { server = it }
@@ -850,4 +851,36 @@ fun quelleName(p: String): String = when {
     p.startsWith("com.google.android.apps.healthdata") -> "Health Connect"
     p == "android" || p.isBlank() -> "Handy"
     else -> p
+}
+
+
+// ── Aussprache-Wörterbuch ─────────────────────────────────────────
+
+@Composable
+private fun AusspracheBereich(vm: NookViewModel) {
+    val st by vm.stimmen.collectAsState()
+    val a = st?.optJSONObject("aussprache")
+    var liste by remember(a?.toString()) { mutableStateOf(a?.keys()?.asSequence()?.map { it to a.optString(it) }?.sortedBy { it.first.lowercase() }?.toList() ?: emptyList()) }
+    var wort by remember { mutableStateOf("") }
+    var laut by remember { mutableStateOf("") }
+    var offen by remember { mutableStateOf(false) }
+    Section("Aussprache", "Wie Namen im Sprachmodus gesprochen werden – „Reacher“ → „Rietscher“. Gilt für alle Stimmen.")
+    if (a == null) { Hint("lade …"); return }
+    TextButton({ offen = !offen }) { Text(if (offen) "Liste zuklappen" else "${liste.size} Einträge ansehen/ändern", color = A.accent) }
+    if (!offen) return
+    liste.forEach { (w, l) ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(w, color = P.fg, fontSize = 14.sp, modifier = Modifier.weight(1f))
+            Text("→ $l", color = P.fg2, fontSize = 14.sp, modifier = Modifier.weight(1f))
+            TextButton({ liste = liste.filterNot { it.first == w }; vm.ausspracheSpeichern(liste.toMap()) }) { Text("✕", color = P.mut) }
+        }
+    }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Field("Wort", wort, modifier = Modifier.weight(1f).padding(end = 6.dp)) { wort = it }
+        Field("so sprechen", laut, modifier = Modifier.weight(1f)) { laut = it }
+    }
+    SideButton("Hinzufügen") {
+        if (wort.isNotBlank() && laut.isNotBlank()) { liste = liste.filterNot { it.first.equals(wort.trim(), true) } + (wort.trim() to laut.trim()); vm.ausspracheSpeichern(liste.toMap()); wort = ""; laut = "" }
+    }
+    Hint("Tipp: so schreiben, wie man es auf Deutsch lesen würde – „Släck“, „Klohd“, „Git-Läb“. In der Bot-Einstellung mit „▶ Probe“ anhören.")
 }
