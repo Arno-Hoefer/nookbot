@@ -98,6 +98,7 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         if (settings.configured) connect()
+        viewModelScope.launch(Dispatchers.IO) { runCatching { de.hoefer.nookbot.Absturz.melden(getApplication()) } }
         refreshFreigaben()
     }
 
@@ -326,6 +327,7 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
     val modellFortschritt = MutableStateFlow<Float?>(null)
 
     fun modellLaden(m: de.hoefer.nookbot.whisper.WhisperModel) = viewModelScope.launch {
+        if (modellFortschritt.value != null) return@launch  // läuft schon – zwei Downloads in dieselbe Datei machen sie kaputt
         modellFortschritt.value = 0f
         runCatching { de.hoefer.nookbot.whisper.WhisperModels.download(getApplication(), m) { modellFortschritt.value = it } }
             .onSuccess { toast.value = "Sprachmodell geladen" }.onFailure { toast.value = it.message }

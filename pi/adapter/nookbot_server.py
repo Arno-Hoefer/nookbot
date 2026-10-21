@@ -3071,6 +3071,13 @@ class Handler(BaseHTTPRequestHandler):
         m = re.match(r"^/api/freigaben/([A-Za-z0-9-]+)$", p)
         if m:
             return self._send(200, freigaben_proxy("POST", f"/app/freigaben/{m.group(1)}", {"entscheidung": d.get("entscheidung")}))
+        if p == "/api/absturz":  # Absturzberichte der App (ohne Chat-Inhalte) – zum Nachsehen auf dem Pi
+            with _lock:
+                lst = read_json(path("abstuerze.json"), [])
+                lst = (lst + [dict(d, empfangen=time.strftime("%Y-%m-%d %H:%M:%S"))])[-30:]
+                write_json(path("abstuerze.json"), lst)
+            log("Absturzbericht der App:", d.get("geraet"), d.get("app"), [b.get("art") for b in d.get("berichte", [])])
+            return self._send(200, {"ok": True})
         if p == "/api/gesundheit":
             return self._send(200, gesundheit_speichern(d))
         if p == "/api/claude/stand":

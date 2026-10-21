@@ -40,6 +40,7 @@ object WhisperModels {
         val target = file(context, m)
         val part = File(dir(context), m.fileName + ".part")
         var have = if (part.exists()) part.length() else 0L
+        if (have > m.sizeBytes) { part.delete(); have = 0L }  // kaputter Rest (z. B. zwei Downloads gleichzeitig)
 
         var conn = open(m.url, have)
         // Huggingface leitet auf ein CDN weiter; HttpURLConnection folgt Weiterleitungen nicht über Hosts hinweg.

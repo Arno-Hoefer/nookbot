@@ -379,7 +379,12 @@ fun ChatScreen(vm: NookViewModel, sid: String) {
                     if (diktat != null) Box(Modifier.size((30 + diktatPegel * 12).dp).clip(CircleShape).background(A.accent)
                         .clickable { diktatStopp() }, contentAlignment = Alignment.Center) { Text("■", color = Color.White, fontSize = 14.sp) }
                     else if (notizStatus != null) CircularProgressIndicator(Modifier.size(20.dp), color = A.accent, strokeWidth = 2.dp)
-                    else Text("🎙", fontSize = 18.sp, modifier = Modifier.clip(CircleShape).clickable {
+                    else Text("🎙", fontSize = 18.sp, modifier = Modifier.clip(CircleShape).combinedClickable(
+                        onLongClick = {
+                            // Nur Entwicklerversion: Testaufnahme aus dem Cache umwandeln (Emulator hat kein Mikrofon)
+                            val t = java.io.File(ctx.cacheDir, "test.wav")
+                            if (de.hoefer.nookbot.BuildConfig.DEBUG && t.exists()) { t.copyTo(diktatWav, true); vm.transkribieren(diktatWav) { x -> input = x } }
+                        }) {
                         if (ctx.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED) diktatStart()
                         else mikroErlaubnis.launch(android.Manifest.permission.RECORD_AUDIO)
                     }.padding(8.dp))
@@ -551,7 +556,9 @@ private fun MessageView(m: Msg, from: de.hoefer.nookbot.data.Bot?) {
             Text(toolLine(m.text), color = P.fg2, fontSize = 13.sp, modifier = Modifier.padding(start = 6.dp))
         }
         "error" -> Text("⚠ ${m.text}", color = A.accent, fontSize = 13.sp, modifier = Modifier.padding(vertical = 6.dp))
-        else -> if (m.text.isNotBlank()) Column(Modifier.padding(vertical = 8.dp)) {
+        else -> if (m.text.isNotBlank()) Column(Modifier.padding(vertical = 6.dp).padding(end = 28.dp)
+            .clip(RoundedCornerShape(18.dp, 18.dp, 18.dp, 4.dp)).background(P.card).border(1.dp, P.line, RoundedCornerShape(18.dp, 18.dp, 18.dp, 4.dp))
+            .padding(horizontal = 14.dp, vertical = 10.dp)) {
             if (from != null || m.zusammenfassung) Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 4.dp)) {
                 BotFigure(from, 22.dp)
                 Text((from?.name ?: "") + if (m.zusammenfassung) " · Zusammenfassung" else "", color = P.fg2, fontSize = 13.sp,
