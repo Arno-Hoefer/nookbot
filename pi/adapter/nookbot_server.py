@@ -395,6 +395,77 @@ def restart_bot(b: dict):
 # Ein Bot mit Claude-Modell bekommt in seiner PicoClaw-Konfiguration den Eintrag „claude“ (provider anthropic).
 
 CLAUDE_MODELLE = ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "claude-fable-5-1"]
+CLAUDE_API = "https://api.anthropic.com"
+# Listenpreise in $ je Million Tokens (Stand 10/2026): Eingabe, Ausgabe, Cache-Lesen. Cache-Schreiben = 1,25 × Eingabe (5 min) bzw. 2 × (1 h).
+CLAUDE_PREISE = {"claude-fable-5-1": (10.0, 50.0, 0.25), "claude-opus-5-5": (4.0, 20.0, 0.20), "claude-sonnet-5-5": (2.0, 10.0, 0.20),
+                 "claude-haiku-5-5": (0.10, 0.50, 0.01)}
+
+
+def claude_preis(model: str, u: dict) -> float:
+    """Kosten einer Antwort in $ aus ihrem usage-Block (Listenpreise; Haiku über 100K Eingabe teurer)."""
+    p = next((v for k, v in CLAUDE_PREISE.items() if str(model).startswith(k)), (4.0, 20.0, 0.20))
+    ein, aus, lesen = p
+    cc = u.get("cache_creation") or {}
+    c5, c60 = cc.get("ephemeral_5m_input_tokens"), cc.get("ephemeral_1h_input_tokens")
+    if c5 is None and c60 is None:
+        c5, c60 = u.get("cache_creation_input_tokens") or 0, 0
+    eingabe = (u.get("input_tokens") or 0) + (u.get("cache_read_input_tokens") or 0) + (c5 or 0) + (c60 or 0)
+    if str(model).startswith("claude-haiku-5-5") and eingabe > 100_000:
+        ein, aus, lesen = 0.50, 2.50, 0.05
+    return ((u.get("input_tokens") or 0) * ein + (u.get("output_tokens") or 0) * aus + (u.get("cache_read_input_tokens") or 0) * lesen
+            + (c5 or 0) * ein * 1.25 + (c60 or 0) * ein * 2) / 1_000_000
+
+
+def usage_von_openai(u: dict) -> dict:
+    """usage der OpenAI-kompatiblen Schnittstelle (die PicoClaw nutzt) → Felder wie bei der Messages API."""
+    cached = ((u.get("prompt_tokens_details") or {}).get("cached_tokens")) or 0
+    return {"input_tokens": max(0, (u.get("prompt_tokens") or 0) - cached), "cache_read_input_tokens": cached,
+            "output_tokens": u.get("completion_tokens") or 0}
+
+
+def claude_anpassen(body: bytes, openai: bool = False) -> bytes:
+    """PicoClaw (anthropic-sdk-go, Stand Juli 2026) schickt Angaben, die die aktuellen Modelle ablehnen – hier glätten:
+    keine Sampling-Parameter, kein abgeschaltetes/budgetiertes Denken, keine erzwungene Werkzeugwahl."""
+    try:
+        o = json.loads(body or b"{}")
+    except ValueError:
+        return body
+    if not isinstance(o, dict) or not str(o.get("model", "")).startswith("claude-"):
+        return body
+    for k in ("temperature", "top_p", "top_k"):
+        o.pop(k, None)
+    if openai and o.get("stream"):  # Verbrauch im letzten Block anfordern
+        o["stream_options"] = {**(o.get("stream_options") if isinstance(o.get("stream_options"), dict) else {}), "include_usage": True}
+    th = o.get("thinking")
+    if isinstance(th, dict) and th.get("type") in ("disabled", "enabled"):
+        o.pop("thinking")  # Standard ist adaptives Denken
+    tc = o.get("tool_choice")
+    if isinstance(tc, dict) and tc.get("type") in ("any", "tool"):
+        o["tool_choice"] = {"type": "auto", **({"disable_parallel_tool_use": tc["disable_parallel_tool_use"]}
+                                              if "disable_parallel_tool_use" in tc else {})}
+    return json.dumps(o, ensure_ascii=False).encode()
+
+
+def claude_buchen(model: str, u: dict, bid: str = ""):
+    """Verbrauch einer Antwort festhalten: je Tag und Modell Tokens und Kosten (claude_verbrauch.json)."""
+    usd = claude_preis(model, u)
+    tag = time.strftime("%Y-%m-%d")
+    with _lock:
+        d = read_json(path("claude_verbrauch.json"), {})
+        t = d.setdefault(tag, {}).setdefault(model or "?", {"anfragen": 0, "ein": 0, "aus": 0, "cache": 0, "usd": 0.0})
+        t["anfragen"] += 1
+        t["ein"] += (u.get("input_tokens") or 0) + (u.get("cache_creation_input_tokens") or 0)
+        t["cache"] += u.get("cache_read_input_tokens") or 0
+        t["aus"] += u.get("output_tokens") or 0
+        t["usd"] = round(t["usd"] + usd, 6)
+        for alt in sorted(d)[:-400]:  # gut ein Jahr reicht
+            d.pop(alt)
+        write_json(path("claude_verbrauch.json"), d)
+
+
+def claude_verbrauch(seit: str) -> float:
+    d = read_json(path("claude_verbrauch.json"), {})
+    return sum(m["usd"] for tag, ms in d.items() if tag >= seit for m in ms.values())
 
 
 def claude_conf() -> dict:
@@ -418,7 +489,7 @@ def set_model(b: dict, model: str):
         if not e:
             e = {"model_name": "claude", "provider": "anthropic", "request_timeout": 300, "streaming": {"enabled": True}}
             ml.append(e)
-        e.update(model=model, api_keys=[key])
+        e.update(model=model, api_keys=[key], api_base=f"http://127.0.0.1:{PORT}/anthropic/v1")  # über den Adapter → Verbrauch
         d.update(model_name="claude", provider="anthropic")
     else:
         e = next((m for m in ml if m.get("provider") == "ollama" and m.get("model_name") != "flash"), None) or \
@@ -437,8 +508,9 @@ def claude_schluessel_verteilen():
         cfgp = bot_cfg_path(b)
         cfg = read_json(cfgp, {})
         e = next((m for m in cfg.get("model_list", []) if m.get("model_name") == "claude"), None)
-        if e and key and e.get("api_keys") != [key]:
-            e["api_keys"] = [key]
+        base = f"http://127.0.0.1:{PORT}/anthropic/v1"
+        if e and key and (e.get("api_keys") != [key] or e.get("api_base") != base):
+            e.update(api_keys=[key], api_base=base)
             write_json(cfgp, cfg)
             restart_bot(b)
 
@@ -448,9 +520,17 @@ def claude_kosten() -> dict:
     import datetime as dt
     c = claude_conf()
     out = {"eingerichtet": bool(c.get("api_key")), "kosten": bool(c.get("admin_key")), "stand": c.get("stand")}
+    heute = dt.date.today()
+    # Eigene Zählung (alles, was die Bots über den Adapter an Claude schicken) – geht ohne Admin-Schlüssel
+    st = c.get("stand") or {}
+    out["eigen_monat_usd"] = round(claude_verbrauch(heute.replace(day=1).isoformat()), 4)
+    out["eigen_heute_usd"] = round(claude_verbrauch(heute.isoformat()), 4)
+    if st.get("usd") is not None and not c.get("admin_key"):
+        seit = round(claude_verbrauch(str(st.get("datum"))[:10]), 4)
+        out["seit_stand_usd"] = seit
+        out["rest_usd"] = round(float(st["usd"]) - seit, 2)
     if not c.get("admin_key"):
         return out
-    heute = dt.date.today()
     monat = heute.replace(day=1)
     stand = c.get("stand") or {}
     try:
@@ -2158,8 +2238,95 @@ class Handler(BaseHTTPRequestHandler):
         finally:
             EV.clients -= 1
 
+    def _claude_proxy(self, p: str):
+        """Claude-Anfragen der Bots durchreichen und den Verbrauch aus usage mitschreiben (nur mit dem eigenen Schlüssel)."""
+        key = claude_conf().get("api_key") or ""
+        got = self.headers.get("x-api-key") or self.headers.get("Authorization", "").removeprefix("Bearer ").strip()
+        if not key or not hmac.compare_digest(got.encode(), key.encode()):
+            time.sleep(0.3)
+            return self._send(401, {"type": "error", "error": {"type": "authentication_error", "message": "unbekannter Schlüssel"}})
+        n_ = int(self.headers.get("Content-Length") or 0)
+        body = self.rfile.read(n_) if 0 < n_ < 40_000_000 else b""
+        ziel = "/v1/" + p.split("/v1/", 1)[1] if "/v1/" in p else "/v1/messages"
+        openai = ziel.rstrip("/").endswith("/chat/completions")
+        body = claude_anpassen(body, openai)
+        q = self.path.split("?", 1)[1] if "?" in self.path else ""
+        hdr = {k: v for k, v in self.headers.items() if k.lower() in ("x-api-key", "authorization", "anthropic-version", "anthropic-beta",
+                                                                       "content-type", "accept", "user-agent")}
+        req = urllib.request.Request(CLAUDE_API + ziel + (("?" + q) if q else ""), data=body, method="POST", headers=hdr)
+        try:
+            model = json.loads(body or b"{}").get("model", "")
+        except ValueError:
+            model = ""
+        try:
+            r = urllib.request.urlopen(req, timeout=900)
+        except urllib.error.HTTPError as e:
+            data = e.read()
+            self.send_response(e.code)
+            for k in ("Content-Type", "retry-after", "request-id"):
+                if e.headers.get(k):
+                    self.send_header(k, e.headers[k])
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+            return
+        except urllib.error.URLError as e:
+            return self._send(502, {"type": "error", "error": {"type": "api_error", "message": f"Anthropic nicht erreichbar: {e.reason}"}})
+        zaehlen = openai or ziel.rstrip("/").endswith("/messages")  # count_tokens & Co. kosten nichts
+        with r:
+            ct = r.headers.get("Content-Type", "")
+            self.send_response(r.status)
+            for k, v in r.headers.items():
+                if k.lower() in ("content-type", "request-id", "anthropic-ratelimit-requests-remaining", "anthropic-ratelimit-tokens-remaining"):
+                    self.send_header(k, v)
+            if "event-stream" not in ct:
+                data = r.read()
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+                if zaehlen:
+                    try:
+                        o = json.loads(data)
+                        u = o.get("usage") or {}
+                        claude_buchen(o.get("model") or model, usage_von_openai(u) if openai else u)
+                    except (ValueError, AttributeError):
+                        pass
+                return
+            # Streaming: Ereignisse sofort weiterreichen; usage steckt in message_start (Eingabe) und message_delta (Ausgabe, kumuliert)
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.close_connection = True
+            usage, m_ = {}, model
+            for line in r:
+                self.wfile.write(line)
+                if line.startswith(b"\n") or line == b"\r\n":
+                    self.wfile.flush()
+                if zaehlen and line.startswith(b"data: ") and b"usage" in line:
+                    try:
+                        ev = json.loads(line[6:])
+                    except ValueError:
+                        continue
+                    if openai:
+                        if ev.get("usage"):
+                            usage = usage_von_openai(ev["usage"])
+                            m_ = ev.get("model") or m_
+                    elif ev.get("type") == "message_start":
+                        m_ = ev.get("message", {}).get("model") or m_
+                        usage.update({k: v for k, v in (ev.get("message", {}).get("usage") or {}).items() if v is not None})
+                    elif ev.get("type") == "message_delta":
+                        usage.update({k: v for k, v in (ev.get("usage") or {}).items() if v is not None})
+            self.wfile.flush()
+            if zaehlen and usage:
+                claude_buchen(m_, usage)
+
     def do_POST(self):  # noqa: N802
         p = self.path.split("?")[0]
+        if p.startswith("/anthropic/"):
+            # Nur die Bots auf dem Pi: tailscale serve reicht Tailnet-Anfragen ebenfalls über 127.0.0.1 weiter, setzt aber X-Forwarded-For
+            if self.client_address[0] != "127.0.0.1" or self.headers.get("X-Forwarded-For") or self.headers.get("Tailscale-User-Login"):
+                return self._send(403, {"error": "nur lokal"})
+            return self._claude_proxy(p)
         m = re.match(r"^/mcp/([a-z0-9-]+)$", p)
         if m:
             if not self._auth(conf()["mcp_token"]):
