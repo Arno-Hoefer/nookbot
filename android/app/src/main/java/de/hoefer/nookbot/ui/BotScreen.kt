@@ -66,6 +66,7 @@ fun readTextFile(ctx: Context, uri: Uri, max: Int = 300_000): Result<Pair<String
 fun BotScreen(vm: NookViewModel, id: String?) {
     val bots by vm.bots.collectAsState()
     val modelle by vm.modelle.collectAsState()
+    val claudeModelle by vm.claudeModelle.collectAsState()
     val b = bots.firstOrNull { it.id == id }
     val neu = id == null
     var name by remember(b?.id) { mutableStateOf(b?.name ?: "") }
@@ -110,13 +111,19 @@ fun BotScreen(vm: NookViewModel, id: String?) {
                 }
             }
 
-            Section("Modell", "Läuft über Ollama Pro. Größere Modelle denken gründlicher, „flash“-Modelle sind schneller.")
+            Section("Modell", "Ollama Pro (Pauschale) oder Claude (nach Verbrauch, eigener Schlüssel auf dem Pi). " +
+                "Größere Modelle denken gründlicher, „flash“/Haiku sind schneller und günstiger.")
             Box {
                 OutlinedButton(onClick = { modellMenu = true; if (modelle.isEmpty()) vm.loadModelle() }, shape = RoundedCornerShape(12.dp)) {
                     Text(modell.ifBlank { "Modell wählen" } + "  ▾", color = P.fg)
                 }
                 DropdownMenu(modellMenu, { modellMenu = false }, containerColor = P.card, modifier = Modifier.heightIn(max = 380.dp)) {
-                    if (modelle.isEmpty()) DropdownMenuItem({ Text("lade …", color = P.mut) }, {})
+                    if (modelle.isEmpty() && claudeModelle.isEmpty()) DropdownMenuItem({ Text("lade …", color = P.mut) }, {})
+                    if (claudeModelle.isNotEmpty()) {
+                        DropdownMenuItem({ Text("Claude (Anthropic)", color = P.mut, fontSize = 12.sp) }, {}, enabled = false)
+                        claudeModelle.forEach { m -> DropdownMenuItem({ Text(m, color = P.fg) }, { modell = m; modellMenu = false }) }
+                        DropdownMenuItem({ Text("Ollama", color = P.mut, fontSize = 12.sp) }, {}, enabled = false)
+                    }
                     modelle.forEach { m -> DropdownMenuItem({ Text(m, color = P.fg) }, { modell = m; modellMenu = false }) }
                 }
             }

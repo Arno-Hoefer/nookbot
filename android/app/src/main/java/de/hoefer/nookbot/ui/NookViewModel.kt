@@ -72,6 +72,9 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
     val datenbanken = MutableStateFlow<List<Datenbank>>(emptyList())
     val wissenGlobal = MutableStateFlow<List<WissenDatei>>(emptyList())
     val modelle = MutableStateFlow<List<String>>(emptyList())
+    val claudeModelle = MutableStateFlow<List<String>>(emptyList())
+    /** Claude auf dem Pi: eingerichtet, Ausgaben (mit Admin-Schlüssel), eingetragener Guthabenstand, „ca. übrig“. */
+    val claude = MutableStateFlow<JSONObject?>(null)
     val guthaben = MutableStateFlow<Guthaben?>(null)
     val zugriffe = MutableStateFlow<JSONObject?>(null)
     val ntfy = MutableStateFlow(false)
@@ -154,6 +157,7 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
         }
         current?.let { loadSessionNow(it) }
         runCatching { guthaben.value = Guthaben.from(api.get("/api/guthaben")) }
+        runCatching { claude.value = api.get("/api/claude") }
     }
 
     private fun arr(a: JSONArray?): List<JSONObject> = if (a == null) emptyList() else (0 until a.length()).map { a.getJSONObject(it) }
@@ -384,8 +388,11 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun loadModelle() = viewModelScope.launch(Dispatchers.IO) {
-        runCatching { api.get("/api/modelle").optJSONArray("modelle") }.getOrNull()?.let { a ->
-            modelle.value = (0 until a.length()).map { a.getString(it) }
+        runCatching { api.get("/api/modelle") }.getOrNull()?.let { o ->
+            val a = o.optJSONArray("modelle")
+            val c = o.optJSONArray("claude")
+            modelle.value = if (a == null) emptyList() else (0 until a.length()).map { a.getString(it) }
+            claudeModelle.value = if (c == null) emptyList() else (0 until c.length()).map { c.getString(it) }
         }
     }
 
@@ -436,6 +443,12 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
     fun loadSchema(db: String, onText: (String) -> Unit) = io {
         val t = api.get("/api/schema?db=" + java.net.URLEncoder.encode(db, "UTF-8")).optString("text")
         withContext(Dispatchers.Main) { onText(t) }
+    }
+
+    /** Guthabenstand aus der Claude Console eintragen – ab dann rechnet der Pi „ca. übrig“ mit den Ausgaben seit heute. */
+    fun claudeStand(usd: Double?) = io {
+        claude.value = api.post("/api/claude/stand", JSONObject().put("usd", usd ?: JSONObject.NULL))
+        toast.value = if (usd == null) "Guthabenstand entfernt" else "Guthabenstand gespeichert"
     }
 
     // ── Zugriffe, Guthaben, Benachrichtigung ──

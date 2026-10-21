@@ -487,6 +487,7 @@ fun SettingsScreen(vm: NookViewModel) {
                 Section("Ollama Pro")
                 Text("${"%.2f".format(it.rest)} $ von ${"%.0f".format(it.gesamt)} $ übrig (${it.genutztProzent} % genutzt) · neu ab ${it.bis}", color = P.fg2, fontSize = 14.sp)
             }
+            ClaudeBereich(vm)
 
             Section("Pi (NookBot-Adapter)")
             Field("Adresse", server) { server = it }
@@ -735,5 +736,37 @@ fun GedaechtnisScreen(vm: NookViewModel) {
             text = { Field("Text", t, lines = 4) { t = it } },
             confirmButton = { TextButton({ vm.gedaechtnisAendern(e, t); bearbeiten = null }, enabled = t.isNotBlank()) { Text("Speichern", color = A.accent) } },
             dismissButton = { TextButton({ bearbeiten = null }) { Text("Abbrechen", color = P.fg2) } })
+    }
+}
+
+
+// ── Claude (Anthropic) in den Einstellungen ───────────────────────
+
+@Composable
+private fun ClaudeBereich(vm: NookViewModel) {
+    val c by vm.claude.collectAsState()
+    var stand by remember { mutableStateOf("") }
+    Section("Claude (Anthropic)")
+    val o = c
+    if (o == null || !o.optBoolean("eingerichtet")) {
+        Hint("Nicht eingerichtet. Auf dem Pi: sudo bash 7-claude.sh (fragt den API-Schlüssel verdeckt ab). Danach ist Claude je Bot als Modell wählbar.")
+        return
+    }
+    val st = o.optJSONObject("stand")
+    if (!o.optBoolean("kosten")) {
+        Text("Eingerichtet ✓ – je Bot unter „Modell“ wählbar.", color = P.fg2, fontSize = 14.sp)
+        Hint("Ausgaben anzeigen: Anthropic liefert sie nur mit einem Admin-Schlüssel (nur für Organisationen in der Claude Console). " +
+            "Ohne ihn siehst du Guthaben und Verbrauch unter platform.claude.com → Billing.")
+    } else {
+        Text("Diesen Monat: ${"%.2f".format(o.optDouble("monat_usd", 0.0))} $", color = P.fg, fontSize = 14.sp)
+        if (o.has("rest_usd")) Text("ca. ${"%.2f".format(o.optDouble("rest_usd"))} $ übrig (Stand ${st?.optString("usd")} $ am ${datumText(st?.optString("datum") ?: "")}, " +
+            "seitdem ${"%.2f".format(o.optDouble("seit_stand_usd"))} $ verbraucht)", color = P.fg2, fontSize = 14.sp)
+        Hint("Anthropic meldet nur Ausgaben, kein Restguthaben – trag ab und zu den Stand aus der Console ein (Billing → Credit balance), dann rechnet der Pi weiter. " +
+            "Die Zahlen kommen mit ein paar Minuten Verzögerung.")
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Field("Guthaben laut Console ($)", stand, number = true, modifier = Modifier.width(200.dp)) { stand = it.replace(',', '.') }
+            Spacer(Modifier.width(10.dp))
+            SideButton("Speichern") { stand.toDoubleOrNull()?.let { vm.claudeStand(it); stand = "" } ?: vm.say("Betrag als Zahl, z. B. 42.50") }
+        }
     }
 }

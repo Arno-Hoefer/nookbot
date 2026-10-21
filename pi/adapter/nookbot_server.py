@@ -5,7 +5,7 @@ NookBot-Adapter – sitzt zwischen der App und den Bots (je ein PicoClaw-Prozess
 - Hält die WebSocket-Verbindungen zu den Bots und speichert jede Nachricht → nichts geht verloren, wenn die App zu ist.
 - App-Schnittstelle: JSON + Server-Sent Events auf 127.0.0.1:8795 (im Tailnet über tailscale serve :8444).
   Anmeldung mit demselben Chat-Token wie der PicoClaw-Kanal (Authorization: Bearer nb_…).
-- Bots anlegen/ändern (Name, Rolle, Farbe, Modell, Persönlichkeit, Fokus, Zugriffe), Wissen (global + je Bot),
+- Bots anlegen/ändern (Name, Rolle, Farbe, Modell – Ollama oder Claude, Persönlichkeit, Fokus, Zugriffe), Wissen (global + je Bot),
   Datenbank-Bibliothek (als Skill für Bots mit Zugriffen), Routinen (Zeitplan), Runden (mehrere Bots + Zusammenfassung),
   Benachrichtigungen über ntfy, Ollama-Guthaben, Zugriffs-Übersicht.
 - MCP-Endpunkt /mcp/<bot> für die Bots: Routinen, Erinnerungen, Team (bot_fragen, auftraege_verteilen), Bots anlegen (Kapitän),
@@ -389,14 +389,117 @@ def restart_bot(b: dict):
         log("Neustart fehlgeschlagen:", e)
 
 
+# ── Claude (Anthropic) neben Ollama ────────────────────────────────
+# <BASE>/claude.json {"api_key": "sk-ant-…", "admin_key": "sk-ant-admin…" (optional, nur Kosten lesen),
+#                     "stand": {"usd": 50.0, "datum": "2026-10-21"}} – angelegt mit einrichtung/7-claude.sh.
+# Ein Bot mit Claude-Modell bekommt in seiner PicoClaw-Konfiguration den Eintrag „claude“ (provider anthropic).
+
+CLAUDE_MODELLE = ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "claude-fable-5-1"]
+
+
+def claude_conf() -> dict:
+    return read_json(path("claude.json"), {})
+
+
+def ist_claude(model: str) -> bool:
+    return str(model or "").startswith("claude-")
+
+
 def set_model(b: dict, model: str):
     cfgp = bot_cfg_path(b)
     cfg = read_json(cfgp, {})
-    name = cfg.get("agents", {}).get("defaults", {}).get("model_name", "")
-    for m in cfg.get("model_list", []):
-        if m.get("model_name") == name:
-            m["model"] = model
+    d = cfg.setdefault("agents", {}).setdefault("defaults", {})
+    ml = cfg.setdefault("model_list", [])
+    if ist_claude(model):
+        key = claude_conf().get("api_key")
+        if not key:
+            raise ValueError("Claude ist auf dem Pi nicht eingerichtet (einrichtung/7-claude.sh).")
+        e = next((m for m in ml if m.get("model_name") == "claude"), None)
+        if not e:
+            e = {"model_name": "claude", "provider": "anthropic", "request_timeout": 300, "streaming": {"enabled": True}}
+            ml.append(e)
+        e.update(model=model, api_keys=[key])
+        d.update(model_name="claude", provider="anthropic")
+    else:
+        e = next((m for m in ml if m.get("provider") == "ollama" and m.get("model_name") != "flash"), None) or \
+            next((m for m in ml if m.get("provider") == "ollama"), None)
+        if not e:
+            raise ValueError("Kein Ollama-Modell in der Konfiguration.")
+        e["model"] = model
+        d.update(model_name=e["model_name"], provider="ollama")
     write_json(cfgp, cfg)
+
+
+def claude_schluessel_verteilen():
+    """Neuer oder geänderter Claude-Schlüssel: in alle Bots mit Claude-Eintrag schreiben (nach 7-claude.sh)."""
+    key = claude_conf().get("api_key")
+    for b in bots():
+        cfgp = bot_cfg_path(b)
+        cfg = read_json(cfgp, {})
+        e = next((m for m in cfg.get("model_list", []) if m.get("model_name") == "claude"), None)
+        if e and key and e.get("api_keys") != [key]:
+            e["api_keys"] = [key]
+            write_json(cfgp, cfg)
+            restart_bot(b)
+
+
+def claude_kosten() -> dict:
+    """Ausgaben laut Anthropic (Admin-Schlüssel nötig): dieser Monat und seit dem eingetragenen Guthabenstand."""
+    import datetime as dt
+    c = claude_conf()
+    out = {"eingerichtet": bool(c.get("api_key")), "kosten": bool(c.get("admin_key")), "stand": c.get("stand")}
+    if not c.get("admin_key"):
+        return out
+    heute = dt.date.today()
+    monat = heute.replace(day=1)
+    stand = c.get("stand") or {}
+    try:
+        seit = dt.date.fromisoformat(str(stand.get("datum"))[:10]) if stand.get("datum") else monat
+    except ValueError:
+        seit = monat
+    start = min(monat, seit)
+
+    def summe(von: dt.date) -> float:
+        cents, page = 0.0, None
+        while True:
+            q = {"starting_at": von.isoformat() + "T00:00:00Z", "ending_at": (heute + dt.timedelta(days=1)).isoformat() + "T00:00:00Z",
+                 "bucket_width": "1d", "limit": 31}
+            if page:
+                q["page"] = page
+            req = urllib.request.Request("https://api.anthropic.com/v1/organizations/cost_report?" + urllib.parse.urlencode(q),
+                                         headers={"x-api-key": c["admin_key"], "anthropic-version": "2023-06-01",
+                                                  "User-Agent": "NookBot/" + VERSION})
+            try:
+                with urllib.request.urlopen(req, timeout=20) as r:
+                    o = json.loads(r.read())
+            except urllib.error.HTTPError as e:
+                raise ValueError(f"Anthropic-Kosten: {e.code} – Admin-Schlüssel prüfen") from None
+            for bucket in o.get("data", []):
+                for row in bucket.get("results", []):
+                    try:
+                        cents += float(row.get("amount") or 0)
+                    except (TypeError, ValueError):
+                        pass
+            if not o.get("has_more"):
+                return cents / 100
+            page = o.get("next_page")
+
+    out["monat_usd"] = round(summe(monat), 2)
+    if stand.get("usd") is not None:
+        seit_usd = out["monat_usd"] if seit == monat else round(summe(seit), 2)
+        out["seit_stand_usd"] = seit_usd
+        out["rest_usd"] = round(float(stand["usd"]) - seit_usd, 2)
+    return out
+
+
+def claude_stand_setzen(usd, datum: str | None = None):
+    import datetime as dt
+    c = claude_conf()
+    if usd in (None, ""):
+        c.pop("stand", None)
+    else:
+        c["stand"] = {"usd": round(float(usd), 2), "datum": (datum or dt.date.today().isoformat())[:10]}
+    write_json(path("claude.json"), c)
 
 
 def create_bot(d: dict) -> dict:
@@ -1976,8 +2079,15 @@ class Handler(BaseHTTPRequestHandler):
             d = read_json(path("notify.json"), {"last": 0, "items": []})
             n = int(q.get("since") or 0)
             return self._send(200, {"last": d["last"], "items": [x for x in d["items"] if x["id"] > n]})
+        if p == "/api/claude":
+            return self._send(200, claude_kosten())
         if p == "/api/modelle":
-            return self._send(200, {"modelle": modelle()})
+            try:
+                oll = modelle()
+            except Exception as e:  # noqa: BLE001 – Claude soll auch ohne Ollama wählbar sein
+                log("Ollama-Modelle:", e)
+                oll = []
+            return self._send(200, {"modelle": oll, "claude": CLAUDE_MODELLE if claude_conf().get("api_key") else []})
         if p == "/api/guthaben":
             return self._send(200, ollama_get("https://ollama.com/api/balance"))
         if p == "/api/datenbanken":
@@ -2125,6 +2235,9 @@ class Handler(BaseHTTPRequestHandler):
         m = re.match(r"^/api/freigaben/([A-Za-z0-9-]+)$", p)
         if m:
             return self._send(200, freigaben_proxy("POST", f"/app/freigaben/{m.group(1)}", {"entscheidung": d.get("entscheidung")}))
+        if p == "/api/claude/stand":
+            claude_stand_setzen(d.get("usd"), d.get("datum"))
+            return self._send(200, claude_kosten())
         if p == "/api/test-push":
             push("NookBot", "Benachrichtigungen funktionieren ✓", prio="high")
             return self._send(200, {"ok": True})
@@ -2227,6 +2340,10 @@ def main():
     srv.daemon_threads = True
     threading.Thread(target=srv.serve_forever, daemon=True, name="http").start()
     start_bots()
+    try:
+        claude_schluessel_verteilen()
+    except Exception as e:  # noqa: BLE001
+        log("Claude-Schlüssel:", e)
     for fn in (watchdog, scheduler):
         threading.Thread(target=fn, daemon=True, name=fn.__name__).start()
     log(f"nookbot {VERSION} auf 127.0.0.1:{PORT} – Bots: {', '.join(b['name'] for b in bots())}")
