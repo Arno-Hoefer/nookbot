@@ -21,8 +21,13 @@ if [ -n "$ADMIN" ]; then
   von=$(date -u +%Y-%m-01T00:00:00Z)
   code=$(curl -s -o /dev/null -w "%{http_code}" "https://api.anthropic.com/v1/organizations/cost_report?starting_at=$von&limit=1" \
     -H "x-api-key: $ADMIN" -H "anthropic-version: 2023-06-01")
-  [ "$code" = "200" ] || { echo "Kosten-Abfrage klappt nicht (HTTP $code) – Admin-Schlüssel gibt es nur für Organisationen"; exit 1; }
-  echo "ok"
+  if [ "$code" = "200" ]; then
+    echo "ok"
+  else
+    echo "Kosten-Abfrage klappt nicht (HTTP $code) – Admin-Schlüssel wird NICHT gespeichert, der API-Schlüssel schon."
+    echo "(403: kein Admin-Schlüssel oder ein Einzelkonto – die Kosten-API gibt es nur für Organisationen.)"
+    ADMIN=""
+  fi
 fi
 
 python3 - <<'PY'
