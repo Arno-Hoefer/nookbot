@@ -695,6 +695,7 @@ def update_bot(bid: str, d: dict) -> dict:
         if "rechte" in d and isinstance(d["rechte"], dict) and d["rechte"].get("alle"):
             b.pop("rechte", None)  # „Alles“: alles, was der Schlüssel darf (auch künftig Neues)
             b["zugriffe"] = True
+            b["gesundheit"] = bool(d["rechte"].get("gesundheit"))  # gehört nie automatisch dazu
         elif "rechte" in d and isinstance(d["rechte"], dict):
             b["rechte"] = rechte_norm(d["rechte"])
             b["zugriffe"] = rechte_irgendwas(b["rechte"])
@@ -1372,7 +1373,7 @@ def rechte(b: dict) -> dict:
     if not b.get("zugriffe"):
         return dict(RECHTE_LEER)
     if not isinstance(b.get("rechte"), dict):
-        return rechte_alle()
+        return dict(rechte_alle(), gesundheit=bool(b.get("gesundheit")))
     return rechte_norm(b["rechte"])
 
 
@@ -2985,7 +2986,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("X-Frame-Options", "DENY")
         self.send_header("Referrer-Policy", "no-referrer")
         self.send_header("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
-                                                    "img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
+                                                    "img-src 'self' data:; media-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
         self.end_headers()
         self.wfile.write(data)
 
