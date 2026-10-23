@@ -7,7 +7,7 @@ import threading
 import time
 
 
-VERSION = "0.14.0"
+VERSION = "0.14.1"
 BASE = os.environ.get("NOOKBOT_HOME", "/srv/picoclaw/nookbot")
 MAIN_HOME = os.environ.get("NOOKBOT_MAIN_HOME", "/srv/picoclaw")
 BOTS_HOME = os.path.join(MAIN_HOME, "bots")

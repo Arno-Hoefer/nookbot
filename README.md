@@ -21,6 +21,8 @@ dieselbe Frage beantworten, der Kapitän fasst zusammen. Alles läuft auf einem 
 
 *(Screenshots mit Demo-Daten.)*
 
+Ausführliche Doku mit Screenshots: **[docs/](docs/README.md)** (Funktionen, Architektur, Sicherheit, Betrieb, Schnittstellen).
+
 ## Was es kann
 
 **Team und Gespräche**
