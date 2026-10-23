@@ -126,6 +126,10 @@ fun Sprachmodus(vm: NookViewModel, sid: String, b: Bot?, erst: String? = null, t
             withContext(Dispatchers.IO + kotlinx.coroutines.NonCancellable) { w.close() }
         }
     }
+    // Protokoll: beim Zuhören alle 5 Sekunden den lautesten Pegel (zeigt, ob das Mikro im Anruf überhaupt etwas bekommt)
+    LaunchedEffect(phase) {
+        while (phase == Phase.Hoert) { delay(5000); if (phase == Phase.Hoert) de.hoefer.nookbot.Anruf.protokoll("hört … Spitze ${"%.2f".format(spitze)}") }
+    }
     // Werkzeuge, die der Bot gerade benutzt, als kleine Zeile
     val werkzeug = if (phase == Phase.Denkt) msgs.lastOrNull()?.takeIf { it.role == "tool" }?.let { toolLine(it.text) } else null
 

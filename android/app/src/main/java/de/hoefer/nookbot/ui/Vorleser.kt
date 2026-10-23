@@ -73,6 +73,7 @@ class Vorleser(private val ctx: Context, private val vm: NookViewModel) {
             naechster = if (i + 1 < saetze.size) holen(i + 1) else null
             onSatz(saetze[i])
             val weiter = if (wav != null && wav.size > 44) abspielen(wav, i) else handySprechen(ausspracheHier(saetze[i]), "")
+            de.hoefer.nookbot.Anruf.protokoll("Satz ${i + 1}/${saetze.size}: ${if (wav != null && wav.size > 44) "Pi ${wav.size / 1024} KB" else "Handy-Stimme"} → ${if (weiter) "gespielt" else "abgebrochen/Fehler"}")
             if (!weiter) { naechster?.cancel(); return@coroutineScope }
         }
     }
@@ -86,7 +87,10 @@ class Vorleser(private val ctx: Context, private val vm: NookViewModel) {
             fun ende(ok: Boolean) { runCatching { mp.release() }; if (player === mp) player = null; if (cont.isActive) cont.resume(ok) }
             fertig = { ok -> fertig = null; ende(ok) }
             runCatching {
-                mp.setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANT)
+                // Im Anruf läuft der Ton als Telefonat – andere Arten schaltet Android im Gespräch leise oder stumm
+                val imAnruf = de.hoefer.nookbot.Anruf.zustand.value == de.hoefer.nookbot.Anruf.Zustand.Laeuft
+                mp.setAudioAttributes(AudioAttributes.Builder()
+                    .setUsage(if (imAnruf) AudioAttributes.USAGE_VOICE_COMMUNICATION else AudioAttributes.USAGE_ASSISTANT)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
                 mp.setDataSource(f.absolutePath)
                 mp.setOnCompletionListener { ende(true) }
@@ -101,6 +105,10 @@ class Vorleser(private val ctx: Context, private val vm: NookViewModel) {
     private suspend fun handySprechen(satz: String, name: String): Boolean {
         withTimeoutOrNull(3000) { while (!bereit) delay(100) } ?: return false
         if (name.isNotBlank()) tts.voices.orEmpty().firstOrNull { it.name == name }?.let { tts.voice = it }
+        val imAnruf = de.hoefer.nookbot.Anruf.zustand.value == de.hoefer.nookbot.Anruf.Zustand.Laeuft
+        tts.setAudioAttributes(AudioAttributes.Builder()
+            .setUsage(if (imAnruf) AudioAttributes.USAGE_VOICE_COMMUNICATION else AudioAttributes.USAGE_ASSISTANT)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
         return suspendCancellableCoroutine { cont ->
             fertig = { ok -> fertig = null; if (cont.isActive) cont.resume(ok) }
             tts.speak(satz, TextToSpeech.QUEUE_FLUSH, null, "s${System.nanoTime()}")
