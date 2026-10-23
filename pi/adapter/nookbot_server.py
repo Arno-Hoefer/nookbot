@@ -1326,7 +1326,24 @@ def _el(method: str, p: str, body: dict | None = None, roh: bool = False, timeou
     return data if roh else json.loads(data or b"{}")
 
 
+BUTLER_KLANG = ("highpass=f=75,equalizer=f=180:t=q:w=1:g=2,equalizer=f=2800:t=q:w=1.5:g=1.5,"
+                "aecho=0.9:0.4:14|23:0.06|0.04,loudnorm=I=-16")
+
+
+def klang(wav: bytes, filt: str) -> bytes:
+    """WAV durch ffmpeg schicken (Butler-Klang: wärmer, präsenter, ein Hauch Raum)."""
+    r = subprocess.run(["ffmpeg", "-loglevel", "error", "-f", "wav", "-i", "pipe:0", "-af", filt, "-ar", "22050", "-f", "wav", "pipe:1"],
+                       input=wav, capture_output=True, timeout=60)
+    return r.stdout if r.returncode == 0 and r.stdout else wav
+
+
 def el_stimmen() -> list:
+    """Jede Cloud-Stimme auch als „· Butler“-Variante (…+butler)."""
+    return [y for x in _el_stimmen_roh() for y in (x, {"id": x["id"] + "+butler", "name": x["name"].replace(" (ElevenLabs)", " · Butler (ElevenLabs)"),
+                                                     "beschreibung": x["beschreibung"].replace(" · Cloud", ", wärmer mit etwas Raum · Cloud")})]
+
+
+def _el_stimmen_roh() -> list:
     if not el_conf().get("api_key"):
         return []
     if time.time() - _el_cache["t"] > 3600:
@@ -1430,7 +1447,9 @@ def sprechen(text: str, stimme: str, tempo: float = 1.0) -> bytes:
         if not t:
             raise ValueError("Kein Text.")
         try:
-            return el_sprechen(t, stimme[3:], float(tempo or 1.0))
+            vid, _, k = stimme[3:].partition("+")
+            w = el_sprechen(t, vid, float(tempo or 1.0))
+            return klang(w, BUTLER_KLANG) if k == "butler" else w
         except Exception as e:  # noqa: BLE001
             log("ElevenLabs → Thorsten:", e)  # Kontingent leer oder offline – dann eben der Pi
             stimme = STANDARD_STIMME
