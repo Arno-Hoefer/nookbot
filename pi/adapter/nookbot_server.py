@@ -1303,6 +1303,8 @@ def stimmen_liste() -> list:
 EL_API = "https://api.elevenlabs.io"
 EL_MODELL = "eleven_multilingual_v2"
 _el_cache: dict = {"t": 0, "stimmen": []}
+EL_STANDARD = [("George", "JBFqnCBsd6RMkjVDRZzb", "britisch, männlich, warm"), ("Daniel", "onwK4e9ZLuTAKqWW03F9", "britisch, männlich, sachlich"),
+               ("Alice", "Xb7hH8MSUJpSbSDYk0k2", "britisch, weiblich")]
 
 
 def el_conf() -> dict:
@@ -1342,6 +1344,9 @@ def el_stimmen() -> list:
         except Exception as e:  # noqa: BLE001
             log("ElevenLabs Stimmen:", e)
             _el_cache["t"] = time.time() - 3000  # in 10 Minuten noch einmal
+            if not _el_cache["stimmen"]:  # Schlüssel ohne „Voices: Read“ – die bekannten Standardstimmen gehen trotzdem
+                _el_cache["stimmen"] = [{"id": "el:" + i, "name": f"{nm} (ElevenLabs)", "beschreibung": f"{b} · Cloud, Kontingent"}
+                                        for nm, i, b in EL_STANDARD]
     return _el_cache["stimmen"]
 
 
