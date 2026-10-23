@@ -1331,10 +1331,22 @@ BUTLER_KLANG = ("highpass=f=75,equalizer=f=180:t=q:w=1:g=2,equalizer=f=2800:t=q:
 
 
 def klang(wav: bytes, filt: str) -> bytes:
-    """WAV durch ffmpeg schicken (Butler-Klang: wärmer, präsenter, ein Hauch Raum)."""
-    r = subprocess.run(["ffmpeg", "-loglevel", "error", "-f", "wav", "-i", "pipe:0", "-af", filt, "-ar", "22050", "-f", "wav", "pipe:1"],
-                       input=wav, capture_output=True, timeout=60)
-    return r.stdout if r.returncode == 0 and r.stdout else wav
+    """WAV durch ffmpeg schicken (Butler-Klang: wärmer, präsenter, ein Hauch Raum).
+    ffmpeg gibt rohe Samples aus und Python schreibt den WAV-Kopf – in eine Pipe kann ffmpeg die Länge nicht eintragen,
+    und solche Dateien spielt Android nicht ab."""
+    import io
+    import wave
+    r = subprocess.run(["ffmpeg", "-loglevel", "error", "-f", "wav", "-i", "pipe:0", "-af", filt, "-ar", "22050", "-ac", "1",
+                        "-f", "s16le", "pipe:1"], input=wav, capture_output=True, timeout=60)
+    if r.returncode or not r.stdout:
+        return wav
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(22050)
+        w.writeframes(r.stdout)
+    return buf.getvalue()
 
 
 def el_stimmen() -> list:
