@@ -317,7 +317,7 @@ fun ChatScreen(vm: NookViewModel, sid: String) {
             msgs.forEach { m ->
                 if (m.role == "user") lastBot = null
                 else if (m.role == "bot") {
-                    if ((runde || (m.bot != null && m.bot != s?.bot)) && m.bot != lastBot) names += m.id
+                    if ((runde || (m.bot != null && m.bot != s?.bot)) && (m.bot != lastBot || m.gespraech > 0)) names += m.id
                     lastBot = m.bot
                 }
             }
@@ -567,7 +567,7 @@ private fun MessageView(m: Msg, from: de.hoefer.nookbot.data.Bot?) {
             .padding(horizontal = 14.dp, vertical = 10.dp)) {
             if (from != null || m.zusammenfassung) Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 4.dp)) {
                 BotFigure(from, 22.dp)
-                Text((from?.name ?: "") + if (m.zusammenfassung) " · Zusammenfassung" else "", color = P.fg2, fontSize = 13.sp,
+                Text((from?.name ?: "") + if (m.zusammenfassung) " · Zusammenfassung" else if (m.gespraech > 0) " · Gespräch ${m.gespraech}" else "", color = P.fg2, fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 6.dp))
             }
             SelectionContainer { Text(markdown(m.text, P.fg2), color = P.fg, fontSize = 15.sp, lineHeight = 21.sp) }

@@ -41,6 +41,9 @@ sealed class Route {
     data object Datenbanken : Route()
     data class DatenbankEdit(val index: Int) : Route()
     data object Routinen : Route()
+    data object Ausloeser : Route()
+    data class AusloeserEdit(val id: String?) : Route()
+    data object Aktivitaet : Route()
     data class RoutineEdit(val id: String?) : Route()
     data object Wissen : Route()
     data object Zugriffe : Route()
@@ -66,6 +69,9 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
     val msgs = MutableStateFlow<List<Msg>>(emptyList())
     val busy = MutableStateFlow<Set<String>>(emptySet())
     val routinen = MutableStateFlow<List<Routine>>(emptyList())
+    val ausloeser = MutableStateFlow<List<de.hoefer.nookbot.data.Ausloeser>>(emptyList())
+    val aktivitaet = MutableStateFlow<List<de.hoefer.nookbot.data.AktEintrag>>(emptyList())
+    val aktFilter = MutableStateFlow(Triple(1, "", false))  // Tage, Bot, nur Hintergrund
     val erinnerungen = MutableStateFlow<List<Erinnerung>>(emptyList())
     val ablaeufe = MutableStateFlow<List<Ablauf>>(emptyList())
     val gedaechtnis = MutableStateFlow<List<Merk>>(emptyList())
@@ -127,6 +133,7 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
             Route.Zugriffe -> loadZugriffe()
             is Route.BotEdit -> { loadModelle(); loadRechte(); loadStimmen() }
             Route.Settings -> loadStimmen()
+            Route.Aktivitaet -> loadAktivitaet()
             else -> {}
         }
     }
@@ -171,6 +178,7 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
             sitzungen.value = arr(st.optJSONArray("sessions")).map { Sitzung.from(it) }.sortedByDescending { it.aktualisiert }
             busy.value = sitzungen.value.filter { it.laeuft }.map { it.id }.toSet()
             routinen.value = arr(st.optJSONArray("routinen")).map { Routine.from(it) }
+            ausloeser.value = de.hoefer.nookbot.data.Ausloeser.list(st.optJSONArray("ausloeser"))
             erinnerungen.value = Erinnerung.list(st.optJSONArray("erinnerungen"))
             ablaeufe.value = Ablauf.list(st.optJSONArray("ablaeufe"))
             gedaechtnis.value = Merk.list(st.optJSONArray("gedaechtnis"))
@@ -204,7 +212,8 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
                 if (s.art != "intern") sitzungen.value = (listOf(s) + sitzungen.value.filterNot { it.id == s.id }).sortedByDescending { it.aktualisiert }
             }
             "session_del" -> sitzungen.value = sitzungen.value.filterNot { it.id == ev.optString("s") }
-            "bots", "routinen", "erinnerungen", "ablaeufe", "gedaechtnis" -> io { loadStateNow() }
+            "bots", "routinen", "erinnerungen", "ablaeufe", "gedaechtnis", "ausloeser" -> io { loadStateNow() }
+            "aktivitaet" -> if (stack.value.lastOrNull() == Route.Aktivitaet) loadAktivitaet()
         }
     }
 
@@ -427,8 +436,9 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
         withContext(Dispatchers.Main) { sitzungen.value = sitzungen.value.filterNot { it.id == sid } }
     }
 
-    fun startRunde(frage: String, teilnehmer: List<String>, kapitaen: String) = io {
-        val s = Sitzung.from(api.post("/api/runden", JSONObject().put("frage", frage).put("bots", JSONArray(teilnehmer)).put("kapitaen", kapitaen)))
+    fun startRunde(frage: String, teilnehmer: List<String>, kapitaen: String, gespraech: Int = 0) = io {
+        val s = Sitzung.from(api.post("/api/runden", JSONObject().put("frage", frage).put("bots", JSONArray(teilnehmer)).put("kapitaen", kapitaen)
+            .put("gespraech", gespraech)))
         withContext(Dispatchers.Main) {
             sitzungen.value = listOf(s) + sitzungen.value.filterNot { it.id == s.id }
             stack.value = listOf(Route.Home)
@@ -494,6 +504,27 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
     fun runRoutine(id: String) = io {
         val r = api.post("/api/routinen/$id/jetzt")
         withContext(Dispatchers.Main) { toast.value = "Routine läuft"; openChat(r.optString("session")) }
+    }
+
+    // ── Auslöser und Aktivität ──
+
+    fun saveAusloeser(list: List<de.hoefer.nookbot.data.Ausloeser>, done: () -> Unit = {}) = io {
+        val r = api.put("/api/ausloeser", JSONObject().put("ausloeser", JSONArray().apply { list.forEach { put(it.json()) } }))
+        withContext(Dispatchers.Main) { ausloeser.value = de.hoefer.nookbot.data.Ausloeser.list(r.optJSONArray("ausloeser")); done() }
+    }
+
+    fun pruefeAusloeser(id: String) = io {
+        val r = api.post("/api/ausloeser/$id/pruefen")
+        withContext(Dispatchers.Main) {
+            ausloeser.value = de.hoefer.nookbot.data.Ausloeser.list(r.optJSONArray("ausloeser"))
+            toast.value = r.optString("ergebnis")
+        }
+    }
+
+    fun loadAktivitaet() = io {
+        val (tage, bot, hinter) = aktFilter.value
+        val r = api.get("/api/aktivitaet?tage=$tage&bot=${java.net.URLEncoder.encode(bot, "UTF-8")}" + if (hinter) "&hintergrund=1" else "")
+        withContext(Dispatchers.Main) { aktivitaet.value = de.hoefer.nookbot.data.AktEintrag.list(r.optJSONArray("eintraege")) }
     }
 
     // ── Datenbanken ──

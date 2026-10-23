@@ -75,7 +75,7 @@ data class Erinnerung(val id: String, val text: String, val wann: String, val wi
 data class Msg(
     val id: String, val role: String, val text: String, val ts: Long, val bot: String?, val zusammenfassung: Boolean = false,
     val art: String = "", val ref: String = "", val status: String = "", val titel: String = "", val zurueck: Boolean = false,
-    val ziel: String = "", val teile: List<Teilauftrag> = emptyList(),
+    val ziel: String = "", val teile: List<Teilauftrag> = emptyList(), val gespraech: Int = 0,
 ) {
     companion object {
         fun from(o: JSONObject) = Msg(
@@ -83,6 +83,7 @@ data class Msg(
             o.optString("bot").takeIf { it.isNotBlank() }, o.optBoolean("zusammenfassung"),
             o.optString("art"), o.optString("ref"), o.optString("status"), o.optString("titel"), o.optBoolean("zurueck"),
             o.optString("ziel"), o.optJSONArray("teile")?.let { a -> (0 until a.length()).map { Teilauftrag.from(a.getJSONObject(it)) } } ?: emptyList(),
+            o.optInt("gespraech"),
         )
     }
 }
@@ -135,6 +136,42 @@ data class Routine(
             o.optJSONArray("tage")?.let { a -> (0 until a.length()).map { a.getInt(it) } } ?: listOf(1, 2, 3, 4, 5),
             o.optBoolean("aktiv", true), (o.optDouble("letzter_lauf", 0.0) * 1000).toLong(), o.optString("datum"), o.optString("sitzung"),
         )
+    }
+}
+
+/** Auslöser: bei einem Ereignis (Mail, Slack, Webseite, Paket) bekommt ein Bot einen Auftrag. Geprüft wird auf dem Pi ohne KI. */
+data class Ausloeser(
+    val id: String, val name: String, val bot: String, val quelle: String, val suche: String, val konto: String, val auftrag: String,
+    val aktiv: Boolean, val intervall: Int, val maxProTag: Int, val sitzung: String = "",
+    val basis: Boolean = false, val letztePruefung: Long = 0, val letzterTreffer: Long = 0, val fehler: String = "",
+    private val roh: JSONObject? = null,
+) {
+    /** Laufzeitstand (gesehen, heute …) bleibt erhalten – der Pi übernimmt ihn, solange sich die Abfrage nicht ändert. */
+    fun json(): JSONObject = JSONObject(roh?.toString() ?: "{}").put("id", id).put("name", name).put("bot", bot).put("quelle", quelle)
+        .put("suche", suche).put("konto", konto).put("auftrag", auftrag).put("aktiv", aktiv).put("intervall", intervall)
+        .put("max_pro_tag", maxProTag).put("sitzung", sitzung)
+
+    companion object {
+        val QUELLEN = linkedMapOf("mail" to "✉️ Mail", "slack" to "💬 Slack", "webseite" to "🌐 Webseite", "paket" to "📦 Paket")
+
+        fun from(o: JSONObject) = Ausloeser(
+            o.optString("id"), o.optString("name"), o.optString("bot"), o.optString("quelle", "mail"), o.optString("suche"), o.optString("konto"),
+            o.optString("auftrag"), o.optBoolean("aktiv", true), o.optInt("intervall", 15), o.optInt("max_pro_tag", 6), o.optString("sitzung"),
+            o.optBoolean("basis"), (o.optDouble("letzte_pruefung", 0.0) * 1000).toLong(), (o.optDouble("letzter_treffer", 0.0) * 1000).toLong(),
+            o.optString("fehler"), o,
+        )
+
+        fun list(a: JSONArray?): List<Ausloeser> = if (a == null) emptyList() else (0 until a.length()).map { from(a.getJSONObject(it)) }
+    }
+}
+
+/** Eine Zeile der Aktivität: was ein Bot getan hat (Werkzeug, Routine, Auslöser, Freigabe, Runde). */
+data class AktEintrag(val ts: Long, val bot: String, val art: String, val was: String, val detail: String, val ok: Boolean, val hintergrund: Boolean) {
+    companion object {
+        fun list(a: JSONArray?): List<AktEintrag> = if (a == null) emptyList() else (0 until a.length()).map { a.getJSONObject(it) }.map { o ->
+            AktEintrag((o.optDouble("ts", 0.0) * 1000).toLong(), o.optString("bot"), o.optString("art"), o.optString("was"), o.optString("detail"),
+                o.optBoolean("ok", true), o.optBoolean("hintergrund"))
+        }
     }
 }
 
@@ -203,7 +240,9 @@ data class Datenbank(val titel: String, val name: String, val beschreibung: Stri
 
 /** Was ein Werkzeug tut – für die kleine Zeile im Chat. MCP-Werkzeuge heißen z. B. „mcp_home_termine“. */
 private val TOOL_TEXT = linkedMapOf(
-    "termin_anlegen" to "Termin zur Freigabe vorgelegt", "termin_gaeste" to "Einladung zur Freigabe vorgelegt",
+    "termine_anlegen" to "Termine zur Freigabe vorgelegt", "termin_anlegen" to "Termin zur Freigabe vorgelegt",
+    "dokument_ansehen" to "Dokument angesehen", "gesundheit" to "Gesundheitsdaten gelesen",
+    "ausloeser_anlegen" to "Auslöser angelegt", "ausloeser_liste" to "Auslöser angesehen", "ausloeser_loeschen" to "Auslöser gelöscht", "termin_gaeste" to "Einladung zur Freigabe vorgelegt",
     "entwurf_anlegen" to "Mail-Entwurf zur Freigabe vorgelegt", "freigabe_status" to "Freigabe nachgesehen",
     "kalender_liste" to "Kalender aufgelistet", "termine" to "Kalender gelesen", "mails_suchen" to "Mails durchsucht",
     "mail_lesen" to "Mail gelesen", "thread_lesen" to "Mail-Verlauf gelesen", "konten" to "Zugänge nachgesehen",

@@ -28,6 +28,13 @@ aside{background:var(--panel);border-right:1px solid var(--line);display:flex;fl
 .marke{display:flex;align-items:center;gap:10px;padding:16px 16px 10px;font-weight:700;font-size:18px}
 .marke .pkt{width:12px;height:12px;border-radius:50%;background:var(--accent)}
 .liste{overflow:auto;flex:1;padding:4px 8px 12px}
+.fuss{padding:10px 16px;border-top:1px solid var(--line);font-size:12.5px;color:var(--mut);display:flex;gap:8px;align-items:center;cursor:pointer}
+.fuss .pkt{width:8px;height:8px;border-radius:50%;background:var(--green);flex:none}
+button.mic.an{background:var(--accent);color:#fff}
+.akt{display:grid;grid-template-columns:58px 1fr;gap:2px 10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+.akt .z{color:var(--mut);font-variant-numeric:tabular-nums}
+.akt .d{grid-column:2;color:var(--mut);font-size:12.5px;overflow-wrap:anywhere}
+.akt.fehl .w{color:var(--accent)}
 .gruppe{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:14px 8px 4px}
 .eintrag{display:flex;gap:10px;align-items:center;padding:8px;border-radius:10px;cursor:pointer;min-width:0}
 .eintrag:hover{background:var(--hover)}.eintrag.aktiv{background:var(--soft)}
@@ -125,6 +132,7 @@ dialog::backdrop{background:#0006}
   <aside id="seite">
     <div class="marke"><span class="pkt"></span>NookBot <span class="mut" id="ver" style="font-weight:400;font-size:12px"></span></div>
     <div class="liste" id="nav"></div>
+    <div class="fuss" id="status" title="Einstellungen"><span class="pkt"></span><span id="statusT">verbinde …</span></div>
   </aside>
   <main id="haupt"></main>
 </div>
@@ -193,7 +201,7 @@ function ava(b, gr = 30) {
 async function laden() {
   const o = await api('GET', '/api/state');
   Object.assign(S, {bots: o.bots, sessions: o.sessions, routinen: o.routinen, ablaeufe: o.ablaeufe || [], gedaechtnis: o.gedaechtnis || [],
-    erinnerungen: o.erinnerungen || [], seq: o.seq, webFreigaben: !!o.freigaben_web});
+    erinnerungen: o.erinnerungen || [], ausloeser: o.ausloeser || [], seq: o.seq, webFreigaben: !!o.freigaben_web});
   $('#ver').textContent = o.version;
   S.bots.sort((a, b) => (b.kapitaen ? 1 : 0) - (a.kapitaen ? 1 : 0) || a.name.localeCompare(b.name));
 }
@@ -232,7 +240,8 @@ function ereignis(e) {
     chatZeichnen();
   }
   if (e.t === 'del' && S.offen?.id === e.s) { S.offen.msgs = S.offen.msgs.filter((m) => m.id !== e.id); chatZeichnen(); }
-  if (['bots', 'routinen', 'ablaeufe', 'gedaechtnis', 'erinnerungen'].includes(e.t)) laden().then(() => { nav(); if (S.ansicht.art !== 'chat' && !S.bearbeitet) zeigen(); });
+  if (e.t === 'aktivitaet' && S.ansicht.art === 'aktivitaet') { clearTimeout(S.aktT); S.aktT = setTimeout(seiteAktivitaet, 800); }
+  if (['bots', 'routinen', 'ablaeufe', 'gedaechtnis', 'erinnerungen', 'ausloeser'].includes(e.t)) laden().then(() => { nav(); if (S.ansicht.art !== 'chat' && !S.bearbeitet) zeigen(); });
   if (e.t === 'busy' && !e.v) fertigMelden(e.s);
 }
 
@@ -256,7 +265,7 @@ function nav() {
   h += '<div class="gruppe">Mehr</div>';
   const offenF = Object.values(S.freigaben).filter((f) => f && f.status === 'offen').length;
   for (const [k, n, z] of [['suche', 'Suche', 0], ['freigaben', 'Freigaben', offenF], ['ablaeufe', 'Abläufe', entw], ['routinen', 'Routinen', 0],
-    ['erinnerungen', 'Erinnerungen', 0], ['gedaechtnis', 'Gedächtnis', 0], ['wissen', 'Wissen', 0], ['datenbanken', 'Datenbanken', 0],
+    ['ausloeser', 'Auslöser', (S.ausloeser || []).filter((x) => x.fehler).length], ['aktivitaet', 'Aktivität', 0], ['erinnerungen', 'Erinnerungen', 0], ['gedaechtnis', 'Gedächtnis', 0], ['wissen', 'Wissen', 0], ['datenbanken', 'Datenbanken', 0],
     ['archiv', 'Ältere Unterhaltungen', 0], ['zugriffe', 'Zugriffe', 0], ['einstellungen', 'Einstellungen', 0]]) {
     h += `<div class="eintrag ${a.art === k ? 'aktiv' : ''}" data-seite="${k}"><div class="t"><div class="n">${n}</div></div>${z ? `<span class="badge">${z}</span>` : ''}</div>`;
   }
@@ -284,7 +293,7 @@ async function zeigen() {
   S.bearbeitet = false;
   if (a.art === 'chat') return chatOeffnen(a.id || S.bots[0]?.sitzung);
   S.offen = null;
-  ({ablaeufe: seiteAblaeufe, gedaechtnis: seiteGedaechtnis, freigaben: seiteFreigaben, routinen: seiteRoutinen, runde: seiteRunde,
+  ({ablaeufe: seiteAblaeufe, gedaechtnis: seiteGedaechtnis, freigaben: seiteFreigaben, routinen: seiteRoutinen, runde: seiteRunde, ausloeser: seiteAusloeser, aktivitaet: seiteAktivitaet,
     bot: () => seiteBot(a.id), suche: seiteSuche, archiv: seiteArchiv, erinnerungen: seiteErinnerungen, wissen: seiteWissen,
     datenbanken: seiteDatenbanken, zugriffe: seiteZugriffe, einstellungen: seiteEinstellungen}[a.art] || (() => {}))();
 }
@@ -306,7 +315,7 @@ async function chatOeffnen(sid) {
      <button class="klein text" id="botEinst" title="Einstellungen von ${esc(b?.name || '')}">⚙</button>`)
     + '<div id="verlauf"><div class="bl" id="bl"></div></div>'
     + (nurLesen ? '' : `<footer class="eingabe"><div class="chips" id="anh"></div><div class="zeile"><button class="text" id="anhKnopf" title="Datei oder Bild anhängen">📎</button><input type="file" id="anhDatei" multiple hidden>
-      <textarea id="txt" rows="1" placeholder="Nachricht an ${esc(b?.name || 'Bot')} …"></textarea><button class="pri" id="senden">Senden</button></div>
+      <textarea id="txt" rows="1" placeholder="Nachricht an ${esc(b?.name || 'Bot')} …"></textarea><button class="text mic" id="mic" title="Diktieren (Spracherkennung auf dem Pi)">🎙</button><button class="pri" id="senden">Senden</button></div>
       <div class="hinweis">Enter sendet, Umschalt+Enter für eine neue Zeile. Dateien und Screenshots hierher ziehen oder einfügen (Cmd/Strg+V) → Anhang. Als Wissen: ⚙ → Wissen.</div></footer>`);
   chatZeichnen(true);
   const txt = $('#txt');
@@ -316,6 +325,7 @@ async function chatOeffnen(sid) {
     txt.addEventListener('input', () => { groesse(); store.set('nb_entwurf_' + sid, txt.value || null); });
     txt.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); senden(); } });
     $('#senden').onclick = senden; groesse(); txt.focus();
+    $('#mic').onclick = () => diktieren(txt, groesse);
     anhaengeZeichnen();
     $('#anhKnopf').onclick = () => $('#anhDatei').click();
     $('#anhDatei').onchange = async (e) => { for (const f of e.target.files) await anhaengen(f); e.target.value = ''; };
@@ -387,7 +397,7 @@ function chatZeichnen(unten) {
     else if (m.role === 'error') h += `<div class="m error">${esc(m.text)}</div>`;
     else if (m.role === 'info') h += karte(m);
     else if (m.role === 'bot' && m.text?.trim()) {
-      const wer = s.art === 'runde' ? `<div class="wer">${esc(botName(m.bot))}${m.zusammenfassung ? ' · Zusammenfassung' : ''}</div>` : '';
+      const wer = s.art === 'runde' ? `<div class="wer">${esc(botName(m.bot))}${m.zusammenfassung ? ' · Zusammenfassung' : m.gespraech ? ' · Gespräch ' + m.gespraech : ''}</div>` : '';
       h += `<div class="m bot md ${m.zusammenfassung ? 'zus' : ''}">${wer}${md(m.text)}</div>`;
       for (const fid of new Set(m.text.match(FREI) || [])) h += freigabeKarte(fid);
     }
@@ -540,10 +550,13 @@ function seiteRunde() {
   $('#haupt').innerHTML = kopf('Neue Runde', 'mehrere Bots, eine Frage') + `<div class="seite"><div class="bl"><div class="box">
     <textarea id="rF" rows="4" placeholder="Frage an die Runde …"></textarea>
     <div class="zeilen" style="margin:10px 0">${S.bots.filter((b) => !b.kapitaen).map((b) => `<label><input type="checkbox" value="${b.id}" checked style="width:auto"> ${esc(b.name)}</label>`).join('')}</div>
-    <button class="pri" id="rOk">Runde starten</button><p class="mut">Jeder Bot antwortet aus seiner Rolle, der Kapitän fasst zusammen.</p></div></div></div>`;
+    <label class="zeilen" style="margin:0 0 10px">Danach miteinander reden: <select id="rG" style="width:auto">
+      <option value="0">nein</option><option value="1">1 Runde</option><option value="2">bis zu 2 Runden</option></select></label>
+    <button class="pri" id="rOk">Runde starten</button><p class="mut">Jeder Bot antwortet aus seiner Rolle. Beim Reden sieht jeder nur die neuen Beiträge der anderen,
+      antwortet in höchstens 4 Sätzen oder passt – sagen alle „passe“, ist früher Schluss. Dann fasst der Kapitän zusammen.</p></div></div></div>`;
   $('#rOk').onclick = async () => {
     const bots = [...document.querySelectorAll('#haupt input[type=checkbox]:checked')].map((x) => x.value);
-    try { const s = await api('POST', '/api/runden', {frage: $('#rF').value, bots}); S.ansicht = {art: 'chat', id: s.id}; await laden(); nav(); zeigen(); } catch (e) { toast(e.message); }
+    try { const s = await api('POST', '/api/runden', {frage: $('#rF').value, bots, gespraech: +$('#rG').value}); S.ansicht = {art: 'chat', id: s.id}; await laden(); nav(); zeigen(); } catch (e) { toast(e.message); }
   };
 }
 
@@ -561,7 +574,8 @@ const WERKZEUGE = {termin_anlegen: 'Termin zur Freigabe', termin_gaeste: 'Einlad
   drive_lesen: 'Datei aus Drive gelesen', sheets_lesen: 'Tabelle gelesen', sheets_schreiben: 'Tabelle ändern – Freigabe',
   sheets_anhaengen: 'Zeilen anhängen – Freigabe', sheet_anlegen: 'Neue Tabelle – Freigabe', doc_anlegen: 'Neues Dokument – Freigabe',
   doc_anhaengen: 'Dokument ergänzen – Freigabe', read_file: 'Wissen/Datei gelesen', write_file: 'Notiz geschrieben', edit_file: 'Notiz geändert',
-  list_dir: 'Ordner angesehen', load_image: 'Bild angesehen', subagent: 'Teilaufgabe', spawn: 'Teilaufgabe'};
+  list_dir: 'Ordner angesehen', dokument_ansehen: 'Dokument angesehen', termine_anlegen: 'Termine zur Freigabe',
+  ausloeser_anlegen: 'Auslöser angelegt', ausloeser_liste: 'Auslöser angesehen', ausloeser_loeschen: 'Auslöser gelöscht', web_fetch: 'Seite abgerufen', load_image: 'Bild angesehen', subagent: 'Teilaufgabe', spawn: 'Teilaufgabe'};
 function werkzeugText(n) {
   const k = String(n || '').trim().replace(/^mcp_/, '').replace(/^(home|nookbot)_/, '');
   if (k.startsWith('gitlab_')) return 'GitLab gelesen';
@@ -764,6 +778,114 @@ function routineDialog(r, speichern) {
   d.showModal();
 }
 
+// ── Diktat: Aufnahme im Browser, Erkennung auf dem Pi (whisper.cpp) ──
+async function diktieren(txt, groesse) {
+  const k = $('#mic');
+  if (S.aufnahme) { S.aufnahme.stop(); return; }
+  if (!navigator.mediaDevices?.getUserMedia) return toast('Dieser Browser kann nicht aufnehmen (nur über https).');
+  let strom;
+  try { strom = await navigator.mediaDevices.getUserMedia({audio: true}); } catch (e) { return toast('Kein Mikrofon: ' + e.message); }
+  const rec = new MediaRecorder(strom); const teile = [];
+  rec.ondataavailable = (e) => e.data.size && teile.push(e.data);
+  rec.onstop = async () => {
+    strom.getTracks().forEach((t) => t.stop()); S.aufnahme = null; clearTimeout(S.aufT);
+    k.classList.remove('an'); k.textContent = '…'; k.disabled = true;
+    try {
+      const blob = new Blob(teile, {type: rec.mimeType});
+      const b64 = await new Promise((r) => { const f = new FileReader(); f.onload = () => r(String(f.result).split(',')[1]); f.readAsDataURL(blob); });
+      const o = await api('POST', '/api/diktat', {b64});
+      if (o.text) { txt.value = (txt.value.trim() ? txt.value.trimEnd() + ' ' : '') + o.text; groesse(); txt.dispatchEvent(new Event('input')); txt.focus(); }
+      else toast('Nichts verstanden');
+    } catch (e) { toast(e.message); }
+    k.textContent = '🎙'; k.disabled = false;
+  };
+  rec.start(); S.aufnahme = rec; k.classList.add('an'); k.textContent = '■';
+  S.aufT = setTimeout(() => rec.state === 'recording' && rec.stop(), 120000);
+  toast('Sprich – nochmal tippen beendet');
+}
+
+// ── Statuszeile unten links: Pi, Ollama, Claude ──
+async function statusLaden() {
+  const [g, c] = await Promise.all([api('GET', '/api/guthaben').catch(() => null), api('GET', '/api/claude').catch(() => null)]);
+  const inc = g?.included; const teile = ['Pi verbunden'];
+  if (inc?.allowance_usd) teile.push(`Ollama ${Math.round(100 - 100 * ((inc.balance_usd || 0) / inc.allowance_usd))} %`);
+  if (c?.eingerichtet) teile.push(c.rest_usd != null ? `Claude ${c.rest_usd.toFixed(2)} $ übrig` : `Claude ${(c.eigen_monat_usd || 0).toFixed(2)} $ im Monat`);
+  $('#statusT').textContent = teile.join(' · ');
+}
+$('#status').onclick = () => { S.ansicht = {art: 'einstellungen', id: null}; nav(); zeigen(); };
+
+// ── Auslöser ──
+const QUELLE = {mail: '✉️ Mail', slack: '💬 Slack', webseite: '🌐 Webseite', paket: '📦 Paket'};
+const SUCHE_HILFE = {mail: 'Gmail-Suche, z. B. from:schule@beispiel.de oder subject:Rechnung', slack: 'Slack-Suche, z. B. in:#support dringend',
+  webseite: 'https://… – meldet, wenn sich der Text der Seite ändert', paket: 'leer – meldet jeden neuen Paketstatus'};
+const zeitText = (t) => t ? new Date(t * 1000).toLocaleString('de-DE', {weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'}) : '–';
+function seiteAusloeser() {
+  const l = S.ausloeser || [];
+  $('#haupt').innerHTML = kopf('Auslöser', 'bei einem Ereignis arbeitet ein Bot', '<button class="pri klein" id="aNeu">+ Neu</button>') + `<div class="seite"><div class="bl">${l.map((a) => `<div class="box">
+    <div class="zeilen" style="justify-content:space-between"><h3 style="margin:0">${esc(a.name)} <span class="mut">· ${QUELLE[a.quelle] || a.quelle} · ${esc(botName(a.bot))}</span></h3>
+    <label class="zeilen"><input type="checkbox" data-a-aktiv="${a.id}" ${a.aktiv ? 'checked' : ''} style="width:auto"> aktiv</label></div>
+    ${a.suche ? `<div class="mut" style="margin-top:4px"><code>${esc(a.suche)}</code>${a.konto ? ' · ' + esc(a.konto) : ''}</div>` : ''}
+    <div style="white-space:pre-wrap;margin:6px 0">${esc(a.auftrag)}</div>
+    <div class="mut">alle ${a.intervall} min · höchstens ${a.max_pro_tag}× am Tag · geprüft ${zeitText(a.letzte_pruefung)} · zuletzt ausgelöst ${zeitText(a.letzter_treffer)}${a.basis ? '' : ' · Stand wird beim ersten Prüfen gemerkt'}</div>
+    ${a.fehler ? `<div style="color:var(--accent);margin-top:4px">⚠ ${esc(a.fehler)}</div>` : ''}
+    <div class="zeilen" style="margin-top:8px"><button class="klein" data-a-edit="${a.id}">Ändern</button><button class="klein" data-a-jetzt="${a.id}">Jetzt prüfen</button><button class="klein text" data-a-weg="${a.id}">Löschen</button></div></div>`).join('')
+    || '<div class="box mut">Noch keine Auslöser. Beispiel: „Wenn eine Mail von der Schule kommt, fasse sie zusammen und sag, ob ich etwas tun muss.“</div>'}
+    <p class="mut">Geprüft wird ohne KI – nur eine Suche im Takt. Erst wenn etwas Neues da ist, bekommt der Bot einen Auftrag mit allen neuen Treffern. Oder per Chat: „sag mir Bescheid, wenn …“.</p></div></div>`;
+  const speichern = async (neu, msg) => { try { await api('PUT', '/api/ausloeser', {ausloeser: neu}); await laden(); nav(); seiteAusloeser(); if (msg) toast(msg); } catch (e) { toast(e.message); } };
+  $('#aNeu').onclick = () => ausloeserDialog(null, speichern);
+  const h = $('#haupt');
+  h.querySelectorAll('[data-a-aktiv]').forEach((c) => c.onchange = () => speichern(l.map((a) => a.id === c.dataset.aAktiv ? {...a, aktiv: c.checked} : a)));
+  h.querySelectorAll('[data-a-edit]').forEach((c) => c.onclick = () => ausloeserDialog(l.find((a) => a.id === c.dataset.aEdit), speichern));
+  h.querySelectorAll('[data-a-weg]').forEach((c) => c.onclick = () => { if (confirm('Auslöser löschen?')) speichern(l.filter((a) => a.id !== c.dataset.aWeg), 'Gelöscht'); });
+  h.querySelectorAll('[data-a-jetzt]').forEach((c) => c.onclick = async () => {
+    c.disabled = true; c.textContent = 'prüft …';
+    try { const o = await api('POST', `/api/ausloeser/${c.dataset.aJetzt}/pruefen`); S.ausloeser = o.ausloeser; seiteAusloeser(); toast(o.ergebnis); } catch (e) { toast(e.message); c.disabled = false; }
+  });
+}
+function ausloeserDialog(a, speichern) {
+  const d = $('#dlg'); const q0 = a?.quelle || 'mail';
+  d.innerHTML = `<h3 style="margin-top:0">${a ? 'Auslöser ändern' : 'Neuer Auslöser'}</h3>${feld('Name', `<input id="aN" value="${esc(a?.name || '')}" placeholder="z. B. Mails von der Schule">`)}
+    <div class="reihe">${feld('Wenn …', `<select id="aQ">${Object.entries(QUELLE).map(([k, v]) => `<option value="${k}" ${q0 === k ? 'selected' : ''}>${v}</option>`).join('')}</select>`)}
+      ${feld('Bot', `<select id="aB">${S.bots.map((b) => `<option value="${b.id}" ${(a?.bot || S.bots.find((x) => x.kapitaen)?.id) === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select>`)}</div>
+    ${feld('<span id="aSL">Suche</span>', `<input id="aS" value="${esc(a?.suche || '')}">`)}
+    <div id="aKW">${feld('Konto (leer = alle, die der Bot sehen darf)', `<input id="aK" value="${esc(a?.konto || '')}">`)}</div>
+    ${feld('… dann soll der Bot', `<textarea id="aA" rows="5" placeholder="z. B. Fasse die Mail in 2 Sätzen zusammen und sag, ob ich etwas tun muss.">${esc(a?.auftrag || '')}</textarea>`)}
+    <div class="reihe">${feld('Prüfen alle … Minuten', `<input id="aI" type="number" min="5" max="1440" value="${a?.intervall || 15}">`)}${feld('Höchstens … mal am Tag', `<input id="aM" type="number" min="1" max="50" value="${a?.max_pro_tag || 6}">`)}</div>
+    <div class="zeilen"><button class="pri" id="aOk">Speichern</button><button onclick="this.closest('dialog').close()">Abbrechen</button></div>`;
+  const art = () => { const q = $('#aQ').value; $('#aS').placeholder = SUCHE_HILFE[q]; $('#aSL').textContent = q === 'webseite' ? 'Adresse' : 'Suche'; $('#aKW').hidden = q !== 'mail'; $('#aS').disabled = q === 'paket'; };
+  $('#aQ').onchange = art; art();
+  $('#aOk').onclick = () => {
+    const n = {...(a || {}), name: $('#aN').value.trim(), quelle: $('#aQ').value, bot: $('#aB').value, suche: $('#aS').value.trim(), konto: $('#aK').value.trim(),
+      auftrag: $('#aA').value.trim(), intervall: +$('#aI').value || 15, max_pro_tag: +$('#aM').value || 6, aktiv: a ? a.aktiv : true};
+    if (!n.name || !n.auftrag) return toast('Name und Auftrag nötig');
+    d.close(); speichern(a ? S.ausloeser.map((x) => x.id === a.id ? n : x) : [...(S.ausloeser || []), n], 'Gespeichert');
+  };
+  d.showModal();
+}
+
+// ── Aktivität ──
+const AKT_ART = {werkzeug: '🔧', routine: '⏰', ausloeser: '⚡', freigabe: '✅', runde: '👥'};
+async function seiteAktivitaet() {
+  const f = S.aktFilter || (S.aktFilter = {tage: 1, bot: '', hintergrund: false});
+  const o = await api('GET', `/api/aktivitaet?tage=${f.tage}&bot=${encodeURIComponent(f.bot)}${f.hintergrund ? '&hintergrund=1' : ''}`).catch(() => ({eintraege: []}));
+  let tag = '';
+  const zeilen = o.eintraege.map((e) => {
+    const d = new Date(e.ts * 1000); const t = d.toLocaleDateString('de-DE', {weekday: 'long', day: '2-digit', month: '2-digit'});
+    const kopfz = t !== tag ? `<h3 style="margin:14px 0 2px">${t}</h3>` : ''; tag = t;
+    return kopfz + `<div class="akt ${e.ok ? '' : 'fehl'}"><span class="z">${d.toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit'})}</span>
+      <span class="w">${AKT_ART[e.art] || '·'} <b>${esc(botName(e.bot))}</b> · ${esc(WERKZEUGE[e.was] || e.was)}${e.hintergrund ? ' <span class="mut">· im Hintergrund</span>' : ''}${e.ok ? '' : ' · fehlgeschlagen'}</span>
+      ${e.detail ? `<span class="d">${esc(e.detail)}</span>` : ''}</div>`;
+  }).join('');
+  $('#haupt').innerHTML = kopf('Aktivität', 'was die Bots getan haben') + `<div class="seite"><div class="bl"><div class="zeilen">
+    <select id="fT" style="width:auto">${[[1, 'heute + gestern'], [7, '7 Tage'], [30, '30 Tage']].map(([v, n]) => `<option value="${v}" ${f.tage === v ? 'selected' : ''}>${n}</option>`).join('')}</select>
+    <select id="fB" style="width:auto"><option value="">alle Bots</option>${S.bots.map((b) => `<option value="${b.id}" ${f.bot === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select>
+    <label class="zeilen"><input type="checkbox" id="fH" ${f.hintergrund ? 'checked' : ''} style="width:auto"> nur im Hintergrund</label></div>
+    ${zeilen || '<div class="box mut">Nichts in diesem Zeitraum.</div>'}</div></div>`;
+  $('#fT').onchange = (e) => { f.tage = +e.target.value; seiteAktivitaet(); };
+  $('#fB').onchange = (e) => { f.bot = e.target.value; seiteAktivitaet(); };
+  $('#fH').onchange = (e) => { f.hintergrund = e.target.checked; seiteAktivitaet(); };
+}
+
 // ── Erinnerungen ──
 const ortszeit = (ms) => { const d = new Date(ms); const z = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}T${z(d.getHours())}:${z(d.getMinutes())}`; };
 const WDH = {'': 'einmalig', taeglich: 'täglich', werktags: 'werktags', woechentlich: 'wöchentlich', monatlich: 'monatlich'};
@@ -898,7 +1020,7 @@ async function start() {
   $('#login').hidden = true; $('#app').hidden = false;
   const letzte = store.get('nb_ansicht');
   S.ansicht = {art: 'chat', id: S.sessions.some((x) => x.id === letzte) || S.bots.some((b) => b.sitzung === letzte) ? letzte : S.bots[0]?.sitzung};
-  nav(); zeigen(); ereignisse();
+  nav(); zeigen(); ereignisse(); statusLaden(); setInterval(statusLaden, 300000);
   setInterval(() => { if (S.webFreigaben && Object.values(S.freigaben).some((f) => f && (f.status === 'offen' || f.status === 'laeuft'))) freigabenLaden(); }, 20000);
 }
 $('#loginForm').addEventListener('submit', (e) => { e.preventDefault(); TOKEN = $('#tok').value.trim(); store.set('nb_token', TOKEN); $('#loginFehler').textContent = ''; start(); });

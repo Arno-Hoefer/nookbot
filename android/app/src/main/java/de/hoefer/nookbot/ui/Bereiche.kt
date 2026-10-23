@@ -52,6 +52,10 @@ fun MehrScreen(vm: NookViewModel) {
             Entry("✅", "Freigaben", "${fr.count { it.offen }} warten") { vm.go(Route.Freigaben) }
             Entry("👥", "Neue Runde", "Mehrere Bots zu einer Frage, der Kapitän fasst zusammen") { vm.go(Route.RundeNeu) }
             Entry("⏰", "Routinen", "${routinen.count { it.aktiv }} aktiv – Aufgaben, die ein Bot zu einer Zeit erledigt") { vm.go(Route.Routinen) }
+            val al by vm.ausloeser.collectAsState()
+            Entry("⚡", "Auslöser", "${al.count { it.aktiv }} aktiv" + (al.count { it.fehler.isNotBlank() }.takeIf { it > 0 }?.let { " · $it mit Fehler" } ?: "") +
+                " – bei neuer Mail, Slack-Nachricht, Änderung arbeitet ein Bot") { vm.go(Route.Ausloeser) }
+            Entry("📜", "Aktivität", "Was die Bots getan haben – auch im Hintergrund") { vm.go(Route.Aktivitaet) }
             Entry("🔔", "Erinnerungen", "${vm.erinnerungen.collectAsState().value.count { !it.erledigt }} offen – Hinweise zur Uhrzeit, auch von den Bots gestellt") {
                 vm.go(Route.Erinnerungen)
             }
@@ -112,6 +116,7 @@ fun RundeNeuScreen(vm: NookViewModel) {
     var frage by remember { mutableStateOf("") }
     var sel by remember { mutableStateOf(bots.map { it.id }.toSet()) }
     var kap by remember { mutableStateOf(bots.firstOrNull { it.kapitaen }?.id ?: "") }
+    var gespraech by remember { mutableStateOf(0) }
     Column(Modifier.fillMaxSize()) {
         TopBar("Neue Runde", { vm.back() })
         Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
@@ -127,10 +132,13 @@ fun RundeNeuScreen(vm: NookViewModel) {
                     Text("  ${b.rolle}", color = P.mut, fontSize = 13.sp)
                 }
             }
+            Section("Danach miteinander reden?", "Jeder sieht nur die neuen Beiträge der anderen und antwortet in höchstens 4 Sätzen oder passt. " +
+                "Sagen alle „passe“, ist früher Schluss – so bleibt es kurz und günstig.")
+            Row { Chip("Nein", gespraech == 0) { gespraech = 0 }; Chip("1 Runde", gespraech == 1) { gespraech = 1 }; Chip("Bis zu 2", gespraech == 2) { gespraech = 2 } }
             Section("Wer fasst zusammen?")
-            Row { bots.forEach { b -> Chip(b.name, kap == b.id) { kap = b.id } } }
+            androidx.compose.foundation.layout.FlowRow { bots.forEach { b -> Chip(b.name, kap == b.id) { kap = b.id } } }
             Row(Modifier.padding(vertical = 20.dp)) {
-                MainButton("Runde starten", enabled = frage.isNotBlank() && sel.size >= 2) { vm.startRunde(frage, sel.toList(), kap) }
+                MainButton("Runde starten", enabled = frage.isNotBlank() && sel.size >= 2) { vm.startRunde(frage, sel.toList(), kap, gespraech) }
             }
             if (sel.size < 2) Hint("Mindestens zwei Bots auswählen.")
         }
@@ -195,7 +203,7 @@ fun RoutineEditScreen(vm: NookViewModel, id: String?) {
         Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
             Field("Name", name) { name = it }
             Section("Wer?")
-            Row { bots.forEach { b -> Chip(b.name, bot == b.id) { bot = b.id } } }
+            androidx.compose.foundation.layout.FlowRow { bots.forEach { b -> Chip(b.name, bot == b.id) { bot = b.id } } }
             Section("Wann?")
             Row { Chip("Wiederkehrend", !einmalig) { einmalig = false }; Chip("Einmalig", einmalig) { einmalig = true } }
             Row {
