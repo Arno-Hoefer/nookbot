@@ -44,6 +44,7 @@ sealed class Route {
     data object Ausloeser : Route()
     data class AusloeserEdit(val id: String?) : Route()
     data object Aktivitaet : Route()
+    data object Arbeit : Route()
     data class RoutineEdit(val id: String?) : Route()
     data object Wissen : Route()
     data object Zugriffe : Route()
@@ -72,6 +73,9 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
     val ausloeser = MutableStateFlow<List<de.hoefer.nookbot.data.Ausloeser>>(emptyList())
     val aktivitaet = MutableStateFlow<List<de.hoefer.nookbot.data.AktEintrag>>(emptyList())
     val aktFilter = MutableStateFlow(Triple(1, "", false))  // Tage, Bot, nur Hintergrund
+    val arbeit = MutableStateFlow<List<de.hoefer.nookbot.data.ArbeitDatei>>(emptyList())
+    /** Regel-Katalog vom Pi: Werkzeug → Anzeigename, dazu die, die nie „frei“ sein dürfen, und das Tageslimit */
+    val regelKatalog = MutableStateFlow<JSONObject?>(null)
     val erinnerungen = MutableStateFlow<List<Erinnerung>>(emptyList())
     val ablaeufe = MutableStateFlow<List<Ablauf>>(emptyList())
     val gedaechtnis = MutableStateFlow<List<Merk>>(emptyList())
@@ -131,9 +135,10 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
             Route.Datenbanken -> loadDatenbanken()
             Route.Wissen -> loadWissen()
             Route.Zugriffe -> loadZugriffe()
-            is Route.BotEdit -> { loadModelle(); loadRechte(); loadStimmen() }
+            is Route.BotEdit -> { loadModelle(); loadRechte(); loadStimmen(); io { val k = api.get("/api/regeln"); withContext(Dispatchers.Main) { regelKatalog.value = k } } }
             Route.Settings -> loadStimmen()
             Route.Aktivitaet -> loadAktivitaet()
+            Route.Arbeit -> loadArbeit()
             else -> {}
         }
     }
@@ -214,6 +219,7 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
             "session_del" -> sitzungen.value = sitzungen.value.filterNot { it.id == ev.optString("s") }
             "bots", "routinen", "erinnerungen", "ablaeufe", "gedaechtnis", "ausloeser" -> io { loadStateNow() }
             "aktivitaet" -> if (stack.value.lastOrNull() == Route.Aktivitaet) loadAktivitaet()
+            "arbeit" -> if (stack.value.lastOrNull() == Route.Arbeit) loadArbeit()
         }
     }
 
@@ -518,6 +524,47 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
         withContext(Dispatchers.Main) {
             ausloeser.value = de.hoefer.nookbot.data.Ausloeser.list(r.optJSONArray("ausloeser"))
             toast.value = r.optString("ergebnis")
+        }
+    }
+
+    fun loadArbeit() = io {
+        val r = api.get("/api/arbeit")
+        withContext(Dispatchers.Main) { arbeit.value = de.hoefer.nookbot.data.ArbeitDatei.list(r.optJSONArray("dateien")) }
+    }
+
+    fun arbeitLoeschen(name: String) = io {
+        val r = api.delete("/api/arbeit/" + android.net.Uri.encode(name))
+        withContext(Dispatchers.Main) { arbeit.value = de.hoefer.nookbot.data.ArbeitDatei.list(r.optJSONArray("dateien")) }
+    }
+
+    fun arbeitHoch(uri: android.net.Uri) = io {
+        val ctx = getApplication<android.app.Application>()
+        val name = Dateien.name(ctx, uri)
+        val bytes = ctx.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
+        if (bytes.size > 50_000_000) error("Datei zu groß (max. 50 MB)")
+        val r = api.post("/api/arbeit", JSONObject().put("name", name).put("b64", android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)))
+        withContext(Dispatchers.Main) { arbeit.value = de.hoefer.nookbot.data.ArbeitDatei.list(r.optJSONArray("dateien")); toast.value = "$name liegt im Arbeitsordner" }
+    }
+
+    /** Bytes einer Datei aus dem Arbeitsordner (für Vorschaubilder im Chat), im Cache des Handys gehalten. */
+    suspend fun arbeitBytes(name: String): ByteArray = withContext(Dispatchers.IO) {
+        val f = java.io.File(java.io.File(getApplication<android.app.Application>().cacheDir, "arbeit").apply { mkdirs() }, name)
+        if (!f.exists()) f.writeBytes(api.getBytes("/api/arbeit/" + android.net.Uri.encode(name)))
+        f.readBytes()
+    }
+
+    /** Datei öffnen: herunterladen und an eine passende App geben (Bildbetrachter, Excel, PDF …). */
+    fun arbeitOeffnen(name: String) = io {
+        val ctx = getApplication<android.app.Application>()
+        val f = java.io.File(java.io.File(ctx.cacheDir, "arbeit").apply { mkdirs() }, name)
+        f.writeBytes(api.getBytes("/api/arbeit/" + android.net.Uri.encode(name)))
+        val uri = androidx.core.content.FileProvider.getUriForFile(ctx, ctx.packageName + ".dateien", f)
+        val mime = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(name.substringAfterLast('.', "").lowercase()) ?: "application/octet-stream"
+        val i = android.content.Intent(android.content.Intent.ACTION_VIEW).setDataAndType(uri, mime)
+            .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        withContext(Dispatchers.Main) {
+            runCatching { ctx.startActivity(android.content.Intent.createChooser(i, name).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                .onFailure { toast.value = "Keine App zum Öffnen gefunden" }
         }
     }
 

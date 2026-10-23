@@ -2,4 +2,5 @@
 <!-- Nur der Ordner für Kamerafotos – die Kamera-App schreibt dorthin, danach wird das Foto hochgeladen und gelöscht. -->
 <paths>
     <cache-path name="kamera" path="kamera/" />
+    <cache-path name="arbeit" path="arbeit/" />
 </paths>

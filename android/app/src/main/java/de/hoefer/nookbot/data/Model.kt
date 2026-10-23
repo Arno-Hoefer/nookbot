@@ -12,6 +12,8 @@ data class Bot(
     val rechte: JSONObject = JSONObject(),
     /** Stimme im Sprachmodus: „pi:thorsten-high“ (Piper auf dem Pi) oder „handy:<Name der Android-Stimme>“ */
     val stimme: String = "pi:thorsten-high",
+    /** Regeln für Schreibendes: Werkzeug → „frei“ oder „nie“ (fehlt = fragen) */
+    val regeln: Map<String, String> = emptyMap(),
 ) {
     companion object {
         fun from(o: JSONObject) = Bot(
@@ -19,6 +21,7 @@ data class Bot(
             o.optBoolean("kapitaen"), o.optBoolean("zugriffe"), o.optString("persoenlichkeit"), o.optString("fokus"),
             o.optString("modell"), o.optBoolean("laeuft"), WissenDatei.list(o.optJSONArray("wissen")), o.optString("sitzung"),
             o.optBoolean("merken", true), o.optJSONObject("rechte") ?: JSONObject(), o.optString("stimme", "pi:thorsten-high").ifBlank { "pi:thorsten-high" },
+            o.optJSONObject("regeln")?.let { r -> r.keys().asSequence().associateWith { r.optString(it) } } ?: emptyMap(),
         )
     }
 }
@@ -165,6 +168,17 @@ data class Ausloeser(
     }
 }
 
+/** Eine Datei im gemeinsamen Arbeitsordner auf dem Pi. */
+data class ArbeitDatei(val name: String, val groesse: Long, val ts: Long, val bot: String) {
+    val bild: Boolean get() = Regex("(?i)\\.(png|jpe?g|gif|webp)$").containsMatchIn(name)
+
+    companion object {
+        fun list(a: JSONArray?): List<ArbeitDatei> = if (a == null) emptyList() else (0 until a.length()).map { a.getJSONObject(it) }.map {
+            ArbeitDatei(it.optString("name"), it.optLong("groesse"), (it.optDouble("ts", 0.0) * 1000).toLong(), it.optString("bot"))
+        }
+    }
+}
+
 /** Eine Zeile der Aktivität: was ein Bot getan hat (Werkzeug, Routine, Auslöser, Freigabe, Runde). */
 data class AktEintrag(val ts: Long, val bot: String, val art: String, val was: String, val detail: String, val ok: Boolean, val hintergrund: Boolean) {
     companion object {
@@ -241,7 +255,8 @@ data class Datenbank(val titel: String, val name: String, val beschreibung: Stri
 /** Was ein Werkzeug tut – für die kleine Zeile im Chat. MCP-Werkzeuge heißen z. B. „mcp_home_termine“. */
 private val TOOL_TEXT = linkedMapOf(
     "termine_anlegen" to "Termine zur Freigabe vorgelegt", "termin_anlegen" to "Termin zur Freigabe vorgelegt",
-    "dokument_ansehen" to "Dokument angesehen", "gesundheit" to "Gesundheitsdaten gelesen",
+    "dokument_ansehen" to "Dokument angesehen", "python_ausfuehren" to "Python ausgeführt", "arbeitsordner" to "Arbeitsordner angesehen",
+    "datei_ablegen" to "Datei abgelegt", "seite_ansehen" to "Seitenbild gemacht", "gesundheit" to "Gesundheitsdaten gelesen",
     "ausloeser_anlegen" to "Auslöser angelegt", "ausloeser_liste" to "Auslöser angesehen", "ausloeser_loeschen" to "Auslöser gelöscht", "termin_gaeste" to "Einladung zur Freigabe vorgelegt",
     "entwurf_anlegen" to "Mail-Entwurf zur Freigabe vorgelegt", "freigabe_status" to "Freigabe nachgesehen",
     "kalender_liste" to "Kalender aufgelistet", "termine" to "Kalender gelesen", "mails_suchen" to "Mails durchsucht",

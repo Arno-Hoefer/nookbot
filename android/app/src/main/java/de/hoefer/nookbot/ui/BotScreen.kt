@@ -66,6 +66,8 @@ fun BotScreen(vm: NookViewModel, id: String?) {
     var fokus by remember(b?.id) { mutableStateOf(b?.fokus ?: "") }
     var rechte by remember(b?.id) { mutableStateOf(org.json.JSONObject((b?.rechte ?: org.json.JSONObject()).toString())) }
     var merken by remember(b?.id) { mutableStateOf(b?.merken ?: true) }
+    var regeln by remember(b?.id) { mutableStateOf(b?.regeln ?: emptyMap()) }
+    val regelKatalog by vm.regelKatalog.collectAsState()
     var stimme by remember(b?.id) { mutableStateOf(b?.stimme ?: "pi:thorsten-high") }
     val gedaechtnis by vm.gedaechtnis.collectAsState()
     var modellMenu by remember { mutableStateOf(false) }
@@ -128,6 +130,21 @@ fun BotScreen(vm: NookViewModel, id: String?) {
                 "Schreiben (Entwürfe, Termine, Tabellen) nur mit deiner Freigabe. Ohne Häkchen: nur Websuche und Wissen.")
             RechteWahl(vm, rechte) { rechte = it }
 
+            regelKatalog?.takeIf { b != null }?.let { k ->
+                val wz = k.optJSONObject("werkzeuge") ?: org.json.JSONObject()
+                val nieFrei = k.optJSONArray("nie_frei")?.let { a -> (0 until a.length()).map { a.getString(it) }.toSet() } ?: emptySet()
+                Section("Regeln für Schreibendes", "frei = sofort ausführen (höchstens ${k.optInt("frei_max", 10)}× am Tag, steht in der Aktivität) · " +
+                    "fragen = Freigabe wie bisher · nie = gesperrt. Sind Gäste oder Einladungen dabei, wird immer gefragt.")
+                wz.keys().forEach { t ->
+                    Text(wz.optString(t), color = P.fg, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
+                    Row {
+                        listOf("frei", "fragen", "nie").filter { it != "frei" || t !in nieFrei }.forEach { v ->
+                            Chip(v, (regeln[t] ?: "fragen") == v) { regeln = if (v == "fragen") regeln - t else regeln + (t to v) }
+                        }
+                    }
+                }
+            }
+
             Section("Gedächtnis", "Was sich der Bot dauerhaft merkt – Vorlieben, Arbeitsweisen, Fakten über dich. Nur aus deinen eigenen Nachrichten.")
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Darf sich selbst etwas merken", color = P.fg, fontSize = 14.sp, modifier = Modifier.weight(1f))
@@ -157,6 +174,7 @@ fun BotScreen(vm: NookViewModel, id: String?) {
                     saving = true
                     val d = JSONObject().put("name", name).put("rolle", rolle).put("farbe", colorHex(farbe)).put("form", form).put("modell", modell)
                         .put("persoenlichkeit", persoenlichkeit).put("fokus", fokus).put("rechte", rechte).put("merken", merken).put("stimme", stimme)
+                        .apply { if (b != null) put("regeln", org.json.JSONObject(regeln)) }
                     vm.saveBot(id, d) { saving = false; vm.back() }
                 }
                 Spacer(Modifier.width(10.dp))

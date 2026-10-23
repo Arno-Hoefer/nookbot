@@ -17,6 +17,16 @@ class Api(private val base: () -> String, private val token: () -> String) {
     fun put(path: String, body: JSONObject): JSONObject = call(Request.Builder().url(base() + path).put(body.toString().toRequestBody(json)))
     fun delete(path: String): JSONObject = call(Request.Builder().url(base() + path).delete())
 
+    /** GET, Antwort als Bytes (Dateien aus dem Arbeitsordner). */
+    fun getBytes(path: String): ByteArray {
+        if (token().isBlank()) throw IOException("Chat-Token fehlt (Einstellungen)")
+        val req = Request.Builder().url(base() + path).get().header("Authorization", "Bearer ${token()}").build()
+        client.newCall(req).execute().use { r ->
+            if (!r.isSuccessful) throw IOException(runCatching { JSONObject(r.body?.string() ?: "").optString("error") }.getOrNull() ?: "HTTP ${r.code}")
+            return r.body?.bytes() ?: ByteArray(0)
+        }
+    }
+
     /** POST, Antwort als Bytes (z. B. Sprachausgabe als WAV). */
     fun postBytes(path: String, body: JSONObject): ByteArray {
         if (token().isBlank()) throw IOException("Chat-Token fehlt (Einstellungen)")

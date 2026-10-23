@@ -433,6 +433,7 @@ fun ChatScreen(vm: NookViewModel, sid: String) {
 private fun InfoKarte(vm: NookViewModel, m: Msg) {
     val ablaeufe by vm.ablaeufe.collectAsState()
     when (m.art) {
+        "datei" -> DateiKarte(vm, m.ref)
         "gedaechtnis" -> Row(Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(12.dp)).background(P.card)
             .border(1.dp, A.violet.copy(alpha = 0.5f), RoundedCornerShape(12.dp)).padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically) {

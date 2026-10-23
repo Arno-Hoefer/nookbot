@@ -35,6 +35,7 @@ button.mic.an{background:var(--accent);color:#fff}
 .akt .z{color:var(--mut);font-variant-numeric:tabular-nums}
 .akt .d{grid-column:2;color:var(--mut);font-size:12.5px;overflow-wrap:anywhere}
 .akt.fehl .w{color:var(--accent)}
+.karte.datei{display:flex;gap:10px;align-items:flex-end;border-left-color:var(--green)}
 .gruppe{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:14px 8px 4px}
 .eintrag{display:flex;gap:10px;align-items:center;padding:8px;border-radius:10px;cursor:pointer;min-width:0}
 .eintrag:hover{background:var(--hover)}.eintrag.aktiv{background:var(--soft)}
@@ -240,6 +241,7 @@ function ereignis(e) {
     chatZeichnen();
   }
   if (e.t === 'del' && S.offen?.id === e.s) { S.offen.msgs = S.offen.msgs.filter((m) => m.id !== e.id); chatZeichnen(); }
+  if (e.t === 'arbeit' && S.ansicht.art === 'arbeit') seiteArbeit();
   if (e.t === 'aktivitaet' && S.ansicht.art === 'aktivitaet') { clearTimeout(S.aktT); S.aktT = setTimeout(seiteAktivitaet, 800); }
   if (['bots', 'routinen', 'ablaeufe', 'gedaechtnis', 'erinnerungen', 'ausloeser'].includes(e.t)) laden().then(() => { nav(); if (S.ansicht.art !== 'chat' && !S.bearbeitet) zeigen(); });
   if (e.t === 'busy' && !e.v) fertigMelden(e.s);
@@ -265,7 +267,7 @@ function nav() {
   h += '<div class="gruppe">Mehr</div>';
   const offenF = Object.values(S.freigaben).filter((f) => f && f.status === 'offen').length;
   for (const [k, n, z] of [['suche', 'Suche', 0], ['freigaben', 'Freigaben', offenF], ['ablaeufe', 'Abläufe', entw], ['routinen', 'Routinen', 0],
-    ['ausloeser', 'Auslöser', (S.ausloeser || []).filter((x) => x.fehler).length], ['aktivitaet', 'Aktivität', 0], ['erinnerungen', 'Erinnerungen', 0], ['gedaechtnis', 'Gedächtnis', 0], ['wissen', 'Wissen', 0], ['datenbanken', 'Datenbanken', 0],
+    ['ausloeser', 'Auslöser', (S.ausloeser || []).filter((x) => x.fehler).length], ['aktivitaet', 'Aktivität', 0], ['arbeit', 'Arbeitsordner', 0], ['erinnerungen', 'Erinnerungen', 0], ['gedaechtnis', 'Gedächtnis', 0], ['wissen', 'Wissen', 0], ['datenbanken', 'Datenbanken', 0],
     ['archiv', 'Ältere Unterhaltungen', 0], ['zugriffe', 'Zugriffe', 0], ['einstellungen', 'Einstellungen', 0]]) {
     h += `<div class="eintrag ${a.art === k ? 'aktiv' : ''}" data-seite="${k}"><div class="t"><div class="n">${n}</div></div>${z ? `<span class="badge">${z}</span>` : ''}</div>`;
   }
@@ -293,7 +295,7 @@ async function zeigen() {
   S.bearbeitet = false;
   if (a.art === 'chat') return chatOeffnen(a.id || S.bots[0]?.sitzung);
   S.offen = null;
-  ({ablaeufe: seiteAblaeufe, gedaechtnis: seiteGedaechtnis, freigaben: seiteFreigaben, routinen: seiteRoutinen, runde: seiteRunde, ausloeser: seiteAusloeser, aktivitaet: seiteAktivitaet,
+  ({ablaeufe: seiteAblaeufe, gedaechtnis: seiteGedaechtnis, freigaben: seiteFreigaben, routinen: seiteRoutinen, runde: seiteRunde, ausloeser: seiteAusloeser, aktivitaet: seiteAktivitaet, arbeit: seiteArbeit,
     bot: () => seiteBot(a.id), suche: seiteSuche, archiv: seiteArchiv, erinnerungen: seiteErinnerungen, wissen: seiteWissen,
     datenbanken: seiteDatenbanken, zugriffe: seiteZugriffe, einstellungen: seiteEinstellungen}[a.art] || (() => {}))();
 }
@@ -408,6 +410,11 @@ function chatZeichnen(unten) {
   if (amEnde) vl.scrollTop = vl.scrollHeight;
 }
 function karte(m) {
+  if (m.art === 'datei') {
+    const bild = /\.(png|jpe?g|gif|webp)$/i.test(m.ref || '');
+    return `<div class="karte datei"><div style="flex:1;min-width:0">${bild ? `<img data-arbeit-bild="${esc(m.ref)}" alt="${esc(m.ref)}" style="max-width:100%;max-height:420px;border-radius:10px;display:block;margin-bottom:6px;cursor:zoom-in">` : ''}
+      <span>📎 ${esc(m.ref)}</span> <span class="mut">· Arbeitsordner</span></div><button class="klein" data-arbeit-laden="${esc(m.ref)}">Laden</button></div>`;
+  }
   if (m.art === 'gedaechtnis') return `<div class="karte ged ${m.zurueck ? 'zurueck' : ''}"><span style="flex:1">${esc(m.text)}</span>${m.zurueck ? '' : `<button class="klein text" data-vergessen="${esc(m.ref)}">Rückgängig</button>`}</div>`;
   if (m.art === 'ablauf') {
     const st = m.status || 'entwurf';
@@ -574,7 +581,8 @@ const WERKZEUGE = {termin_anlegen: 'Termin zur Freigabe', termin_gaeste: 'Einlad
   drive_lesen: 'Datei aus Drive gelesen', sheets_lesen: 'Tabelle gelesen', sheets_schreiben: 'Tabelle ändern – Freigabe',
   sheets_anhaengen: 'Zeilen anhängen – Freigabe', sheet_anlegen: 'Neue Tabelle – Freigabe', doc_anlegen: 'Neues Dokument – Freigabe',
   doc_anhaengen: 'Dokument ergänzen – Freigabe', read_file: 'Wissen/Datei gelesen', write_file: 'Notiz geschrieben', edit_file: 'Notiz geändert',
-  list_dir: 'Ordner angesehen', dokument_ansehen: 'Dokument angesehen', termine_anlegen: 'Termine zur Freigabe',
+  list_dir: 'Ordner angesehen', python_ausfuehren: 'Python ausgeführt', arbeitsordner: 'Arbeitsordner angesehen',
+  datei_ablegen: 'Datei abgelegt', seite_ansehen: 'Seitenbild gemacht', dokument_ansehen: 'Dokument angesehen', termine_anlegen: 'Termine zur Freigabe',
   ausloeser_anlegen: 'Auslöser angelegt', ausloeser_liste: 'Auslöser angesehen', ausloeser_loeschen: 'Auslöser gelöscht', web_fetch: 'Seite abgerufen', load_image: 'Bild angesehen', subagent: 'Teilaufgabe', spawn: 'Teilaufgabe'};
 function werkzeugText(n) {
   const k = String(n || '').trim().replace(/^mcp_/, '').replace(/^(home|nookbot)_/, '');
@@ -635,6 +643,7 @@ async function seiteBot(id) {
     neu ? '' : `<button class="klein" id="bChat">Chat öffnen</button>`) + `<div class="seite"><div class="bl" id="bForm"><div class="box mut">lädt …</div></div></div>`;
   const [mod, stim, kat] = await Promise.all([api('GET', '/api/modelle').catch(() => ({modelle: [], claude: []})), api('GET', '/api/stimmen').catch(() => ({stimmen: []})),
     api('GET', '/api/rechte').catch(() => null)]);
+  const rk = neu ? null : await api('GET', '/api/regeln').catch(() => null);
   const r = JSON.parse(JSON.stringify(b?.rechte || {}));
   const modelle = [...(mod.claude || []).map((m) => [m, 'Claude']), ...(mod.modelle || []).map((m) => [m, 'Ollama'])];
   if (b && !modelle.some(([m]) => m === b.modell)) modelle.unshift([b.modell, '']);
@@ -650,6 +659,10 @@ async function seiteBot(id) {
       ${b?.stimme?.startsWith('handy:') ? `<option value="${esc(b.stimme)}" selected>Handy: ${esc(b.stimme.slice(6))}</option>` : ''}</select><button class="klein" id="bProbe">▶ Probe</button></div>
       <p class="mut">Handy-Stimmen wählst du in der App. Namen spricht das Aussprache-Wörterbuch (Einstellungen) richtig aus.</p></div>
     ${neu ? '' : `<div class="box"><h3>Zugriffe</h3><div id="bRechte"></div></div>`}
+    ${neu || !rk ? '' : `<div class="box"><h3>Regeln für Schreibendes</h3><p class="mut" style="margin-top:0">frei = sofort ausführen (höchstens ${rk.frei_max}× am Tag, steht in der Aktivität) ·
+      fragen = Freigabe wie bisher · nie = gesperrt. Sobald Gäste oder Einladungen dabei sind, wird immer gefragt.</p>
+      ${Object.entries(rk.werkzeuge).map(([t, n]) => `<div class="teil"><span style="flex:1">${esc(n)}</span><select data-regel="${t}" style="width:auto">
+        ${['frei', 'fragen', 'nie'].filter((v) => v !== 'frei' || !rk.nie_frei.includes(t)).map((v) => `<option ${((b.regeln || {})[t] || 'fragen') === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>`).join('')}</div>`}
     ${neu ? '' : `<div class="box"><h3>Gedächtnis</h3>${schalter('bMerken', 'Darf sich selbst etwas merken', b.merken !== false)}
       ${S.gedaechtnis.filter((e) => e.fuer === b.id).map((e) => `<div class="teil"><span style="flex:1">🧠 ${esc(e.text)}</span><button class="klein text" data-ged-edit="${e.id}">✎</button><button class="klein text" data-vergessen="${e.id}">✕</button></div>`).join('') || '<p class="mut">Noch nichts gemerkt.</p>'}</div>
     <div class="box"><h3>Eigenes Wissen</h3>${(b.wissen || []).map((w) => `<div class="teil"><span style="flex:1">📄 ${esc(w.name)}</span><span class="mut">${Math.ceil(w.groesse / 1000)} KB</span>
@@ -670,7 +683,10 @@ async function seiteBot(id) {
     const d = {name: $('#bName').value.trim(), rolle: $('#bRolle').value.trim(), farbe: $('#bFarbe').value.toUpperCase(), form: $('#bForm2').value,
       modell: $('#bModell').value, persoenlichkeit: $('#bPers').value, fokus: $('#bFokus').value, stimme: $('#bStimme').value};
     if (!d.name) return toast('Name fehlt');
-    if (!neu) { d.merken = $('#bMerken').checked; d.rechte = S.rechteEntwurf; }
+    if (!neu) {
+      d.merken = $('#bMerken').checked; d.rechte = S.rechteEntwurf;
+      d.regeln = Object.fromEntries([...document.querySelectorAll('[data-regel]')].map((x) => [x.dataset.regel, x.value]).filter(([, v]) => v !== 'fragen'));
+    }
     try {
       const o = neu ? await api('POST', '/api/bots', d) : await api('PUT', '/api/bots/' + b.id, d);
       if (neu && d.stimme) await api('PUT', '/api/bots/' + o.id, {stimme: d.stimme});
@@ -863,8 +879,48 @@ function ausloeserDialog(a, speichern) {
   d.showModal();
 }
 
+// ── Arbeitsordner (gemeinsam für alle Bots) ──
+async function arbeitBlob(name) {
+  const r = await fetch('/api/arbeit/' + encodeURIComponent(name), {headers: {'Authorization': 'Bearer ' + TOKEN}});
+  if (!r.ok) throw new Error('Datei nicht gefunden');
+  return r.blob();
+}
+async function arbeitLaden(name) {
+  try { const u = URL.createObjectURL(await arbeitBlob(name)); const a = document.createElement('a'); a.href = u; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(u), 5000); }
+  catch (e) { toast(e.message); }
+}
+async function arbeitBilder(root = document) {
+  for (const img of root.querySelectorAll('img[data-arbeit-bild]:not([src])')) {
+    try { img.src = URL.createObjectURL(await arbeitBlob(img.dataset.arbeitBild)); } catch (e) { img.replaceWith(document.createTextNode('(Bild gelöscht)')); }
+  }
+}
+document.addEventListener('click', (ev) => {
+  const l = ev.target.closest('[data-arbeit-laden]'); if (l) arbeitLaden(l.dataset.arbeitLaden);
+  const i = ev.target.closest('img[data-arbeit-bild]'); if (i?.src) window.open(i.src, '_blank');
+});
+new MutationObserver(() => arbeitBilder()).observe(document.body, {childList: true, subtree: true});
+async function seiteArbeit() {
+  const o = await api('GET', '/api/arbeit').catch(() => ({dateien: []}));
+  const kb = (n) => n > 1e6 ? (n / 1e6).toFixed(1) + ' MB' : Math.ceil(n / 1024) + ' KB';
+  $('#haupt').innerHTML = kopf('Arbeitsordner', 'gemeinsam für alle Bots', '<button class="pri klein" id="arHoch">+ Datei</button><input type="file" id="arDatei" multiple hidden>') +
+    `<div class="seite"><div class="bl">${o.dateien.map((f) => `<div class="eintrag" style="cursor:default">
+      <div class="t"><div class="n">${/\.(png|jpe?g|gif|webp)$/i.test(f.name) ? '🖼' : '📄'} ${esc(f.name)}</div><div class="s">${kb(f.groesse)} · ${zeitText(f.ts)}${f.bot && f.bot !== 'app' ? ' · von ' + esc(botName(f.bot)) : f.bot === 'app' ? ' · von dir' : ''}</div></div>
+      <button class="klein" data-arbeit-laden="${esc(f.name)}">Laden</button><button class="klein text" data-ar-weg="${esc(f.name)}">✕</button></div>`).join('')
+      || '<div class="box mut">Leer. Hier landen Diagramme, Tabellen und Seitenbilder der Bots – und Dateien, die du für sie ablegst.</div>'}
+    <p class="mut">Die Bots lesen und schreiben hier mit <code>python_ausfuehren</code>; legst du eine Datei ab, sag dem Bot einfach den Namen.</p></div></div>`;
+  $('#arHoch').onclick = () => $('#arDatei').click();
+  $('#arDatei').onchange = async (e) => {
+    for (const f of e.target.files) {
+      try { const b64 = await new Promise((r) => { const x = new FileReader(); x.onload = () => r(String(x.result).split(',')[1]); x.readAsDataURL(f); });
+        await api('POST', '/api/arbeit', {name: f.name, b64}); } catch (er) { toast(er.message); }
+    }
+    seiteArbeit();
+  };
+  $('#haupt').querySelectorAll('[data-ar-weg]').forEach((c) => c.onclick = async () => { if (!confirm(c.dataset.arWeg + ' löschen?')) return; await api('DELETE', '/api/arbeit/' + encodeURIComponent(c.dataset.arWeg)); seiteArbeit(); });
+}
+
 // ── Aktivität ──
-const AKT_ART = {werkzeug: '🔧', routine: '⏰', ausloeser: '⚡', freigabe: '✅', runde: '👥'};
+const AKT_ART = {werkzeug: '🔧', frei: '⚙️', routine: '⏰', ausloeser: '⚡', freigabe: '✅', runde: '👥'};
 async function seiteAktivitaet() {
   const f = S.aktFilter || (S.aktFilter = {tage: 1, bot: '', hintergrund: false});
   const o = await api('GET', `/api/aktivitaet?tage=${f.tage}&bot=${encodeURIComponent(f.bot)}${f.hintergrund ? '&hintergrund=1' : ''}`).catch(() => ({eintraege: []}));

@@ -74,6 +74,7 @@ class MainActivity : ComponentActivity() {
                             Route.Ausloeser -> AusloeserScreen(vm)
                             is Route.AusloeserEdit -> AusloeserEditScreen(vm, r.id)
                             Route.Aktivitaet -> AktivitaetScreen(vm)
+                            Route.Arbeit -> ArbeitScreen(vm)
                             Route.Wissen -> WissenScreen(vm)
                             Route.Zugriffe -> ZugriffeScreen(vm)
                             Route.Mehr -> MehrScreen(vm)

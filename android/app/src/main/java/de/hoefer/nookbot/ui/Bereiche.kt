@@ -56,6 +56,7 @@ fun MehrScreen(vm: NookViewModel) {
             Entry("⚡", "Auslöser", "${al.count { it.aktiv }} aktiv" + (al.count { it.fehler.isNotBlank() }.takeIf { it > 0 }?.let { " · $it mit Fehler" } ?: "") +
                 " – bei neuer Mail, Slack-Nachricht, Änderung arbeitet ein Bot") { vm.go(Route.Ausloeser) }
             Entry("📜", "Aktivität", "Was die Bots getan haben – auch im Hintergrund") { vm.go(Route.Aktivitaet) }
+            Entry("🗃️", "Arbeitsordner", "Diagramme, Tabellen, Seitenbilder – gemeinsam für alle Bots") { vm.go(Route.Arbeit) }
             Entry("🔔", "Erinnerungen", "${vm.erinnerungen.collectAsState().value.count { !it.erledigt }} offen – Hinweise zur Uhrzeit, auch von den Bots gestellt") {
                 vm.go(Route.Erinnerungen)
             }
