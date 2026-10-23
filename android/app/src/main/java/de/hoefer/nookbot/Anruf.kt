@@ -142,12 +142,14 @@ object Anruf {
     /** Angenommen (aus dem Anruf-Bildschirm, also sichtbar): Dienst fürs Gespräch starten. */
     fun annehmen(ctx: Context) {
         if (aktuell == null) return
+        de.hoefer.nookbot.ui.Klang.an()
         ctx.getSystemService(NotificationManager::class.java).cancel(NOTIF_ANRUF)
         zustand.value = Zustand.Laeuft
         ctx.startForegroundService(Intent(ctx, AnrufDienst::class.java).setAction(AnrufDienst.GESPRAECH))
     }
 
     fun ende(ctx: Context) {
+        if (zustand.value == Zustand.Laeuft) de.hoefer.nookbot.ui.Klang.aus()
         protokoll("aufgelegt")
         protokollSenden(ctx)
         ctx.getSystemService(NotificationManager::class.java).cancel(NOTIF_ANRUF)

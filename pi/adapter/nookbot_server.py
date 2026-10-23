@@ -33,7 +33,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from wsclient import WSClient  # noqa: E402
 
-VERSION = "0.13.0"
+VERSION = "0.14.0"
 BASE = os.environ.get("NOOKBOT_HOME", "/srv/picoclaw/nookbot")
 MAIN_HOME = os.environ.get("NOOKBOT_MAIN_HOME", "/srv/picoclaw")
 BOTS_HOME = os.path.join(MAIN_HOME, "bots")
@@ -277,6 +277,9 @@ def agent_md(b: dict) -> str:
         parts.append("- Du hast **keine** Zugriffe auf Kalender, Mail, Slack, GitLab oder Datenbank – nur Websuche und Wissen.\n")
     else:
         parts.append("- Deine Zugriffe (nur diese, %NUTZER% stellt sie in der App ein): " + rechte_text(rechte(b)) + ".\n")
+    parts.append("## Gesprochen\n\nBeginnt eine Nachricht mit 🎙, hat %NUTZER% sie gesprochen (Sprachmodus oder Anruf) und hört deine Antwort "
+                 "vorgelesen: antworte in Sprechsprache – ganze, kurze Sätze, keine Tabellen, Listen, Links oder Markdown, höchstens etwa "
+                 "vier Sätze, außer er will ausdrücklich mehr. Zahlen, Uhrzeiten und Daten so, wie man sie sagt.\n")
     parts.append("## Zeitpläne und Erinnerungen\n\n- „Erinnere mich an …“ → `erinnerung_anlegen` (nur ein Hinweis aufs Handy, pünktlich; "
                  "auch wiederkehrend).\n- Aufgaben, die du zu einer Zeit erledigen sollst → `routine_anlegen` (einmalig mit `datum` oder wiederkehrend; "
                  "das Ergebnis kommt in deine Unterhaltung).\n- „Wenn eine Mail/Slack-Nachricht/Änderung kommt, dann …“ → `ausloeser_anlegen` "
@@ -335,7 +338,7 @@ def agent_md(b: dict) -> str:
 
 
 def soul_md(b: dict) -> str:
-    return f"# Soul\n\nIch bin {b['name']}.\n\n" + (b.get("persoenlichkeit") or "Ruhig, hilfsbereit, knapp.").strip() + "\n"
+    return n(f"# Soul\n\nIch bin {b['name']}.\n\n" + (b.get("persoenlichkeit") or "Ruhig, hilfsbereit, knapp.").strip() + "\n")
 
 
 def bot_cfg_path(b: dict) -> str:

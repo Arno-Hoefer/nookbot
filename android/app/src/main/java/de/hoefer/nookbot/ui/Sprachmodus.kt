@@ -70,7 +70,8 @@ fun Sprachmodus(vm: NookViewModel, sid: String, b: Bot?, erst: String? = null, t
     val modell = remember(fortschritt) { WhisperModels.installedPreferred(ctx) }
     val aufnahme = remember { Sprachaufnahme { level = it; if (it > spitze) spitze = it } }
     val tts = remember { Vorleser(ctx, vm) }
-    val botFarbe = b?.let { Color(it.farbe) } ?: A.accent
+    // Im Gespräch schimmert die Kugel blau (wie ein Assistent im Raum), egal welche Farbe der Bot sonst hat
+    val botFarbe = Color(0xFF4FA8FF)
     val name = b?.name ?: "Bot"
 
     // Bildschirm anlassen, solange der Sprachmodus offen ist
@@ -95,7 +96,10 @@ fun Sprachmodus(vm: NookViewModel, sid: String, b: Bot?, erst: String? = null, t
         val w = runCatching { withContext(Dispatchers.IO) { WhisperSitzung(WhisperModels.file(ctx, modell)) } }
             .getOrElse { fehler = it.message; return@LaunchedEffect }
         try {
+            var runde = 0
             while (isActive) {
+                // leiser Ton: jetzt bist du dran – kurz warten, damit er nicht ins gemessene Grundrauschen gerät
+                if (runde++ > 0 || erst != null) { Klang.hoeren(); delay(200) }
                 phase = Phase.Hoert
                 zeile = ""
                 spitze = 0f
@@ -109,19 +113,41 @@ fun Sprachmodus(vm: NookViewModel, sid: String, b: Bot?, erst: String? = null, t
                 hinweis = null
                 zeile = text
                 val vorher = vm.msgs.value.size
-                vm.send(text)
+                vm.send("🎙 $text")  // 🎙 = gesprochen: der Bot antwortet in Sprechsprache
                 de.hoefer.nookbot.Anruf.protokoll("an den Bot geschickt (Chat ${vm.current ?: "KEINER"})")
                 phase = Phase.Denkt
                 quittieren()  // kurzer Ton: verstanden, er arbeitet
-                // warten, bis der Bot fertig ist (Adapter meldet busy=false), höchstens 10 Minuten.
-                // Dauert es länger, sagt er einmal „Einen Moment …“ – damit die Stille nicht wie ein Abbruch wirkt.
+                // Früher hören: jeder fertige Satz wird vorgelesen, sobald er da ist – nicht erst die ganze Antwort.
+                // Kommt 5 Sekunden lang nichts, sagt er einmal „Einen Moment …“, damit die Stille nicht wie ein Abbruch wirkt.
+                val gesprochen = HashMap<String, Int>()  // Nachricht → schon vorgelesene Zeichen
+                fun naechstes(alles: Boolean): String? {
+                    for (m in vm.msgs.value.drop(vorher).filter { it.role == "bot" && it.text.isNotBlank() }) {
+                        val schon = gesprochen[m.id] ?: 0
+                        if (m.text.length <= schon) continue
+                        val rest = m.text.substring(schon)
+                        val ende = if (alles) rest.length else (Regex("""[.!?…:](\s|$)|\n""").findAll(rest).lastOrNull()?.range?.last?.plus(1) ?: 0)
+                        if (ende <= 0) return null  // Satz noch nicht fertig
+                        gesprochen[m.id] = schon + ende
+                        return rest.substring(0, ende).takeIf { it.isNotBlank() } ?: continue
+                    }
+                    return null
+                }
                 val seit = System.currentTimeMillis()
-                var zwischen = false
+                var etwasGesagt = false
+                var zeichen = 0
+                suspend fun vorlesen(stueck: String) {
+                    etwasGesagt = true
+                    zeichen += stueck.length
+                    phase = Phase.Spricht
+                    tts.sprechen(sprechtext(stueck), b?.stimme ?: "pi:thorsten-high") { zeile = it }
+                }
                 withTimeoutOrNull(600_000) {
                     delay(800)
                     while (sid in vm.busy.value) {
-                        if (!zwischen && System.currentTimeMillis() - seit > 5000) {
-                            zwischen = true
+                        val stueck = naechstes(false)
+                        if (stueck != null) { vorlesen(stueck); if (sid in vm.busy.value) phase = Phase.Denkt; continue }
+                        if (!etwasGesagt && System.currentTimeMillis() - seit > 5000) {
+                            etwasGesagt = true
                             phase = Phase.Spricht
                             tts.sprechen(listOf("Einen Moment, ich sehe nach.", "Einen Augenblick.", "Ich kümmere mich darum.").random(),
                                 b?.stimme ?: "pi:thorsten-high") {}
@@ -130,10 +156,8 @@ fun Sprachmodus(vm: NookViewModel, sid: String, b: Bot?, erst: String? = null, t
                         delay(300)
                     }
                 }
-                val antwort = vm.msgs.value.drop(vorher).lastOrNull { it.role == "bot" && it.text.isNotBlank() }?.text ?: continue
-                de.hoefer.nookbot.Anruf.protokoll("Antwort: ${antwort.length} Zeichen")
-                phase = Phase.Spricht
-                tts.sprechen(sprechtext(antwort), b?.stimme ?: "pi:thorsten-high") { zeile = it }
+                while (true) { vorlesen(naechstes(true) ?: break) }  // der Rest, wenn er fertig ist
+                de.hoefer.nookbot.Anruf.protokoll("Antwort vorgelesen: $zeichen Zeichen")
             }
         } finally {
             withContext(Dispatchers.IO + kotlinx.coroutines.NonCancellable) { w.close() }
