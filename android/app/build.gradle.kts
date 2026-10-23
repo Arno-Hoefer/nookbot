@@ -20,8 +20,8 @@ android {
         applicationId = "de.hoefer.nookbot"
         minSdk = 29
         targetSdk = 36
-        versionCode = 27
-        versionName = "0.12.4"
+        versionCode = 28
+        versionName = "0.12.5"
         buildConfigField("String", "SERVER", "\"${lokal.getProperty("nookbot.server", "")}\"")
         buildConfigField("String", "MCP", "\"${lokal.getProperty("nookbot.mcp", "")}\"")
         // Sprachnotizen: whisper.cpp lokal auf dem Handy (wie in Echo), nur 64-bit-ARM

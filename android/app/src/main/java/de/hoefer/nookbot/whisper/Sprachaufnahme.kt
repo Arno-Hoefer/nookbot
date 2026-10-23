@@ -58,7 +58,8 @@ class Sprachaufnahme(private val onLevel: (Float) -> Unit) {
                 onLevel((rms * 12).coerceIn(0.0, 1.0).toFloat())
                 // Grundrauschen der ersten halben Sekunde, danach langsam nachführen solange niemand spricht
                 if (kalibriert < 10) { rauschen += rms / 10; kalibriert++; vorlauf.addLast(f); continue }
-                val schwelle = maxOf(rauschen * 3.0, 0.012)
+                // Untergrenze niedrig: im Anruf über den Lautsprecher kommt das Mikro deutlich leiser an (Echo- und Rauschunterdrückung)
+                val schwelle = maxOf(rauschen * 3.0, 0.006)
                 if (!spricht) {
                     vorlauf.addLast(f)
                     if (vorlauf.size > 10) vorlauf.removeFirst()
