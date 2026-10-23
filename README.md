@@ -69,7 +69,7 @@ App (Kotlin/Compose)  ──HTTPS im Tailnet──▶  nookbot-adapter (Python, 
                                                           │ MCP
                                                           ▼
                                          Zugänge zu Kalender, Mail, Slack, GitLab, Datenbank
-                                         (eigener MCP-Server, nicht Teil dieses Repos)
+                                         (eigener MCP-Server: [home-mcp](https://github.com/Arno-Hoefer/home-mcp))
 ```
 
 - **Bots:** je ein [PicoClaw](https://github.com/sipeed/picoclaw)-Prozess (Go, v0.3.1). Ursprünglich OpenClaw – das brauchte im Leerlauf 1,3 GB RAM, PicoClaw etwa 8 MB.

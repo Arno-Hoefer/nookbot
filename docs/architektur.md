@@ -19,7 +19,7 @@
 - **Der Adapter** hält je Unterhaltung eine WebSocket-Verbindung zum Bot und speichert jede Nachricht. Die App kann deshalb zu sein.
   Ereignisse gehen per Server-Sent Events an App und Web. Er schreibt AGENT.md, SOUL.md, MEMORY.md und die Skills der Bots.
   Außerdem steuert er Rechte, Regeln, Routinen, Auslöser und Anrufe.
-- **home-mcp** ist ein eigener MCP-Server mit OAuth. Er hat einen Schlüssel für alle Bots. Welcher Bot was darf, regelt
+- **home-mcp** ([eigenes Repo](https://github.com/Arno-Hoefer/home-mcp)) ist ein eigener MCP-Server mit OAuth. Er hat einen Schlüssel für alle Bots. Welcher Bot was darf, regelt
   der Adapter (`/homemcp/<bot>` filtert Werkzeuge, Konten, Kanäle und Datenbanken).
 
 ## Module des Adapters (`pi/adapter/nookbot/`)

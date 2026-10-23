@@ -7,7 +7,7 @@ Kontext für Claude-Sitzungen in diesem Repo. Ausführliche Doku: [docs/](docs/R
 NookBot ist ein kleines Team aus KI-Bots auf einem Raspberry Pi 5 zu Hause, mit eigener Android-App und Web-Oberfläche.
 Je Bot läuft ein [PicoClaw](https://github.com/sipeed/picoclaw)-Prozess. Dazwischen sitzt der **Adapter** (Python, nur Standardbibliothek).
 Er speichert den Verlauf und steuert Rechte, Regeln, Routinen, Auslöser, Anrufe und Stimmen.
-Kalender, Mail, Drive, Slack, GitLab und Datenbank kommen über einen eigenen MCP-Server (home-mcp). Der ist **nicht** Teil dieses Repos.
+Kalender, Mail, Drive, Slack, GitLab und Datenbank kommen über einen eigenen MCP-Server (home-mcp). Der liegt in einem eigenen Repo: [home-mcp](https://github.com/Arno-Hoefer/home-mcp).
 Erreichbar ist alles nur im eigenen Tailscale-Netz.
 
 ## Aufbau
