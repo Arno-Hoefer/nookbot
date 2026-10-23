@@ -112,10 +112,23 @@ fun Sprachmodus(vm: NookViewModel, sid: String, b: Bot?, erst: String? = null, t
                 vm.send(text)
                 de.hoefer.nookbot.Anruf.protokoll("an den Bot geschickt (Chat ${vm.current ?: "KEINER"})")
                 phase = Phase.Denkt
-                // warten, bis der Bot fertig ist (Adapter meldet busy=false), höchstens 10 Minuten
+                quittieren()  // kurzer Ton: verstanden, er arbeitet
+                // warten, bis der Bot fertig ist (Adapter meldet busy=false), höchstens 10 Minuten.
+                // Dauert es länger, sagt er einmal „Einen Moment …“ – damit die Stille nicht wie ein Abbruch wirkt.
+                val seit = System.currentTimeMillis()
+                var zwischen = false
                 withTimeoutOrNull(600_000) {
                     delay(800)
-                    while (sid in vm.busy.value) delay(300)
+                    while (sid in vm.busy.value) {
+                        if (!zwischen && System.currentTimeMillis() - seit > 5000) {
+                            zwischen = true
+                            phase = Phase.Spricht
+                            tts.sprechen(listOf("Einen Moment, ich sehe nach.", "Einen Augenblick.", "Ich kümmere mich darum.").random(),
+                                b?.stimme ?: "pi:thorsten-high") {}
+                            phase = Phase.Denkt
+                        }
+                        delay(300)
+                    }
                 }
                 val antwort = vm.msgs.value.drop(vorher).lastOrNull { it.role == "bot" && it.text.isNotBlank() }?.text ?: continue
                 de.hoefer.nookbot.Anruf.protokoll("Antwort: ${antwort.length} Zeichen")
@@ -202,6 +215,16 @@ fun Sprachmodus(vm: NookViewModel, sid: String, b: Bot?, erst: String? = null, t
             }
             Text("Alles steht danach als Text im Chat.", color = Color(0xFF6E6D73), fontSize = 12.sp, modifier = Modifier.padding(top = 14.dp))
         }
+    }
+}
+
+/** Kurzer, leiser Doppelton – „verstanden“ (im Anruf auf dem Gesprächs-Ton, sonst als Medien-Ton). */
+private fun quittieren() {
+    runCatching {
+        val imAnruf = de.hoefer.nookbot.Anruf.zustand.value == de.hoefer.nookbot.Anruf.Zustand.Laeuft
+        val tg = android.media.ToneGenerator(if (imAnruf) android.media.AudioManager.STREAM_VOICE_CALL else android.media.AudioManager.STREAM_MUSIC, 35)
+        tg.startTone(android.media.ToneGenerator.TONE_PROP_ACK, 200)
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ tg.release() }, 400)
     }
 }
 

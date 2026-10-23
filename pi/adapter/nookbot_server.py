@@ -1301,7 +1301,7 @@ def stimmen_liste() -> list:
 # gleiche Sätze kommen aus dem Zwischenspeicher. Ist das Kontingent leer oder ElevenLabs weg, spricht Thorsten auf dem Pi.
 
 EL_API = "https://api.elevenlabs.io"
-EL_MODELL = "eleven_multilingual_v2"
+EL_MODELL = "eleven_flash_v2_5"  # schnell (~0,4 s je Satz); „eleven_multilingual_v2“ klingt etwas voller, braucht ~1,8 s
 _el_cache: dict = {"t": 0, "stimmen": []}
 EL_STANDARD = [("George", "JBFqnCBsd6RMkjVDRZzb", "britisch, männlich, warm"), ("Daniel", "onwK4e9ZLuTAKqWW03F9", "britisch, männlich, sachlich"),
                ("Alice", "Xb7hH8MSUJpSbSDYk0k2", "britisch, weiblich")]
