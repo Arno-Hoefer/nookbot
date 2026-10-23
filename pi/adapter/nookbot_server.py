@@ -1470,7 +1470,7 @@ def sprechbar(text: str) -> str:
     t = re.sub(r"\b(\d{1,2})\.(\d{1,2})\.(\d{4}|\d{2})?(?!\d)",
                lambda m: f"{int(m[1])}. {_MONATE[int(m[2]) - 1]}" + (f" {m[3] if len(m[3]) == 4 else '20' + m[3]}" if m[3] else "")
                if 1 <= int(m[2]) <= 12 and 1 <= int(m[1]) <= 31 else m[0], t)
-    t = re.sub(r"\b((?:" + "|".join(_MONATE) + r")(?: \d{4})?) (?=[A-Za-zÄÖÜäöü0-9])", r"\1, ", t)  # kleine Pause nach dem Datum
+    t = re.sub(r"\b((?:" + "|".join(_MONATE) + r")(?: \d{4})?)(?! \d{4}\b) (?=[A-Za-zÄÖÜäöü0-9])", r"\1, ", t)  # kleine Pause nach dem Datum
     for muster, voll in _KUERZEL:
         t = re.sub(muster, voll, t)
     t = re.sub(r"\s*€", " Euro", t)
