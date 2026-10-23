@@ -14,3 +14,4 @@ android/local.properties
 android/third_party/whisper.cpp/models/*.bin
 __pycache__/
 pi/kapitaen/USER.md
+__pycache__/
