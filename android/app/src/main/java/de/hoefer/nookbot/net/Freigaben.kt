@@ -15,6 +15,12 @@ data class Freigabe(
         "termin_anlegen" -> "Termin eintragen"
         "termin_gaeste" -> "Gäste einladen"
         "entwurf_anlegen" -> "Mail-Entwurf anlegen"
+        "termine_anlegen" -> "Mehrere Termine eintragen"
+        "sheets_schreiben" -> "Tabelle ändern"
+        "sheets_anhaengen" -> "Zeilen an Tabelle anhängen"
+        "sheet_anlegen" -> "Neue Tabelle"
+        "doc_anlegen" -> "Neues Dokument"
+        "doc_anhaengen" -> "Dokument ergänzen"
         else -> tool
     }
     val statusText: String get() = when (status) {

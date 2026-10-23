@@ -203,7 +203,10 @@ fun HomeScreen(vm: NookViewModel) {
 }
 
 /** Eine Zeile Vorschau ohne Markdown-Zeichen (fett, Tabellen, Überschriften). */
-fun vorschau(t: String): String = markdown(t).text.replace(Regex("\\s+"), " ").trim()
+// Vorschau in einer Zeile – Tabellen ohne Striche (Spalten mit „·“, Trennlinien „---“ weg)
+fun vorschau(t: String): String = markdown(
+    t.replace(Regex(":?-{3,}:?"), "").replace(Regex("(\\s*\\|\\s*)+"), " · ").replace(Regex("( · )+"), " · ")
+).text.replace(Regex("\\s+"), " ").trim().removePrefix("· ").removeSuffix(" ·")
 
 @Composable
 fun Badge(t: String, c: Color) = Text(t, color = Color(0xFF0E0E10), fontSize = 11.sp, fontWeight = FontWeight.Bold,
