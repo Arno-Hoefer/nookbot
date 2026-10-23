@@ -105,6 +105,8 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
     }
     /** Claude auf dem Pi: eingerichtet, Ausgaben (mit Admin-Schlüssel), eingetragener Guthabenstand, „ca. übrig“. */
     val claude = MutableStateFlow<JSONObject?>(null)
+    /** ElevenLabs-Verbrauch (Zeichen diesen Monat) – leer, wenn nicht eingerichtet */
+    val elevenlabs = MutableStateFlow<JSONObject?>(null)
     val guthaben = MutableStateFlow<Guthaben?>(null)
     val zugriffe = MutableStateFlow<JSONObject?>(null)
     val ntfy = MutableStateFlow(false)
@@ -193,6 +195,7 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
         current?.let { loadSessionNow(it) }
         runCatching { guthaben.value = Guthaben.from(api.get("/api/guthaben")) }
         runCatching { claude.value = api.get("/api/claude") }
+        runCatching { elevenlabs.value = api.get("/api/elevenlabs").takeIf { it.has("grenze") } }
     }
 
     private fun arr(a: JSONArray?): List<JSONObject> = if (a == null) emptyList() else (0 until a.length()).map { a.getJSONObject(it) }

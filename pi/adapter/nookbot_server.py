@@ -1367,9 +1367,20 @@ def _el_stimmen_roh() -> list:
     return _el_cache["stimmen"]
 
 
-def el_kontingent() -> dict | None:
+_el_stand: dict = {"t": 0, "v": None}
+
+
+def el_kontingent(frisch: bool = False) -> dict | None:
+    """Verbrauch bei ElevenLabs – 2 Minuten zwischengespeichert (die App fragt bei jedem Laden)."""
     if not el_conf().get("api_key"):
         return None
+    if not frisch and time.time() - _el_stand["t"] < 120:
+        return _el_stand["v"]
+    _el_stand.update(t=time.time(), v=_el_kontingent())
+    return _el_stand["v"]
+
+
+def _el_kontingent() -> dict | None:
     try:
         o = _el("GET", "/v1/user/subscription")
         return {"verbraucht": o.get("character_count"), "grenze": o.get("character_limit"), "tarif": o.get("tier"),
@@ -3881,6 +3892,8 @@ class Handler(BaseHTTPRequestHandler):
             k = katalog(neu=q.get("neu") == "1")
             return self._send(200, {"konten": k["konten"], "db": k["db"], "gitlab": k["gitlab"], "statistik": k["statistik"],
                                     "slack": k["slack"], "kanaele": k["kanaele"]})
+        if p == "/api/elevenlabs":
+            return self._send(200, el_kontingent() or {})
         if p == "/api/stimmen":
             return self._send(200, {"stimmen": stimmen_liste(), "standard": STANDARD_STIMME, "aussprache": aussprache(),
                                     "elevenlabs": el_kontingent() if q.get("kontingent") else bool(el_conf().get("api_key"))})

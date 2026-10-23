@@ -63,6 +63,7 @@ fun HomeScreen(vm: NookViewModel) {
     val fehler by vm.fehler.collectAsState()
     val guthaben by vm.guthaben.collectAsState()
     val claude by vm.claude.collectAsState()
+    val eleven by vm.elevenlabs.collectAsState()
     var plus by remember { mutableStateOf(false) }
     var loeschen by remember { mutableStateOf<Sitzung?>(null) }
     var suchen by rememberSaveable { mutableStateOf(false) }
@@ -184,8 +185,10 @@ fun HomeScreen(vm: NookViewModel) {
                 if (c.has("rest_usd")) " · Claude ${"%.2f".format(c.optDouble("rest_usd"))} $ übrig"
                 else " · Claude ${"%.2f".format(c.optDouble("eigen_monat_usd", 0.0))} $ im Monat"
             } ?: ""
-            Text(if (online) "Pi verbunden" + (guthaben?.let { " · Ollama ${it.genutztProzent} %" } ?: "") + claudeText else (fehler ?: "verbinde …"),
-                color = P.fg2, fontSize = 13.sp, modifier = Modifier.padding(start = 10.dp).weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            // ElevenLabs: Anteil der Freizeichen diesen Monat, der schon gesprochen ist
+            val elText = eleven?.let { e -> e.optInt("grenze").takeIf { it > 0 }?.let { g -> " · ElevenLabs ${100 * e.optInt("verbraucht") / g} %" } } ?: ""
+            Text(if (online) "Pi verbunden" + (guthaben?.let { " · Ollama ${it.genutztProzent} %" } ?: "") + claudeText + elText else (fehler ?: "verbinde …"),
+                color = P.fg2, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(start = 10.dp).weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text("Tailnet", color = P.mut, fontSize = 13.sp)
         }
     }
