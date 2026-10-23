@@ -74,6 +74,14 @@ App (Kotlin/Compose)  ──HTTPS im Tailnet──▶  nookbot-adapter (Python, 
 - **Adapter** (`pi/adapter/`): speichert jede Nachricht (nichts geht verloren, wenn die App zu ist), liefert Ereignisse per Server-Sent Events, verwaltet Bots, Wissen, Datenbank-Bibliothek, Routinen, Runden und Erinnerungen und stellt den Bots eigene MCP-Werkzeuge bereit (`bot_fragen`, `auftraege_verteilen`, `bot_anlegen`, `routine_anlegen`, `erinnerung_anlegen`, `seite_lesen`, `merken`,
   `ablauf_vorschlagen` …). Das Gedächtnis schreibt der Adapter als `memory/MEMORY.md`, bestätigte Abläufe als Skills `ablauf-<id>` –
   PicoClaw liest beides bei jeder Antwort neu, ohne Neustart. Unter `/` liefert er die Web-Oberfläche (`pi/adapter/web/`).
+- **Adapter-Code** (`pi/adapter/nookbot/`, Startpunkt `nookbot_server.py`): ein Modul je Bereich –
+  `basis` (Pfade, Konfiguration), `ereignisse` (SSE), `dienste` (Ollama, ntfy), `claude`, `gesundheit`, `stimmen` (Piper, ElevenLabs,
+  Vorlesetext, Diktat), `wissen` (Wissen, Anhänge, Dokumente ansehen), `home` (home-mcp, Zugriffe je Bot), `bots`, `sitzungen`
+  (Verlauf, WebSocket zu den Bots), `seiten` (Seiten lesen, Pakete), `gedaechtnis` (Gedächtnis, Abläufe), `rechner` (Arbeitsordner,
+  Python, Regeln), `automatik` (Routinen, Erinnerungen, Aktivität, Auslöser, Anrufe), `team` (Runden, Aufträge verteilen), `mcp`,
+  `schnittstelle` (HTTP), `start`. Module, die früher geladen werden, stehen oben im Import, spätere am Dateiende – so gibt es
+  beim Laden keine Ringbezüge. `nookbot_server.py` stellt alle Namen wie früher bereit (`nookbot_server.bot(…)`).
+- **Tests** (`pi/adapter/tests/`, nur Standardbibliothek, ohne Pi): `cd pi/adapter && python3 -m unittest discover -s tests`
 - **App** (`android/`): Kotlin + Jetpack Compose, Schlüssel im Android-Keystore, whisper.cpp per NDK (nur arm64).
 
 ### Eigenheiten von PicoClaw, die der Adapter ausgleicht

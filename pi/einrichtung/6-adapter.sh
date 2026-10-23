@@ -2,12 +2,16 @@
 # NookBot 6/6: Adapter einrichten: Programm nach /opt/nookbot, Dienst nookbot-adapter (Benutzer picoclaw, 127.0.0.1:8795),
 # Vorlage picoclaw@.service für weitere Bots, Polkit-Regel (picoclaw darf NUR die Bot-Dienste starten/stoppen/neu starten),
 # Tailnet :8444 → Adapter (statt direkt PicoClaw).
-# Aufruf: sudo bash 6-adapter.sh   (erwartet /tmp/nookbot-adapter/{nookbot_server.py,wsclient.py,web/})
+# Aufruf: sudo bash 6-adapter.sh   (erwartet /tmp/nookbot-adapter/{nookbot_server.py,wsclient.py,nookbot/,web/})
 set -euo pipefail
 
 echo "== Programm"
 install -d -m 755 /opt/nookbot
 install -m 644 /tmp/nookbot-adapter/nookbot_server.py /tmp/nookbot-adapter/wsclient.py /opt/nookbot/
+# Der Code liegt im Paket nookbot/ – immer das ganze Verzeichnis ersetzen (alte Module dürfen nicht liegen bleiben)
+rm -rf /opt/nookbot/nookbot
+install -d -m 755 /opt/nookbot/nookbot
+install -m 644 /tmp/nookbot-adapter/nookbot/*.py /opt/nookbot/nookbot/
 install -d -m 755 /opt/nookbot/web
 install -m 644 /tmp/nookbot-adapter/web/* /opt/nookbot/web/
 install -d -o picoclaw -g picoclaw -m 700 /srv/picoclaw/nookbot /srv/picoclaw/bots
