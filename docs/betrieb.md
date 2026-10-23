@@ -52,23 +52,22 @@ Ist das ElevenLabs-Kontingent leer, spricht Piper auf dem Pi. Gleiche Sätze kom
 Der Adapter darf bis 1,5 GB RAM nutzen (Drop-in `stimmen.conf`). Das reicht für eine geladene Piper-Stimme, whisper.cpp und Python
 gleichzeitig. Für bubblewrap gibt es den Drop-in `rechner.conf` (Netlink fürs Loopback im Sandkasten).
 
-## Sicherung – Vorschlag (noch nicht eingerichtet)
+## Sicherung
 
-Auf dem Pi läuft bereits jede Nacht um 3:45 Uhr `~/bin/pi-backup.sh`. Es sichert verschlüsselt nach Google Drive (rclone crypt)
-mit täglicher, wöchentlicher und monatlicher Aufbewahrung und Wiederherstellungstest. Bisher sind darin Home, Orga und Echo-Bot.
-**NookBot und home-mcp fehlen noch.**
+Jede Nacht um 3:45 Uhr sichert `~/bin/pi-backup.sh` den Pi verschlüsselt nach Google Drive (rclone crypt): täglich 7 Tage,
+sonntags 4 Wochen, am Monatsersten 6 Monate. Seit 23.10.2026 gehören auch NookBot und home-mcp dazu:
 
-Vorschlag – das bestehende Skript erweitern, kein zweites System:
+| Was | Wo |
+|---|---|
+| NookBot: Bots, Verlauf, Routinen, Auslöser, Arbeitsordner, Schlüssel (ohne `stimmen-cache/`) | `/srv/picoclaw` → `nookbot.tar` |
+| home-mcp: Nutzer, OAuth-Token, Freigaben | `/srv/home-mcp` → `home-mcp.tar` |
+| Dienste und Drop-ins | `/etc/systemd/system/{nookbot-adapter*,picoclaw@,picoclaw-gateway,home-mcp}.service` → `system/` |
 
-| Was | Wo | Größe heute |
-|---|---|---|
-| NookBot-Daten (ohne `stimmen-cache/`) | `/srv/picoclaw/nookbot` | ~10 MB |
-| Bots (Konfiguration, Arbeitsbereich, Wissen, Gedächtnis) | `/srv/picoclaw/bots` | ~2 MB |
-| home-mcp (Nutzer, OAuth-Token, Freigaben) | `/srv/home-mcp` | < 1 MB |
-| Dienste und Drop-ins | `/etc/systemd/system/{nookbot-adapter,picoclaw@,home-mcp}*` | klein |
-
-- Darin liegen **Schlüssel und Token**. Deshalb nur über das verschlüsselte rclone-Ziel sichern, nie unverschlüsselt.
-- Der Code (`/opt/nookbot`, `/opt/home-mcp`) muss nicht mit, er kommt aus Git.
-- Wiederherstellen: Archiv entpacken, Ordner zurückkopieren, Dienste neu starten. Den Wiederherstellungstest
-  (`pi-backup-pruefen.sh`) um eine Prüfung von `bots.json` und `config.json` ergänzen.
-- Den Status meldet Home schon heute, wenn das Backup ausbleibt. Das gälte dann auch für NookBot.
+- Darin liegen Schlüssel und Token. Deshalb nur über das verschlüsselte Ziel, Google sieht nur verschlüsselte Dateien und Namen.
+- Der Code (`/opt/nookbot`, `/opt/home-mcp`) kommt aus Git und wird nicht gesichert.
+- **Wiederherstellungstest:** `~/bin/pi-backup-pruefen.sh`. Er holt die neueste Sicherung, packt sie im Testordner aus und prüft
+  unter anderem `bots.json`, `config.json`, die Unterhaltungen und `nutzer.json` von home-mcp.
+- **Wiederherstellen:** `nookbot.tar` bzw. `home-mcp.tar` nach `/srv` entpacken, Dienst-Dateien zurück, `systemctl daemon-reload`,
+  Dienste starten.
+- Bleibt die Sicherung aus, warnt die Home-App (`~/pi-backup/status.json`).
+- Die Skripte liegen im Home-Repo unter `deploy/backup/`.
