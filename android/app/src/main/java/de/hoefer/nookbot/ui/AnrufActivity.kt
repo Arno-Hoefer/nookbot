@@ -81,8 +81,12 @@ class AnrufActivity : ComponentActivity() {
 private fun TonWahl() {
     val ziele by Anruf.ziele.collectAsState()
     val ziel by Anruf.ziel.collectAsState()
-    if (ziele.size < 2) return
-    Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.Center) {
+    if (ziele.size < 2) {  // Android hat die Ziele noch nicht gemeldet (oder es gibt nur eins)
+        Text("Ton: " + (ziel?.name ?: "wird verbunden …"), color = Color(0xFF8D8C93), fontSize = 13.sp,
+            modifier = Modifier.fillMaxWidth().padding(top = 12.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        return
+    }
+    androidx.compose.foundation.layout.FlowRow(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.Center) {
         ziele.forEach { z ->
             val an = ziel?.identifier == z.identifier
             val zeichen = when {
