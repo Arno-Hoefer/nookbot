@@ -33,7 +33,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from wsclient import WSClient  # noqa: E402
 
-VERSION = "0.5.0"
+VERSION = "0.13.0"
 BASE = os.environ.get("NOOKBOT_HOME", "/srv/picoclaw/nookbot")
 MAIN_HOME = os.environ.get("NOOKBOT_MAIN_HOME", "/srv/picoclaw")
 BOTS_HOME = os.path.join(MAIN_HOME, "bots")
@@ -1259,7 +1259,11 @@ def freigaben_proxy(method: str, p: str, body: dict | None = None) -> dict:
         with urllib.request.urlopen(req, timeout=90) as r:
             return json.loads(r.read())
     except urllib.error.HTTPError as e:
-        raise ValueError(f"home-mcp antwortet mit {e.code}") from None
+        try:
+            msg = json.loads(e.read()).get("error") or ""
+        except ValueError:
+            msg = ""
+        raise ValueError(msg or f"home-mcp antwortet mit {e.code}") from None
 
 
 # ── Stimmen (Piper auf dem Pi) und Aussprache ─────────────────────
@@ -2735,12 +2739,14 @@ def _kurz(a) -> str:
     return s[:200] + ("…" if len(s) > 200 else "")
 
 
-def aktivitaet(bid: str, art: str, was: str, detail="", sitzung: str = "", ok: bool = True):
+def aktivitaet(bid: str, art: str, was: str, detail="", sitzung: str = "", ok: bool = True, ref: str = ""):
     """art: werkzeug, routine, ausloeser, freigabe, runde, auftrag."""
     s = SESS.get(sitzung) if sitzung else None
     hinter = art in ("routine", "ausloeser") or bool(s and (s.get("art") in ("routine", "intern", "auftrag") or sitzung.startswith("auftrag-")))
     e = {"ts": round(time.time(), 1), "bot": bid, "art": art, "was": str(was)[:80], "detail": _kurz(detail), "sitzung": sitzung or "",
          "ok": bool(ok), "hintergrund": hinter}
+    if ref:
+        e["ref"] = ref  # z. B. Freigabe-id – damit sich Ausgeführtes zurücknehmen lässt
     with _akt_lock:
         with open(path("aktivitaet.jsonl"), "a", encoding="utf-8") as f:
             f.write(json.dumps(e, ensure_ascii=False) + "\n")
@@ -3163,7 +3169,8 @@ def frei_ausfuehren(b: dict, tool: str, args: dict, text: str) -> str | None:
     _frei_zaehlen(b["id"])
     ok = res.get("status") == "ausgefuehrt" or not res.get("error") and res.get("status") not in ("fehler", "offen")
     aktivitaet(b["id"], "freigabe", "Ohne Rückfrage ausgeführt (Regel frei)" if ok else "Regel frei – Ausführen fehlgeschlagen",
-               f"{ids[0]} · {res.get('text') or REGEL_WERKZEUGE.get(tool, tool)}"[:200], sitzung=caller_session(b["id"]) or "", ok=ok)
+               f"{ids[0]} · {res.get('text') or REGEL_WERKZEUGE.get(tool, tool)}"[:200], sitzung=caller_session(b["id"]) or "", ok=ok,
+               ref=ids[0] if ok else "")
     erg = str(res.get("ergebnis") or res.get("error") or res.get("status") or "")
     return (f"Ausgeführt ohne Rückfrage (Regel „frei“ für {REGEL_WERKZEUGE.get(tool, tool)}): {erg}".strip() if ok
             else f"Freigabe {ids[0]} angelegt, Ausführen schlug fehl: {erg}")
@@ -4205,13 +4212,23 @@ class Handler(BaseHTTPRequestHandler):
             r = add_routine({"name": a["name"], "bot": bid, "auftrag": ablauf_text(a), "zeit": d.get("zeit"), "datum": d.get("datum"),
                              "tage": d.get("tage")})
             return self._send(200, r)
+        m = re.match(r"^/api/freigaben/(F-[0-9a-f]{6})/rueckgaengig$", p)
+        if m:
+            try:
+                res = freigaben_proxy("POST", f"/app/freigaben/{m.group(1)}/rueckgaengig", {})
+            except ValueError as e:
+                aktivitaet("app", "freigabe", "Zurücknehmen fehlgeschlagen", f"{m.group(1)} · {e}"[:200], ok=False)
+                raise
+            aktivitaet("app", "freigabe", "Zurückgenommen", f"{m.group(1)} · {(res.get('ergebnis') or '').splitlines()[-1]}"[:200])
+            return self._send(200, res)
         m = re.match(r"^/api/freigaben/([A-Za-z0-9-]+)$", p)
         if m:
             res = freigaben_proxy("POST", f"/app/freigaben/{m.group(1)}", {"entscheidung": d.get("entscheidung")})
             f = res.get("freigabe") if isinstance(res.get("freigabe"), dict) else res
             ja = str(d.get("entscheidung") or "").lower() == "ja"
             aktivitaet(str(f.get("bot") or "app"), "freigabe", "Freigabe ausgeführt" if ja else "Freigabe abgelehnt",
-                       f"{m.group(1)} · {f.get('text') or f.get('tool') or ''}"[:200], ok=not res.get("error"))
+                       f"{m.group(1)} · {f.get('text') or f.get('tool') or ''}"[:200], ok=not res.get("error"),
+                       ref=m.group(1) if ja and f.get("status") == "ausgefuehrt" else "")
             return self._send(200, res)
         if p == "/api/diagnose":  # Protokolle der App (z. B. je Anruf: Pegel, erkannte Zeichen, Fehler – keine Inhalte)
             with _lock:

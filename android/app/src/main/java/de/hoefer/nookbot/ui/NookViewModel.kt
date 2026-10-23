@@ -584,6 +584,12 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun zuruecknehmen(fid: String) = io {
+        api.post("/api/freigaben/$fid/rueckgaengig")
+        withContext(Dispatchers.Main) { toast.value = "Zurückgenommen" }
+        loadAktivitaet()
+    }
+
     fun loadAktivitaet() = io {
         val (tage, bot, hinter) = aktFilter.value
         val r = api.get("/api/aktivitaet?tage=$tage&bot=${java.net.URLEncoder.encode(bot, "UTF-8")}" + if (hinter) "&hintergrund=1" else "")

@@ -181,11 +181,12 @@ data class ArbeitDatei(val name: String, val groesse: Long, val ts: Long, val bo
 }
 
 /** Eine Zeile der Aktivität: was ein Bot getan hat (Werkzeug, Routine, Auslöser, Freigabe, Runde). */
-data class AktEintrag(val ts: Long, val bot: String, val art: String, val was: String, val detail: String, val ok: Boolean, val hintergrund: Boolean) {
+data class AktEintrag(val ts: Long, val bot: String, val art: String, val was: String, val detail: String, val ok: Boolean, val hintergrund: Boolean,
+                      /** Freigabe-id bei Ausgeführtem – lässt sich zurücknehmen */ val ref: String = "") {
     companion object {
         fun list(a: JSONArray?): List<AktEintrag> = if (a == null) emptyList() else (0 until a.length()).map { a.getJSONObject(it) }.map { o ->
             AktEintrag((o.optDouble("ts", 0.0) * 1000).toLong(), o.optString("bot"), o.optString("art"), o.optString("was"), o.optString("detail"),
-                o.optBoolean("ok", true), o.optBoolean("hintergrund"))
+                o.optBoolean("ok", true), o.optBoolean("hintergrund"), o.optString("ref"))
         }
     }
 }

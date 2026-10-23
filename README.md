@@ -23,20 +23,39 @@ dieselbe Frage beantworten, der Kapitän fasst zusammen. Alles läuft auf einem 
 
 ## Was es kann
 
-- **Ein Bot, eine Unterhaltung** – jeder Bot hat Name, Rolle, Farbe, Form, Modell, **Persönlichkeit**, **Fokus** und eigenes **Wissen** (Text- und PDF-Dateien; dazu globales Wissen für alle).
+**Team und Gespräche**
+- **Ein Bot, eine Unterhaltung** – jeder Bot hat Name, Rolle, Farbe, Form, Modell (Ollama oder Claude), **Persönlichkeit**, **Fokus**, **Stimme** und eigenes **Wissen** (Text, PDF, Word, Excel …; dazu globales Wissen für alle).
 - **Der Kapitän legt Bots an**: „Leg einen Bot an, der mir jede Woche Rezepte vorschlägt“ – fertig.
-- **Bots arbeiten einander zu** (`bot_fragen`), mit Schutz gegen Endlosketten; **Runden** mit Zusammenfassung.
-- **Aufgaben verteilen**: Der Kapitän gibt bis zu vier Bots gleichzeitig je einen Teilauftrag (`auftraege_verteilen`) und fasst die Ergebnisse zusammen – im Chat als Karte mit dem Stand je Bot.
-- **Gedächtnis**: Bots merken sich Vorlieben und Absprachen (`merken`/`vergessen`) – nur aus den eigenen Nachrichten des Nutzers, nie aus Mails oder Webseiten. Jeder Eintrag erscheint im Chat (mit „Rückgängig“) und ist in der App bearbeitbar.
-- **Abläufe**: „Speicher das als Ablauf“ – der Bot fasst den Weg aus dem Gespräch als Entwurf zusammen; erst nach dem OK in der App wird daraus ein Skill, auf Wunsch auch als Routine geplant.
-- **Kontext lesen**: öffentliche Webseiten und PDFs (`seite_lesen`, ohne Anmeldung, nie Adressen aus Heimnetz oder Tailnet; Seiten, die erst im Browser entstehen, über einen Headless-Browser auf dem Pi).
-- **Zugriffe je Bot**: ein MCP-Schlüssel für alle, die Feinsteuerung macht der Adapter – je Bot Konten für Mail/Kalender/Drive, „nur Hauptkalender“, Slack-Kanäle und Direktnachrichten, GitLab, einzelne Datenbanken. Ein Bot kann keinen anderen beauftragen, der mehr darf als er.
-- **Schreiben nur mit Freigabe**: Termine, Einladungen und Mail-Entwürfe werden erst ausgeführt, wenn man in der App zustimmt.
-- **Zahlen nur aus SQL**: feste, beschriebene Abfragen (Bereich *Datenbanken* in der App), Rechnen und Prognosen per SQL – das Modell rechnet nicht im Kopf.
-- **Routinen** (ein Bot erledigt etwas zu einer Uhrzeit) und **Erinnerungen** (pünktlich als Wecker auf dem Handy) – beides auch vom Bot selbst angelegt.
-- **Sprachnotizen**: auf dem Handy aufnehmen und **lokal** transkribieren (whisper.cpp) – das Audio verlässt das Gerät nicht.
-- Hell/Dunkel, Schriftgröße, Suche über alle Unterhaltungen, Benachrichtigungen ohne Dauerverbindung.
-- **Web-Oberfläche** für den Rechner: dieselben Unterhaltungen im Browser (nur im Tailnet, gleicher Schlüssel wie die App).
+- **Bots arbeiten einander zu** (`bot_fragen`), mit Schutz gegen Endlosketten. **Aufgaben verteilen**: bis zu vier Bots gleichzeitig (`auftraege_verteilen`), im Chat als Karte mit dem Stand je Bot.
+- **Runden** mit Zusammenfassung – auf Wunsch reden die Bots ein bis zwei Runden miteinander (je höchstens 4 Sätze, „PASSE“ beendet früher).
+- **Gedächtnis**: Vorlieben und Absprachen (`merken`/`vergessen`) – nur aus den eigenen Nachrichten des Nutzers, sichtbar und rücknehmbar.
+- **Abläufe**: „Speicher das als Ablauf“ – nach dem OK wird daraus ein Skill, auf Wunsch als Routine geplant.
+
+**Daten und Werkzeuge**
+- **Zugriffe je Bot**: ein MCP-Schlüssel für alle, die Feinsteuerung macht der Adapter – je Bot Konten für Mail/Kalender/Drive, „nur Hauptkalender“, Slack-Kanäle und Direktnachrichten, GitLab, einzelne Datenbanken, Pakete, Gesundheit. Ein Bot kann einen anderen nur beauftragen, wenn der nicht mehr darf als er selbst.
+- **Kontext lesen**: öffentliche Webseiten und PDFs (`seite_lesen`), **Seitenbilder** (`seite_ansehen`), **Dokumente ansehen** (`dokument_ansehen`: PDF-Seiten und Fotos als Bild – z. B. Dienstpläne mit Symbolen; über Ollama-Bildmodelle oder Claude, je nachdem, was der Bot nutzt).
+- **Pi-Rechner**: `python_ausfuehren` – abgeschottet mit bubblewrap (kein Netz, nur Arbeitsordner und eigene Anhänge, 2 Minuten, Speichergrenze). Pandas, Matplotlib, Excel. Ergebnisse landen im gemeinsamen **Arbeitsordner** und als Karte im Chat (Bilder mit Vorschau).
+- **Zahlen nur aus SQL oder Python** – das Modell rechnet nicht im Kopf.
+
+**Schreiben mit Kontrolle**
+- **Freigaben**: Termine, Einladungen, Mail-Entwürfe, Tabellen und Dokumente erst nach Zustimmung in App oder Web. Mehrere Termine (z. B. ein Dienstplan) als **eine Sammelfreigabe**.
+- **Regeln je Bot und Aktion**: frei (sofort, höchstens 10 am Tag), fragen (Standard) oder nie. Sobald Gäste oder Einladungen dabei sind, wird immer gefragt.
+- **Zurücknehmen**: Ausgeführte Termine und Entwürfe lassen sich aus der Aktivität heraus wieder löschen.
+
+**Automatik**
+- **Routinen** (Zeitplan) und **Erinnerungen** (pünktlich als Wecker auf dem Handy) – auch vom Bot selbst angelegt.
+- **Auslöser**: neue Mail zu einer Gmail-Suche, neue Slack-Nachricht, geänderte Webseite, neuer Paketstatus → ein Bot bekommt einen Auftrag. Geprüft wird **ohne KI** im Takt; der erste Blick merkt nur den Stand; Tageslimit je Auslöser.
+- **Aktivität**: jedes Werkzeug, jede Routine, jeder Auslöser, jede Freigabe – mit Filter „nur im Hintergrund“ (30 Tage).
+
+**Sprache**
+- **Diktieren** und **Sprachmodus** – Erkennung **lokal** mit whisper.cpp (auf dem Handy; im Web auf dem Pi).
+- **Anrufe**: Routinen und Auslöser „als Anruf“ – das Handy klingelt auch gesperrt, der Bot liest sein Ergebnis vor und hört dann zu. Selbst anrufen geht aus dem Chat. Das Gespräch ist bei Android als Anruf angemeldet (Telecom: Lautsprecher, Headset, Uhr wählbar; echter Anruf hat Vorrang).
+- **Stimmen**: Piper auf dem Pi (Thorsten u. a.) oder **ElevenLabs** (auch im kostenlosen Tarif; britische Stimmen sprechen Deutsch mit Einschlag), je Stimme auch mit „Butler-Klang“. Uhrzeiten, Wochentage und Abkürzungen werden ausgeschrieben vorgelesen. Ist das Kontingent leer, spricht der Pi.
+
+**Oberflächen**
+- **App** (Android) und **Web-Oberfläche** (nur im Tailnet) mit denselben Bereichen; Statuszeile mit Ollama-, Claude- und ElevenLabs-Verbrauch.
+- Hell/Dunkel, Schriftgröße, Suche über alle Unterhaltungen, Benachrichtigungen ohne Dauerverbindung (oder „Für Anrufe erreichbar“).
+- **Gesundheit** (nur NookBot): Health Connect – Schritte, Schlaf, Puls, Trainings … als Tageswerte auf dem Pi.
 
 ## Aufbau
 
@@ -75,7 +94,12 @@ Die Skripte unter `pi/einrichtung/` in dieser Reihenfolge ausführen (Keys werde
 4. `4-home-mcp-anbinden.sh` – optional: eigener MCP-Server für Kalender/Mail/Daten
 5. `5-chat-kanal.sh` – WebSocket-Kanal mit Token (zugleich der Schlüssel der App)
 6. `6-adapter.sh` – Adapter, Vorlage für weitere Bots, Polkit-Regel, Tailnet-Freigabe
-7. `nutzer-setzen.py <Name>` – wie die Bots dich nennen
+7. `7-claude.sh` – optional: Claude als zweiter Anbieter (Schlüssel verdeckt, Verbrauch wird mitgezählt)
+8. `8-stimmen.sh` – optional: Piper-Stimmen für Sprachmodus und Anrufe
+9. `9-whisper.sh` – optional: Spracherkennung auf dem Pi fürs Diktat im Web
+10. `10-rechner.sh` – optional: Python-Sandkasten (bubblewrap) für die Bots
+11. `11-elevenlabs.sh` – optional: Cloud-Stimmen von ElevenLabs
+12. `nutzer-setzen.py <Name>` – wie die Bots dich nennen
 
 App bauen: `android/local.properties.example` nach `local.properties` kopieren, Adressen eintragen, dann
 `./gradlew assembleRelease`. Für Kalender, Mail usw. braucht es einen MCP-Server mit Freigabe-Schnittstelle –
@@ -84,6 +108,8 @@ ohne ihn laufen Websuche, Wissen, Routinen, Erinnerungen und das Bot-Team trotzd
 ## Sicherheit
 
 Nur im Tailnet erreichbar (kein öffentlicher Zugang), keine Messenger-Kanäle, keine Shell für die Bots, keine fremden Skills.
+Python läuft nur im Sandkasten (bubblewrap: kein Netz, keine Konfiguration, nur der Arbeitsordner). Auslöser prüfen ohne Modell;
+Seiten werden nur geöffnet, wenn sie öffentlich sind (keine Adressen aus Heim- oder Tailnetz). Zugriffe und Regeln gelten je Bot.
 Inhalte aus Mails, Web und Dateien gelten als Daten, nicht als Anweisungen. Schreibende Aktionen nur nach Freigabe in der App.
 Private Werte (Adressen, Namen, Keys) liegen nur lokal bzw. auf dem Pi – nie im Repo.
 

@@ -934,13 +934,23 @@ async function seiteAktivitaet() {
     const kopfz = t !== tag ? `<h3 style="margin:14px 0 2px">${t}</h3>` : ''; tag = t;
     return kopfz + `<div class="akt ${e.ok ? '' : 'fehl'}"><span class="z">${d.toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit'})}</span>
       <span class="w">${AKT_ART[e.art] || '·'} <b>${esc(botName(e.bot))}</b> · ${esc(WERKZEUGE[e.was] || e.was)}${e.hintergrund ? ' <span class="mut">· im Hintergrund</span>' : ''}${e.ok ? '' : ' · fehlgeschlagen'}</span>
-      ${e.detail ? `<span class="d">${esc(e.detail)}</span>` : ''}</div>`;
+      ${e.detail ? `<span class="d">${esc(e.detail)}</span>` : ''}
+      ${e.ref && (S.zurueck || {})[e.ref] === undefined ? `<span class="d"><button class="klein text" data-zurueck="${esc(e.ref)}">↩ Rückgängig</button></span>` : ''}</div>`;
   }).join('');
   $('#haupt').innerHTML = kopf('Aktivität', 'was die Bots getan haben') + `<div class="seite"><div class="bl"><div class="zeilen">
     <select id="fT" style="width:auto">${[[1, 'heute + gestern'], [7, '7 Tage'], [30, '30 Tage']].map(([v, n]) => `<option value="${v}" ${f.tage === v ? 'selected' : ''}>${n}</option>`).join('')}</select>
     <select id="fB" style="width:auto"><option value="">alle Bots</option>${S.bots.map((b) => `<option value="${b.id}" ${f.bot === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select>
     <label class="zeilen"><input type="checkbox" id="fH" ${f.hintergrund ? 'checked' : ''} style="width:auto"> nur im Hintergrund</label></div>
     ${zeilen || '<div class="box mut">Nichts in diesem Zeitraum.</div>'}</div></div>`;
+  // Rückgängig: Termine/Entwürfe wieder löschen (Tabellen und Dokumente gehen nicht automatisch)
+  const genommen = new Set(o.eintraege.filter((e) => e.was === 'Zurückgenommen').map((e) => (e.detail || '').split(' ')[0]));
+  $('#haupt').querySelectorAll('[data-zurueck]').forEach((b) => {
+    if (genommen.has(b.dataset.zurueck)) { b.replaceWith(document.createTextNode('↩ zurückgenommen')); return; }
+    b.onclick = async () => {
+      if (!confirm('Wirklich zurücknehmen? Termine werden ohne Absage gelöscht, Entwürfe gelöscht.')) return;
+      try { await api('POST', `/api/freigaben/${b.dataset.zurueck}/rueckgaengig`); toast('Zurückgenommen'); seiteAktivitaet(); } catch (er) { toast(er.message); }
+    };
+  });
   $('#fT').onchange = (e) => { f.tage = +e.target.value; seiteAktivitaet(); };
   $('#fB').onchange = (e) => { f.bot = e.target.value; seiteAktivitaet(); };
   $('#fH').onchange = (e) => { f.hintergrund = e.target.checked; seiteAktivitaet(); };

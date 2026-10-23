@@ -146,6 +146,15 @@ fun AktivitaetScreen(vm: NookViewModel) {
     val (tage, botFilter, hinter) = filter
     fun setze(t: Int = tage, b: String = botFilter, h: Boolean = hinter) { vm.aktFilter.value = Triple(t, b, h); vm.loadAktivitaet() }
     val tagFmt = remember { SimpleDateFormat("EEEE, dd.MM.", Locale.GERMANY) }
+    val zurueck = remember(list) { list.filter { it.was == "Zurückgenommen" }.map { it.detail.substringBefore(" ") }.toSet() }
+    var zuruecknehmen by remember { mutableStateOf<String?>(null) }
+    zuruecknehmen?.let { fid ->
+        AlertDialog(onDismissRequest = { zuruecknehmen = null }, containerColor = P.card,
+            title = { Text("Zurücknehmen?", color = P.fg) },
+            text = { Text("Termine werden ohne Absage gelöscht, Entwürfe gelöscht. Tabellen und Dokumente gehen nicht automatisch.", color = P.fg2) },
+            confirmButton = { TextButton({ vm.zuruecknehmen(fid); zuruecknehmen = null }) { Text("Zurücknehmen", color = A.accent) } },
+            dismissButton = { TextButton({ zuruecknehmen = null }) { Text("Abbrechen", color = P.fg2) } })
+    }
     val uhr = remember { SimpleDateFormat("HH:mm", Locale.GERMANY) }
     Column(Modifier.fillMaxSize()) {
         TopBar("Aktivität", { vm.back() }, sub = "was die Bots getan haben")
@@ -166,14 +175,14 @@ fun AktivitaetScreen(vm: NookViewModel) {
                     tag = t
                     item(key = "tag-$t") { Text(t, color = P.fg, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 14.dp, bottom = 4.dp)) }
                 }
-                item { AktZeile(e, uhr.format(Date(e.ts)), vm.bot(e.bot)?.name ?: e.bot) }
+                item { AktZeile(e, uhr.format(Date(e.ts)), vm.bot(e.bot)?.name ?: e.bot, e.ref.takeIf { it.isNotBlank() && it !in zurueck }) { zuruecknehmen = it } }
             }
         }
     }
 }
 
 @Composable
-private fun AktZeile(e: AktEintrag, uhr: String, botName: String) {
+private fun AktZeile(e: AktEintrag, uhr: String, botName: String, ref: String?, onZurueck: (String) -> Unit) {
     Row(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
         Text(uhr, color = P.mut, fontSize = 13.sp, modifier = Modifier.width(48.dp))
         Column(Modifier.weight(1f)) {
@@ -181,6 +190,7 @@ private fun AktZeile(e: AktEintrag, uhr: String, botName: String) {
                 (if (e.hintergrund) " · im Hintergrund" else "") + (if (!e.ok) " · fehlgeschlagen" else ""),
                 color = if (e.ok) P.fg else A.accent, fontSize = 14.sp)
             if (e.detail.isNotBlank()) Text(e.detail, color = P.mut, fontSize = 12.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
+            if (ref != null) TextButton({ onZurueck(ref) }, contentPadding = PaddingValues(0.dp)) { Text("↩ Rückgängig", color = A.accent, fontSize = 13.sp) }
         }
     }
     HorizontalDivider(color = P.line)
