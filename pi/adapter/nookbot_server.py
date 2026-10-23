@@ -1440,6 +1440,38 @@ def aussprache() -> dict:
     return d
 
 
+_TAGE = {"Mo": "Montag", "Di": "Dienstag", "Mi": "Mittwoch", "Do": "Donnerstag", "Fr": "Freitag", "Sa": "Samstag", "So": "Sonntag"}
+_MONATE = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"]
+_KUERZEL = [(r"z\.\s?B\.", "zum Beispiel"), (r"\bca\.", "circa"), (r"\bbzw\.", "beziehungsweise"), (r"\bggf\.", "gegebenenfalls"),
+            (r"\busw\.", "und so weiter"), (r"\binkl\.", "inklusive"), (r"\bzzgl\.", "zuzüglich"), (r"\bd\.\s?h\.", "das heißt"),
+            (r"\bu\.\s?a\.", "unter anderem"), (r"\bNr\.", "Nummer"), (r"\bStd\.", "Stunden"), (r"\bMin\.", "Minuten"),
+            (r"\bTel\.", "Telefon"), (r"\bvs\.", "gegen")]
+
+
+def sprechbar(text: str) -> str:
+    """Text so aufbereiten, wie man ihn vorliest: Wochentage, Datum, Uhrzeit, Abkürzungen, Zeichen."""
+    def uhr(h: str, m: str) -> str:
+        return f"{int(h)} Uhr" + ("" if m == "00" else f" {int(m)}")
+    t = text
+    # Zeitspannen und Uhrzeiten (06:30–13:15 Uhr → 6 Uhr 30 bis 13 Uhr 15)
+    t = re.sub(r"\b([01]?\d|2[0-3]):([0-5]\d)\s*[–-]\s*([01]?\d|2[0-3]):([0-5]\d)(\s*Uhr)?\b",
+               lambda m: f"{uhr(m[1], m[2])} bis {uhr(m[3], m[4])}", t)
+    t = re.sub(r"\b([01]?\d|2[0-3]):([0-5]\d)(\s*Uhr)?\b", lambda m: uhr(m[1], m[2]), t)
+    # Wochentag-Kürzel nur direkt vor einem Datum (sonst bleibt „So“ ein „so“)
+    t = re.sub(r"\b(Mo|Di|Mi|Do|Fr|Sa|So)\.?,?\s+(?=\d{1,2}\.)", lambda m: _TAGE[m[1]] + ", ", t)
+    # Datum 14.11.(2026) → 14. November (2026)
+    t = re.sub(r"\b(\d{1,2})\.(\d{1,2})\.(\d{4}|\d{2})?(?!\d)",
+               lambda m: f"{int(m[1])}. {_MONATE[int(m[2]) - 1]}" + (f" {m[3] if len(m[3]) == 4 else '20' + m[3]}" if m[3] else "")
+               if 1 <= int(m[2]) <= 12 and 1 <= int(m[1]) <= 31 else m[0], t)
+    t = re.sub(r"\b((?:" + "|".join(_MONATE) + r")(?: \d{4})?) (?=[A-Za-zÄÖÜäöü0-9])", r"\1, ", t)  # kleine Pause nach dem Datum
+    for muster, voll in _KUERZEL:
+        t = re.sub(muster, voll, t)
+    t = re.sub(r"\s*€", " Euro", t)
+    t = re.sub(r"\s*%", " Prozent", t)
+    t = t.replace("&", " und ").replace(" – ", ", ").replace(" - ", ", ")
+    return re.sub(r"\s{2,}", " ", t).strip()
+
+
 def aussprache_anwenden(text: str) -> str:
     for wort, laut in sorted(aussprache().items(), key=lambda x: -len(x[0])):  # längere zuerst („Raspberry Pi“ vor „Pi“)
         text = re.sub(r"(?<![\w-])" + re.escape(wort) + r"(?![\w-])", laut, text, flags=re.IGNORECASE)
@@ -1466,7 +1498,7 @@ def _piper_prozess(modell: str, tempo: float) -> dict:
 def sprechen(text: str, stimme: str, tempo: float = 1.0) -> bytes:
     """Ein Stück Text (am besten ein Satz) mit einer Pi- oder ElevenLabs-Stimme → WAV-Bytes."""
     if stimme.startswith("el:"):
-        t = " ".join(str(text).split())[:1200]  # kein Aussprache-Wörterbuch: englische Namen spricht die Stimme selbst richtig
+        t = sprechbar(" ".join(str(text).split()))[:1200]  # kein Aussprache-Wörterbuch: englische Namen spricht die Stimme selbst richtig
         if not t:
             raise ValueError("Kein Text.")
         try:
@@ -1482,7 +1514,7 @@ def sprechen(text: str, stimme: str, tempo: float = 1.0) -> bytes:
         raise ValueError("Diese Stimme gibt es nicht.")
     modell, _, sprecher = sid.partition(":")
     tempo = min(max(float(tempo or 1.0), 0.6), 1.6)
-    text = aussprache_anwenden(" ".join(str(text).split()))[:1200]
+    text = aussprache_anwenden(sprechbar(" ".join(str(text).split())))[:1200]
     if not text:
         raise ValueError("Kein Text.")
     ziel = f"/tmp/stimme-{secrets.token_hex(6)}.wav"
