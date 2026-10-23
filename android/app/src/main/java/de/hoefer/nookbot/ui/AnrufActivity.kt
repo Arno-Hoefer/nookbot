@@ -43,11 +43,21 @@ class AnrufActivity : ComponentActivity() {
             NookTheme(theme) {
                 if (info == null) return@NookTheme
                 val b = bots.firstOrNull { it.id == info.bot }
+                // Bots erst laden (Stimme!) – höchstens 4 Sekunden warten, dann zur Not mit Thorsten
+                var warten by remember { mutableStateOf(true) }
+                LaunchedEffect(Unit) { kotlinx.coroutines.delay(4000); warten = false }
+                if (zustand == Anruf.Zustand.Laeuft && b == null && warten) {
+                    Box(Modifier.fillMaxSize().background(Color(0xFF0B0B0D)), contentAlignment = Alignment.Center) {
+                        Text("verbinde …", color = Color(0xFFA9A8AE), fontSize = 16.sp)
+                    }
+                    return@NookTheme
+                }
                 when (zustand) {
                     Anruf.Zustand.Klingelt -> Klingeln(info.name, b, { Anruf.annehmen(this) }) { Anruf.ende(this) }
                     // Ruft man selbst an, meldet sich der Bot wie am Telefon (fester Satz, kostet kein Modell – und kommt danach aus dem Zwischenspeicher)
                     Anruf.Zustand.Laeuft -> Sprachmodus(vm, info.sid, b, titel = "Anruf",
-                        erst = info.text.takeIf { it.isNotBlank() } ?: "Hallo, hier ist ${info.name}. Was kann ich für dich tun?") { Anruf.ende(this) }
+                        erst = info.text.takeIf { it.isNotBlank() } ?: "Hallo, hier ist ${info.name}. Was kann ich für dich tun?",
+                        extra = { TonWahl() }) { Anruf.ende(this) }
                     Anruf.Zustand.Frei -> {}
                 }
             }
@@ -64,6 +74,29 @@ class AnrufActivity : ComponentActivity() {
     }
 
     companion object { const val ANNEHMEN = "de.hoefer.nookbot.ANNEHMEN" }
+}
+
+/** Ton-Ausgabe im Gespräch: Lautsprecher, Hörmuschel, Headset, Uhr … */
+@Composable
+private fun TonWahl() {
+    val ziele by Anruf.ziele.collectAsState()
+    val ziel by Anruf.ziel.collectAsState()
+    if (ziele.size < 2) return
+    Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.Center) {
+        ziele.forEach { z ->
+            val an = ziel?.identifier == z.identifier
+            val zeichen = when {
+                z.type == androidx.core.telecom.CallEndpointCompat.TYPE_SPEAKER -> "🔊"
+                z.type == androidx.core.telecom.CallEndpointCompat.TYPE_EARPIECE -> "📱"
+                Anruf.istUhr(z.name) -> "⌚"
+                else -> "🎧"
+            }
+            Text("$zeichen ${z.name.toString().take(18)}", color = if (an) Color(0xFF0B0B0D) else Color(0xFFD6D5DA), fontSize = 13.sp,
+                modifier = Modifier.padding(horizontal = 4.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                    .background(if (an) Color(0xFFF3F2EF) else Color(0xFF1C1C1F)).clickable { Anruf.tonNach(z) }
+                    .padding(horizontal = 12.dp, vertical = 7.dp))
+        }
+    }
 }
 
 @Composable

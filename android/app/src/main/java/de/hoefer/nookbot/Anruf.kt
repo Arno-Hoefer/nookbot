@@ -44,6 +44,15 @@ object Anruf {
 
     enum class Zustand { Frei, Klingelt, Laeuft }
 
+    /** Wohin der Ton im Gespräch geht (Lautsprecher, Hörmuschel, Headset, Uhr) – im Anruf-Bildschirm umschaltbar. */
+    val ziele = MutableStateFlow<List<androidx.core.telecom.CallEndpointCompat>>(emptyList())
+    val ziel = MutableStateFlow<androidx.core.telecom.CallEndpointCompat?>(null)
+    fun istUhr(name: CharSequence) = Regex("(?i)watch|uhr|galaxy fit|fitbit").containsMatchIn(name)
+    fun tonNach(z: androidx.core.telecom.CallEndpointCompat) {
+        val c = control ?: return
+        c.launch { protokoll("Ton gewechselt: ${z.name} (${c.requestEndpointChange(z)})") }
+    }
+
     /** Kurzes Protokoll je Gespräch (Pegel, erkannter Text, Fehler – kein Ton) – geht beim Auflegen an den Pi. */
     private val zeilen = java.util.Collections.synchronizedList(mutableListOf<String>())
     private val zeitFmt = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.GERMANY)
@@ -250,13 +259,16 @@ class AnrufDienst : Service() {
                 Anruf.control = this
                 vordergrund()  // Anruf-Benachrichtigung nach dem Anmelden noch einmal – Telecom wartet darauf
                 // Ton auf den Lautsprecher (Android nimmt bei Anrufen sonst die Hörmuschel) – außer Headset oder Auto sind verbunden
+                // Uhren (Pixel Watch) melden sich auch als Bluetooth-Gerät – die nimmt die Automatik nicht, wählbar bleiben sie
                 launch {
                     val ziele = availableEndpoints.first()
-                    val ziel = ziele.firstOrNull { it.type == androidx.core.telecom.CallEndpointCompat.TYPE_BLUETOOTH }
-                        ?: ziele.firstOrNull { it.type == androidx.core.telecom.CallEndpointCompat.TYPE_WIRED_HEADSET }
+                    val bt = ziele.filter { it.type == androidx.core.telecom.CallEndpointCompat.TYPE_BLUETOOTH && !Anruf.istUhr(it.name) }
+                    val ziel = ziele.firstOrNull { it.type == androidx.core.telecom.CallEndpointCompat.TYPE_WIRED_HEADSET } ?: bt.firstOrNull()
                         ?: ziele.firstOrNull { it.type == androidx.core.telecom.CallEndpointCompat.TYPE_SPEAKER }
                     if (ziel != null) Anruf.protokoll("Ton: ${ziel.name} (${requestEndpointChange(ziel)})")
                 }
+                launch { availableEndpoints.collect { Anruf.ziele.value = it } }
+                launch { currentCallEndpoint.collect { Anruf.ziel.value = it } }
                 launch {
                     android.util.Log.i("NookBot", "Telecom angemeldet, setze aktiv")
                     val r = runCatching { setActive() }

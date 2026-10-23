@@ -51,7 +51,8 @@ private enum class Phase { Laden, Hoert, Versteht, Denkt, Spricht, Stumm }
  * Alles landet als normaler Text im Chat. Der Kreis zeigt, wer gerade dran ist: grau-weiß = du, Bot-Farbe = der Bot.
  */
 @Composable
-fun Sprachmodus(vm: NookViewModel, sid: String, b: Bot?, erst: String? = null, titel: String = "Sprachmodus", onClose: () -> Unit) {
+fun Sprachmodus(vm: NookViewModel, sid: String, b: Bot?, erst: String? = null, titel: String = "Sprachmodus",
+                extra: @Composable () -> Unit = {}, onClose: () -> Unit) {
     val ctx = LocalContext.current
     val msgs by vm.msgs.collectAsState()
     val busy by vm.busy.collectAsState()
@@ -138,6 +139,7 @@ fun Sprachmodus(vm: NookViewModel, sid: String, b: Bot?, erst: String? = null, t
                     modifier = Modifier.padding(start = 10.dp).weight(1f))
                 if (b?.sitzung == sid) Text("auf dem Pi", color = Color(0xFF8D8C93), fontSize = 12.sp)
             }
+            extra()
             Spacer(Modifier.weight(1f))
 
             val du = phase == Phase.Hoert || phase == Phase.Versteht
