@@ -72,6 +72,7 @@ class Benachrichtigung : BroadcastReceiver() {
         }
 
         private fun show(ctx: Context, ev: JSONObject) {
+            ev.optJSONObject("anruf")?.let { Anruf.eingang(ctx, it); return }
             val sid = ev.optString("s").takeIf { it.isNotBlank() && it != "null" }
             val high = ev.optString("prio") == "high"
             // App offen: nur Wichtiges (Freigaben, Test), und nie für die gerade offene Unterhaltung
@@ -108,6 +109,7 @@ class BootReceiver : BroadcastReceiver() {
     override fun onReceive(ctx: Context, intent: Intent) {
         if (intent.action in listOf(Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED)) {
             Benachrichtigung.planen(ctx)
+            if (Settings(ctx).anrufErreichbar) runCatching { AnrufDienst.erreichbar(ctx, true) }
             ErinnerungAlarm.neuStellen(ctx)
         }
     }

@@ -220,6 +220,7 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
             "bots", "routinen", "erinnerungen", "ablaeufe", "gedaechtnis", "ausloeser" -> io { loadStateNow() }
             "aktivitaet" -> if (stack.value.lastOrNull() == Route.Aktivitaet) loadAktivitaet()
             "arbeit" -> if (stack.value.lastOrNull() == Route.Arbeit) loadArbeit()
+            "anruf" -> ev.optJSONObject("a")?.let { de.hoefer.nookbot.Anruf.eingang(getApplication(), it) }
         }
     }
 
@@ -526,6 +527,18 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
             toast.value = r.optString("ergebnis")
         }
     }
+
+    // ── Anrufe ──
+
+    val erreichbar = MutableStateFlow(settings.anrufErreichbar)
+
+    fun setErreichbar(an: Boolean) {
+        settings.anrufErreichbar = an
+        erreichbar.value = an
+        runCatching { de.hoefer.nookbot.AnrufDienst.erreichbar(getApplication(), an) }.onFailure { toast.value = it.message }
+    }
+
+    fun testAnruf(bot: String) = io { api.post("/api/anrufe/test", JSONObject().put("bot", bot)); withContext(Dispatchers.Main) { toast.value = "Gleich klingelt es …" } }
 
     fun loadArbeit() = io {
         val r = api.get("/api/arbeit")

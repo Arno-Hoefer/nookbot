@@ -214,6 +214,7 @@ fun Tag(t: String) = Text(t, color = P.fg2, fontSize = 11.sp,
 
 @Composable
 fun ChatScreen(vm: NookViewModel, sid: String) {
+    val ctxChat = androidx.compose.ui.platform.LocalContext.current
     val msgs by vm.msgs.collectAsState()
     val busySet by vm.busy.collectAsState()
     val sitz by vm.sitzungen.collectAsState()
@@ -298,6 +299,9 @@ fun ChatScreen(vm: NookViewModel, sid: String) {
             if (!runde && b != null) Box {
                 RoundIcon(Icons.Default.MoreVert, "Mehr") { menu = true }
                 DropdownMenu(menu, { menu = false }, containerColor = P.card) {
+                    DropdownMenuItem({ Text("📞 ${b.name} anrufen", color = P.fg) }, {
+                        menu = false; de.hoefer.nookbot.Anruf.anrufen(ctxChat, b.id, b.name, sid)
+                    })
                     DropdownMenuItem({ Text("Einstellungen von ${b.name}", color = P.fg) }, { menu = false; vm.go(Route.BotEdit(b.id)) })
                     DropdownMenuItem({ Text("Als Ablauf speichern …", color = P.fg) }, { menu = false; ablauf = true })
                     DropdownMenuItem({ Text("Neu beginnen …", color = P.fg) }, { menu = false; neu = true })

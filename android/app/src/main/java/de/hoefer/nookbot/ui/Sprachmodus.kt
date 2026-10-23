@@ -51,7 +51,7 @@ private enum class Phase { Laden, Hoert, Versteht, Denkt, Spricht, Stumm }
  * Alles landet als normaler Text im Chat. Der Kreis zeigt, wer gerade dran ist: grau-weiß = du, Bot-Farbe = der Bot.
  */
 @Composable
-fun Sprachmodus(vm: NookViewModel, sid: String, b: Bot?, onClose: () -> Unit) {
+fun Sprachmodus(vm: NookViewModel, sid: String, b: Bot?, erst: String? = null, titel: String = "Sprachmodus", onClose: () -> Unit) {
     val ctx = LocalContext.current
     val msgs by vm.msgs.collectAsState()
     val busy by vm.busy.collectAsState()
@@ -61,6 +61,7 @@ fun Sprachmodus(vm: NookViewModel, sid: String, b: Bot?, onClose: () -> Unit) {
     var zeile by remember { mutableStateOf("") }
     var stumm by remember { mutableStateOf(false) }
     var fehler by remember { mutableStateOf<String?>(null) }
+    var schonGesagt by remember { mutableStateOf(false) }
     var erlaubt by remember { mutableStateOf(ctx.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) }
     val perm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok -> erlaubt = ok; if (!ok) fehler = "Ohne Mikrofon geht der Sprachmodus nicht." }
     val modell = remember(fortschritt) { WhisperModels.installedPreferred(ctx) }
@@ -80,6 +81,12 @@ fun Sprachmodus(vm: NookViewModel, sid: String, b: Bot?, onClose: () -> Unit) {
 
     // Der Ablauf: hören → verstehen → senden → warten → vorlesen → von vorn
     LaunchedEffect(erlaubt, modell, stumm) {
+        // Anruf: der Bot spricht zuerst (sein Ergebnis aus Routine oder Auslöser) – das geht auch ohne Spracherkennung
+        if (erst != null && !schonGesagt && !stumm) {
+            schonGesagt = true
+            phase = Phase.Spricht
+            tts.sprechen(sprechtext(erst), b?.stimme ?: "pi:thorsten-high") { zeile = it }
+        }
         if (!erlaubt || modell == null || stumm) { if (stumm) phase = Phase.Stumm; return@LaunchedEffect }
         val w = runCatching { withContext(Dispatchers.IO) { WhisperSitzung(WhisperModels.file(ctx, modell)) } }
             .getOrElse { fehler = it.message; return@LaunchedEffect }
@@ -118,7 +125,7 @@ fun Sprachmodus(vm: NookViewModel, sid: String, b: Bot?, onClose: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 BotFigure(b, 28.dp)
-                Text("Sprachmodus · $name", color = Color(0xFFF3F2EF), fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+                Text("$titel · $name", color = Color(0xFFF3F2EF), fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(start = 10.dp).weight(1f))
                 if (b?.sitzung == sid) Text("auf dem Pi", color = Color(0xFF8D8C93), fontSize = 12.sp)
             }

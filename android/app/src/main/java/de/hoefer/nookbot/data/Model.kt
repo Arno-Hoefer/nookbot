@@ -125,19 +125,20 @@ data class Merk(val id: String, val text: String, val fuer: String, val von: Str
 
 data class Routine(
     val id: String, val name: String, val bot: String, val auftrag: String, val zeit: String, val tage: List<Int>,
-    val aktiv: Boolean, val letzterLauf: Long, val datum: String = "", val sitzung: String = "",
+    val aktiv: Boolean, val letzterLauf: Long, val datum: String = "", val sitzung: String = "", val anruf: Boolean = false,
 ) {
     /** einmalig an einem Datum (statt wiederkehrend) */
     val einmalig: Boolean get() = datum.isNotBlank()
 
     fun json(): JSONObject = JSONObject().put("id", id).put("name", name).put("bot", bot).put("auftrag", auftrag).put("zeit", zeit)
-        .put("tage", JSONArray(tage)).put("aktiv", aktiv).put("letzter_lauf", letzterLauf / 1000.0).put("datum", datum).put("sitzung", sitzung)
+        .put("tage", JSONArray(tage)).put("aktiv", aktiv).put("letzter_lauf", letzterLauf / 1000.0).put("datum", datum).put("sitzung", sitzung).put("anruf", anruf)
 
     companion object {
         fun from(o: JSONObject) = Routine(
             o.optString("id"), o.optString("name"), o.optString("bot"), o.optString("auftrag"), o.optString("zeit", "08:00"),
             o.optJSONArray("tage")?.let { a -> (0 until a.length()).map { a.getInt(it) } } ?: listOf(1, 2, 3, 4, 5),
             o.optBoolean("aktiv", true), (o.optDouble("letzter_lauf", 0.0) * 1000).toLong(), o.optString("datum"), o.optString("sitzung"),
+            o.optBoolean("anruf"),
         )
     }
 }
@@ -147,12 +148,12 @@ data class Ausloeser(
     val id: String, val name: String, val bot: String, val quelle: String, val suche: String, val konto: String, val auftrag: String,
     val aktiv: Boolean, val intervall: Int, val maxProTag: Int, val sitzung: String = "",
     val basis: Boolean = false, val letztePruefung: Long = 0, val letzterTreffer: Long = 0, val fehler: String = "",
-    private val roh: JSONObject? = null,
+    private val roh: JSONObject? = null, val anruf: Boolean = false,
 ) {
     /** Laufzeitstand (gesehen, heute …) bleibt erhalten – der Pi übernimmt ihn, solange sich die Abfrage nicht ändert. */
     fun json(): JSONObject = JSONObject(roh?.toString() ?: "{}").put("id", id).put("name", name).put("bot", bot).put("quelle", quelle)
         .put("suche", suche).put("konto", konto).put("auftrag", auftrag).put("aktiv", aktiv).put("intervall", intervall)
-        .put("max_pro_tag", maxProTag).put("sitzung", sitzung)
+        .put("max_pro_tag", maxProTag).put("sitzung", sitzung).put("anruf", anruf)
 
     companion object {
         val QUELLEN = linkedMapOf("mail" to "✉️ Mail", "slack" to "💬 Slack", "webseite" to "🌐 Webseite", "paket" to "📦 Paket")
@@ -161,7 +162,7 @@ data class Ausloeser(
             o.optString("id"), o.optString("name"), o.optString("bot"), o.optString("quelle", "mail"), o.optString("suche"), o.optString("konto"),
             o.optString("auftrag"), o.optBoolean("aktiv", true), o.optInt("intervall", 15), o.optInt("max_pro_tag", 6), o.optString("sitzung"),
             o.optBoolean("basis"), (o.optDouble("letzte_pruefung", 0.0) * 1000).toLong(), (o.optDouble("letzter_treffer", 0.0) * 1000).toLong(),
-            o.optString("fehler"), o,
+            o.optString("fehler"), o, o.optBoolean("anruf"),
         )
 
         fun list(a: JSONArray?): List<Ausloeser> = if (a == null) emptyList() else (0 until a.length()).map { from(a.getJSONObject(it)) }

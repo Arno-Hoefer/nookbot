@@ -784,10 +784,11 @@ function routineDialog(r, speichern) {
       ${feld('Uhrzeit', `<input type="time" id="rZ" value="${esc(r?.zeit || '07:45')}">`)}${feld('Einmalig am (leer = wiederkehrend)', `<input type="date" id="rD" value="${esc(r?.datum || '')}" placeholder="${morgen}">`)}</div>
     <div class="zeilen" style="margin:6px 0">${TAGE.map((t, i) => `<label><input type="checkbox" value="${i + 1}" ${(r?.tage || [1, 2, 3, 4, 5]).includes(i + 1) ? 'checked' : ''} style="width:auto"> ${t}</label>`).join('')}</div>
     ${feld('Auftrag – so, als würdest du ihn dem Bot schreiben', `<textarea id="rA" rows="7">${esc(r?.auftrag || '')}</textarea>`)}
+    <label class="zeilen" style="margin:4px 0 10px"><input type="checkbox" id="rAnruf" ${r?.anruf ? 'checked' : ''} style="width:auto"> 📞 Als Anruf – das Handy klingelt, der Bot liest sein Ergebnis vor</label>
     <div class="zeilen"><button class="pri" id="rOk">Speichern</button><button onclick="this.closest('dialog').close()">Abbrechen</button></div>`;
   $('#rOk').onclick = () => {
-    const n = {...(r || {}), name: $('#rN').value.trim(), bot: $('#rB').value, zeit: $('#rZ').value, datum: $('#rD').value, auftrag: $('#rA').value.trim(),
-      tage: [...d.querySelectorAll('.zeilen input[type=checkbox]:checked')].map((x) => +x.value), aktiv: r ? r.aktiv : true};
+    const n = {...(r || {}), name: $('#rN').value.trim(), bot: $('#rB').value, zeit: $('#rZ').value, datum: $('#rD').value, auftrag: $('#rA').value.trim(), anruf: $('#rAnruf').checked,
+      tage: [...d.querySelectorAll('.zeilen input[type=checkbox]:checked:not(#rAnruf)')].map((x) => +x.value), aktiv: r ? r.aktiv : true};
     if (!n.name || !n.auftrag || !n.zeit) return toast('Name, Uhrzeit und Auftrag nötig');
     d.close(); speichern(r ? S.routinen.map((x) => x.id === r.id ? n : x) : [...S.routinen, n], 'Gespeichert');
   };
@@ -866,13 +867,14 @@ function ausloeserDialog(a, speichern) {
     ${feld('<span id="aSL">Suche</span>', `<input id="aS" value="${esc(a?.suche || '')}">`)}
     <div id="aKW">${feld('Konto (leer = alle, die der Bot sehen darf)', `<input id="aK" value="${esc(a?.konto || '')}">`)}</div>
     ${feld('… dann soll der Bot', `<textarea id="aA" rows="5" placeholder="z. B. Fasse die Mail in 2 Sätzen zusammen und sag, ob ich etwas tun muss.">${esc(a?.auftrag || '')}</textarea>`)}
+    <label class="zeilen" style="margin:4px 0 10px"><input type="checkbox" id="aAnruf" ${a?.anruf ? 'checked' : ''} style="width:auto"> 📞 Als Anruf – das Handy klingelt, der Bot liest vor</label>
     <div class="reihe">${feld('Prüfen alle … Minuten', `<input id="aI" type="number" min="5" max="1440" value="${a?.intervall || 15}">`)}${feld('Höchstens … mal am Tag', `<input id="aM" type="number" min="1" max="50" value="${a?.max_pro_tag || 6}">`)}</div>
     <div class="zeilen"><button class="pri" id="aOk">Speichern</button><button onclick="this.closest('dialog').close()">Abbrechen</button></div>`;
   const art = () => { const q = $('#aQ').value; $('#aS').placeholder = SUCHE_HILFE[q]; $('#aSL').textContent = q === 'webseite' ? 'Adresse' : 'Suche'; $('#aKW').hidden = q !== 'mail'; $('#aS').disabled = q === 'paket'; };
   $('#aQ').onchange = art; art();
   $('#aOk').onclick = () => {
     const n = {...(a || {}), name: $('#aN').value.trim(), quelle: $('#aQ').value, bot: $('#aB').value, suche: $('#aS').value.trim(), konto: $('#aK').value.trim(),
-      auftrag: $('#aA').value.trim(), intervall: +$('#aI').value || 15, max_pro_tag: +$('#aM').value || 6, aktiv: a ? a.aktiv : true};
+      auftrag: $('#aA').value.trim(), intervall: +$('#aI').value || 15, max_pro_tag: +$('#aM').value || 6, anruf: $('#aAnruf').checked, aktiv: a ? a.aktiv : true};
     if (!n.name || !n.auftrag) return toast('Name und Auftrag nötig');
     d.close(); speichern(a ? S.ausloeser.map((x) => x.id === a.id ? n : x) : [...(S.ausloeser || []), n], 'Gespeichert');
   };
@@ -920,7 +922,7 @@ async function seiteArbeit() {
 }
 
 // ── Aktivität ──
-const AKT_ART = {werkzeug: '🔧', frei: '⚙️', routine: '⏰', ausloeser: '⚡', freigabe: '✅', runde: '👥'};
+const AKT_ART = {anruf: '📞', werkzeug: '🔧', frei: '⚙️', routine: '⏰', ausloeser: '⚡', freigabe: '✅', runde: '👥'};
 async function seiteAktivitaet() {
   const f = S.aktFilter || (S.aktFilter = {tage: 1, bot: '', hintergrund: false});
   const o = await api('GET', `/api/aktivitaet?tage=${f.tage}&bot=${encodeURIComponent(f.bot)}${f.hintergrund ? '&hintergrund=1' : ''}`).catch(() => ({eintraege: []}));

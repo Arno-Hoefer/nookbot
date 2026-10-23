@@ -79,6 +79,7 @@ fun AusloeserEditScreen(vm: NookViewModel, id: String?) {
     var auftrag by remember { mutableStateOf(a?.auftrag ?: "") }
     var intervall by remember { mutableStateOf((a?.intervall ?: 15).toString()) }
     var maxTag by remember { mutableStateOf((a?.maxProTag ?: 6).toString()) }
+    var anruf by remember { mutableStateOf(a?.anruf ?: false) }
     val sucheOk = when (quelle) {
         "paket" -> true
         "webseite" -> Regex("^https?://\\S+").matches(suche.trim())
@@ -101,6 +102,7 @@ fun AusloeserEditScreen(vm: NookViewModel, id: String?) {
                 Field("Prüfen alle (min)", intervall, number = true, modifier = Modifier.width(170.dp).padding(end = 10.dp)) { intervall = it.filter(Char::isDigit).take(4) }
                 Field("Max. pro Tag", maxTag, number = true, modifier = Modifier.width(170.dp)) { maxTag = it.filter(Char::isDigit).take(2) }
             }
+            AnrufSchalter(anruf) { anruf = it }
             Hint("Beim ersten Prüfen merkt sich der Pi nur den Stand – ab dann zählt nur Neues. Mindestens 5 Minuten.", Modifier.padding(top = 6.dp))
             if (a?.fehler?.isNotBlank() == true) Text("⚠ ${a.fehler}", color = A.accent, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
             Row(Modifier.padding(vertical = 20.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -108,7 +110,7 @@ fun AusloeserEditScreen(vm: NookViewModel, id: String?) {
                     val neu = (a ?: Ausloeser("", "", "", "", "", "", "", true, 15, 6)).copy(
                         name = name.trim(), quelle = quelle, bot = bot, suche = if (quelle == "paket") "" else suche.trim(),
                         konto = if (quelle == "mail") konto.trim() else "", auftrag = auftrag.trim(),
-                        intervall = (intervall.toIntOrNull() ?: 15).coerceIn(5, 1440), maxProTag = (maxTag.toIntOrNull() ?: 6).coerceIn(1, 50))
+                        intervall = (intervall.toIntOrNull() ?: 15).coerceIn(5, 1440), maxProTag = (maxTag.toIntOrNull() ?: 6).coerceIn(1, 50), anruf = anruf)
                     vm.saveAusloeser(if (a == null) list + neu else list.map { if (it.id == a.id) neu else it }) { vm.back() }
                 }
                 Spacer(Modifier.width(10.dp))
@@ -120,9 +122,21 @@ fun AusloeserEditScreen(vm: NookViewModel, id: String?) {
     }
 }
 
+/** „Als Anruf“: nur wenn ausdrücklich gewollt – der Bot ruft an und liest sein Ergebnis vor. */
+@Composable
+fun AnrufSchalter(an: Boolean, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("📞 Als Anruf", color = P.fg, fontSize = 14.sp)
+            Text("Das Handy klingelt, der Bot liest sein Ergebnis vor und hört dann zu.", color = P.mut, fontSize = 12.sp)
+        }
+        Switch(an, onChange, colors = SwitchDefaults.colors(checkedTrackColor = A.accent))
+    }
+}
+
 // ── Aktivität ─────────────────────────────────────────────────────
 
-private val ART_ICON = mapOf("werkzeug" to "🔧", "routine" to "⏰", "ausloeser" to "⚡", "freigabe" to "✅", "runde" to "👥")
+private val ART_ICON = mapOf("anruf" to "📞", "werkzeug" to "🔧", "routine" to "⏰", "ausloeser" to "⚡", "freigabe" to "✅", "runde" to "👥")
 
 @Composable
 fun AktivitaetScreen(vm: NookViewModel) {

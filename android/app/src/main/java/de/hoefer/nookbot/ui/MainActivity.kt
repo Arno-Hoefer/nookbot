@@ -34,6 +34,7 @@ class MainActivity : ComponentActivity() {
         })
         handle(intent)
         de.hoefer.nookbot.Benachrichtigung.planen(this)
+        if (de.hoefer.nookbot.data.Settings(this).anrufErreichbar) runCatching { de.hoefer.nookbot.AnrufDienst.erreichbar(this, true) }
         if (android.os.Build.VERSION.SDK_INT >= 33 &&
             checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1)

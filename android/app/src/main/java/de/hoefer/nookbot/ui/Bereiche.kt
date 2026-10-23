@@ -198,6 +198,7 @@ fun RoutineEditScreen(vm: NookViewModel, id: String?) {
     var datum by remember { mutableStateOf(r?.datum?.takeIf { it.isNotBlank() } ?: java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.GERMANY).format(java.util.Date(System.currentTimeMillis() + 86_400_000))) }
     val datumOk = !einmalig || Regex("^\\d{4}-\\d{2}-\\d{2}$").matches(datum)
     var auftrag by remember { mutableStateOf(r?.auftrag ?: "") }
+    var anruf by remember { mutableStateOf(r?.anruf ?: false) }
     val zeitOk = Regex("^([01]\\d|2[0-3]):[0-5]\\d$").matches(zeit)
     Column(Modifier.fillMaxSize()) {
         TopBar(if (r == null) "Neue Routine" else r.name, { vm.back() })
@@ -218,10 +219,11 @@ fun RoutineEditScreen(vm: NookViewModel, id: String?) {
             if (r?.sitzung?.isNotBlank() == true) Hint("Das Ergebnis kommt in die Unterhaltung, aus der die Routine angelegt wurde.", Modifier.padding(top = 6.dp))
             Section("Auftrag", "So, als würdest du ihn dem Bot schreiben. Er bekommt Datum und Uhrzeit dazu.")
             Field("z. B. Was steht heute in meinem Kalender, und was ist in Slack für mich los? Kurz, als Liste.", auftrag, lines = 8) { auftrag = it }
+            AnrufSchalter(anruf) { anruf = it }
             Row(Modifier.padding(vertical = 20.dp), verticalAlignment = Alignment.CenterVertically) {
                 MainButton("Speichern", enabled = name.isNotBlank() && auftrag.isNotBlank() && zeitOk && datumOk && (einmalig || tage.isNotEmpty()) && bot.isNotBlank()) {
                     val neu = Routine(r?.id ?: "", name, bot, auftrag, zeit, tage.sorted(), if (einmalig) true else r?.aktiv ?: true, r?.letzterLauf ?: 0,
-                        if (einmalig) datum else "", r?.sitzung ?: "")
+                        if (einmalig) datum else "", r?.sitzung ?: "", anruf)
                     vm.saveRoutinen(if (r == null) routinen + neu else routinen.map { if (it.id == r.id) neu else it }) { vm.back() }
                 }
                 Spacer(Modifier.width(10.dp))
@@ -530,6 +532,26 @@ fun SettingsScreen(vm: NookViewModel) {
                 Switch(listen, { vm.setListen(it) }, colors = SwitchDefaults.colors(checkedTrackColor = A.accent))
             }
             if (listen) SideButton("Test-Benachrichtigung") { vm.testPush() }
+
+            val erreichbar by vm.erreichbar.collectAsState()
+            val ctxE = LocalContext.current
+            Section("Anrufe", "Routinen und Auslöser, die du ausdrücklich „als Anruf“ einstellst, rufen an: Das Handy klingelt – auch gesperrt –, " +
+                "nach dem Annehmen liest der Bot sein Ergebnis vor und hört dir dann zu. Ohne „erreichbar“ kommt der Anruf erst mit der nächsten Abfrage (bis ~5 Minuten).")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Für Anrufe erreichbar", color = P.fg, fontSize = 14.sp)
+                    Text("hält eine Verbindung zum Pi offen – klingelt sofort", color = P.mut, fontSize = 12.sp)
+                }
+                Switch(erreichbar, { vm.setErreichbar(it) }, colors = SwitchDefaults.colors(checkedTrackColor = A.accent))
+            }
+            if (!de.hoefer.nookbot.Anruf.vollbildErlaubt(ctxE)) {
+                Hint("Damit der Anruf über dem Sperrbildschirm erscheint, braucht NookBot die Erlaubnis „Vollbild-Benachrichtigungen“.", Modifier.padding(top = 6.dp))
+                SideButton("Erlaubnis öffnen") {
+                    runCatching { ctxE.startActivity(android.content.Intent("android.settings.MANAGE_APP_USE_FULL_SCREEN_INTENT",
+                        android.net.Uri.parse("package:" + ctxE.packageName))) }
+                }
+            }
+            Row(Modifier.padding(top = 6.dp)) { SideButton("Testanruf") { vm.testAnruf(vm.bots.value.firstOrNull { it.kapitaen }?.id ?: "") } }
 
             Text("NookBot ${BuildConfig.VERSION_NAME}", color = P.mut, fontSize = 12.sp, modifier = Modifier.padding(top = 28.dp, bottom = 24.dp))
         }

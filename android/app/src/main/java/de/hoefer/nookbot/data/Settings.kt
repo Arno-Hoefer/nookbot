@@ -35,6 +35,11 @@ class Settings(ctx: Context) {
         get() = prefs.getFloat("textScale", 1.1f)
         set(v) = prefs.edit().putFloat("textScale", v).apply()
 
+    /** Für Anrufe der Bots erreichbar (hält eine Verbindung zum Pi offen) */
+    var anrufErreichbar: Boolean
+        get() = prefs.getBoolean("anrufErreichbar", false)
+        set(v) = prefs.edit().putBoolean("anrufErreichbar", v).apply()
+
     /** Im Hintergrund zuhören (Benachrichtigungen) */
     var listen: Boolean
         get() = prefs.getBoolean("listen", true)
