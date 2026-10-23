@@ -62,6 +62,7 @@ fun HomeScreen(vm: NookViewModel) {
     val online by vm.online.collectAsState()
     val fehler by vm.fehler.collectAsState()
     val guthaben by vm.guthaben.collectAsState()
+    val claude by vm.claude.collectAsState()
     var plus by remember { mutableStateOf(false) }
     var loeschen by remember { mutableStateOf<Sitzung?>(null) }
     var suchen by rememberSaveable { mutableStateOf(false) }
@@ -178,7 +179,12 @@ fun HomeScreen(vm: NookViewModel) {
             .background(P.card).border(1.dp, P.chip, RoundedCornerShape(16.dp)).clickable { vm.go(Route.Settings) }
             .padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(8.dp).clip(CircleShape).background(if (online) A.green else A.accent))
-            Text(if (online) "Pi verbunden" + (guthaben?.let { " · Ollama ${it.genutztProzent} % genutzt" } ?: "") else (fehler ?: "verbinde …"),
+            // Claude: Rest, wenn ein Guthabenstand eingetragen ist – sonst der eigene Verbrauch diesen Monat
+            val claudeText = claude?.takeIf { it.optBoolean("eingerichtet") }?.let { c ->
+                if (c.has("rest_usd")) " · Claude ${"%.2f".format(c.optDouble("rest_usd"))} $ übrig"
+                else " · Claude ${"%.2f".format(c.optDouble("eigen_monat_usd", 0.0))} $ im Monat"
+            } ?: ""
+            Text(if (online) "Pi verbunden" + (guthaben?.let { " · Ollama ${it.genutztProzent} %" } ?: "") + claudeText else (fehler ?: "verbinde …"),
                 color = P.fg2, fontSize = 13.sp, modifier = Modifier.padding(start = 10.dp).weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text("Tailnet", color = P.mut, fontSize = 13.sp)
         }
@@ -584,7 +590,13 @@ fun FreigabeCard(f: Freigabe, busy: Boolean, onChange: ((String) -> Unit)? = nul
             Text(f.titel, color = P.fg2, fontSize = 13.sp, modifier = Modifier.padding(start = 8.dp).weight(1f))
             Text(f.id, color = P.mut, fontSize = 11.sp)
         }
-        Text(f.text, color = P.fg, fontSize = 14.sp, lineHeight = 20.sp, modifier = Modifier.padding(top = 10.dp), maxLines = 14, overflow = TextOverflow.Ellipsis)
+        // Sammelfreigaben (viele Termine) sind lang – angetippt zeigt die Karte alles
+        var ganz by remember { mutableStateOf(false) }
+        val zeilen = f.text.lines().size
+        Text(f.text, color = P.fg, fontSize = 14.sp, lineHeight = 20.sp, maxLines = if (ganz) Int.MAX_VALUE else 14, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 10.dp).clickable(enabled = zeilen > 14) { ganz = !ganz })
+        if (zeilen > 14) Text(if (ganz) "weniger" else "alle $zeilen Zeilen zeigen", color = A.blue, fontSize = 13.sp,
+            modifier = Modifier.padding(top = 4.dp).clickable { ganz = !ganz })
         if (f.offen) {
             Row(Modifier.padding(top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                 MainButton(if (busy) "…" else "Ausführen", enabled = !busy) { onDecide(true) }
