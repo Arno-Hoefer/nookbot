@@ -17,6 +17,9 @@ import kotlin.math.sqrt
 class Sprachaufnahme(private val onLevel: (Float) -> Unit) {
     @Volatile private var stopp = false
     @Volatile private var jetztFertig = false
+    /** Sprache erkannt – die Aufnahme läuft, bis eine Pause kommt (für die Anzeige „Ich höre dich“). */
+    @Volatile var hoertDich = false
+        private set
 
     /** Aufnahme beenden, ohne etwas zu liefern (Sprachmodus zu, Mikro stumm). */
     fun abbrechen() { stopp = true }
@@ -29,6 +32,7 @@ class Sprachaufnahme(private val onLevel: (Float) -> Unit) {
     fun hoeren(maxSekunden: Int = 90): FloatArray? {
         stopp = false
         jetztFertig = false
+        hoertDich = false
         val frame = RATE / 20 // 50 ms
         val minBuf = AudioRecord.getMinBufferSize(RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
         val rec = AudioRecord(MediaRecorder.AudioSource.VOICE_COMMUNICATION, RATE, AudioFormat.CHANNEL_IN_MONO,
@@ -64,7 +68,7 @@ class Sprachaufnahme(private val onLevel: (Float) -> Unit) {
                     vorlauf.addLast(f)
                     if (vorlauf.size > 10) vorlauf.removeFirst()
                     if (rms > schwelle) laut++ else { laut = 0; rauschen = rauschen * 0.95 + rms * 0.05 }
-                    if (laut >= 3) { spricht = true; gesagt.addAll(vorlauf); vorlauf.clear() }
+                    if (laut >= 3) { spricht = true; hoertDich = true; gesagt.addAll(vorlauf); vorlauf.clear() }
                 } else {
                     gesagt.add(f)
                     if (rms < schwelle * 0.8) leise++ else leise = 0

@@ -127,8 +127,15 @@ fun Sprachmodus(vm: NookViewModel, sid: String, b: Bot?, erst: String? = null, t
         }
     }
     // Protokoll: beim Zuhören alle 5 Sekunden den lautesten Pegel (zeigt, ob das Mikro im Anruf überhaupt etwas bekommt)
+    var hoertDich by remember { mutableStateOf(false) }
     LaunchedEffect(phase) {
-        while (phase == Phase.Hoert) { delay(5000); if (phase == Phase.Hoert) de.hoefer.nookbot.Anruf.protokoll("hört … Spitze ${"%.2f".format(spitze)}") }
+        var n = 0
+        while (phase == Phase.Hoert) {
+            delay(250)
+            hoertDich = aufnahme.hoertDich
+            if (++n % 20 == 0) de.hoefer.nookbot.Anruf.protokoll("hört … Spitze ${"%.2f".format(spitze)}${if (hoertDich) ", Sprache erkannt" else ""}")
+        }
+        hoertDich = false
     }
     // Werkzeuge, die der Bot gerade benutzt, als kleine Zeile
     val werkzeug = if (phase == Phase.Denkt) msgs.lastOrNull()?.takeIf { it.role == "tool" }?.let { toolLine(it.text) } else null
@@ -167,6 +174,7 @@ fun Sprachmodus(vm: NookViewModel, sid: String, b: Bot?, erst: String? = null, t
                 fehler != null -> fehler ?: ""
                 modell == null -> "Für die Spracherkennung auf dem Handy einmalig ein Modell laden:"
                 phase == Phase.Laden -> "Starte …"
+                phase == Phase.Hoert && hoertDich -> "Ich höre dich … kurze Pause oder Tippen = fertig"
                 phase == Phase.Hoert -> hinweis ?: "Ich höre zu – sprich einfach. Tippen schließt ab."
                 phase == Phase.Versteht -> "Verstehe …"
                 phase == Phase.Denkt -> "$name denkt nach …" + (werkzeug?.let { "\n$it" } ?: "")
