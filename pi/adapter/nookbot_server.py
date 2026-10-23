@@ -713,7 +713,7 @@ def update_bot(bid: str, d: dict) -> dict:
             b["merken"] = bool(d["merken"])
         if "regeln" in d and isinstance(d["regeln"], dict):
             b["regeln"] = regeln_norm(d["regeln"])
-        if "stimme" in d and (not d["stimme"] or str(d["stimme"]).startswith(("pi:", "handy:"))):
+        if "stimme" in d and (not d["stimme"] or str(d["stimme"]).startswith(("pi:", "handy:", "el:"))):
             b["stimme"] = str(d["stimme"] or "")[:120]
         save_bots(all_b)
     if d.get("modell"):
@@ -1291,7 +1291,100 @@ _piper_lock = threading.Lock()
 
 def stimmen_liste() -> list:
     da = set(os.listdir(os.path.join(PIPER, "stimmen"))) if os.path.isdir(os.path.join(PIPER, "stimmen")) else set()
-    return [{"id": "pi:" + i, "name": n, "beschreibung": b} for i, n, b, _ in STIMMEN if f"de_DE-{i.split(':')[0]}.onnx" in da]
+    pi = [{"id": "pi:" + i, "name": n, "beschreibung": b} for i, n, b, _ in STIMMEN if f"de_DE-{i.split(':')[0]}.onnx" in da]
+    return el_stimmen() + pi
+
+
+# ── ElevenLabs (Cloud-Stimmen, optional) ────────────────────────────
+# Schlüssel in elevenlabs.json (einrichtung/11-elevenlabs.sh). Stimmen-ids „el:<voice_id>“. Sprache spricht das Modell
+# mehrsprachig – britische Stimmen behalten beim Deutschen ihren Einschlag. Jeder Satz kostet Zeichen vom Kontingent;
+# gleiche Sätze kommen aus dem Zwischenspeicher. Ist das Kontingent leer oder ElevenLabs weg, spricht Thorsten auf dem Pi.
+
+EL_API = "https://api.elevenlabs.io"
+EL_MODELL = "eleven_multilingual_v2"
+_el_cache: dict = {"t": 0, "stimmen": []}
+
+
+def el_conf() -> dict:
+    return read_json(path("elevenlabs.json"), {})
+
+
+def _el(method: str, p: str, body: dict | None = None, roh: bool = False, timeout: int = 30):
+    key = el_conf().get("api_key")
+    if not key:
+        raise ValueError("ElevenLabs ist nicht eingerichtet.")
+    req = urllib.request.Request(EL_API + p, data=json.dumps(body).encode() if body is not None else None, method=method,
+                                 headers={"xi-api-key": key, "Content-Type": "application/json", "User-Agent": "NookBot/" + VERSION})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            data = r.read()
+    except urllib.error.HTTPError as e:
+        txt = e.read()[:300].decode(errors="replace")
+        raise ValueError(f"ElevenLabs {e.code}: {txt}") from None
+    return data if roh else json.loads(data or b"{}")
+
+
+def el_stimmen() -> list:
+    if not el_conf().get("api_key"):
+        return []
+    if time.time() - _el_cache["t"] > 3600:
+        try:
+            vs = _el("GET", "/v1/voices").get("voices", [])
+            out = []
+            for v in vs:
+                lab = v.get("labels") or {}
+                besch = ", ".join(x for x in (lab.get("accent"), lab.get("gender"), lab.get("descriptive") or lab.get("description"), lab.get("age")) if x)
+                out.append({"id": "el:" + v["voice_id"], "name": f"{v.get('name', '?').split(' - ')[0]} (ElevenLabs)",
+                            "beschreibung": (besch + " · " if besch else "") + "Cloud, Kontingent"})
+            # britische zuerst – passt zum Butler
+            out.sort(key=lambda x: (0 if "british" in x["beschreibung"].lower() else 1, x["name"]))
+            _el_cache.update(t=time.time(), stimmen=out)
+        except Exception as e:  # noqa: BLE001
+            log("ElevenLabs Stimmen:", e)
+            _el_cache["t"] = time.time() - 3000  # in 10 Minuten noch einmal
+    return _el_cache["stimmen"]
+
+
+def el_kontingent() -> dict | None:
+    if not el_conf().get("api_key"):
+        return None
+    try:
+        o = _el("GET", "/v1/user/subscription")
+        return {"verbraucht": o.get("character_count"), "grenze": o.get("character_limit"), "tarif": o.get("tier"),
+                "neu_ab": o.get("next_character_count_reset_unix")}
+    except Exception as e:  # noqa: BLE001
+        return {"fehler": str(e)[:200]}
+
+
+def el_sprechen(text: str, voice: str, tempo: float = 1.0) -> bytes:
+    import hashlib as _h
+    import io
+    import wave
+    c = el_conf()
+    modell = c.get("modell") or EL_MODELL
+    d = path("stimmen-cache")
+    os.makedirs(d, exist_ok=True)
+    fp = os.path.join(d, _h.sha1(f"{voice}|{modell}|{tempo:.2f}|{text}".encode()).hexdigest() + ".wav")
+    if os.path.exists(fp):
+        os.utime(fp)
+        return open(fp, "rb").read()
+    body = {"text": text, "model_id": modell,
+            "voice_settings": {"stability": float(c.get("stabilitaet", 0.55)), "similarity_boost": 0.75, "style": float(c.get("stil", 0.15)),
+                               "use_speaker_boost": True, "speed": min(max(tempo, 0.7), 1.2)}}
+    pcm = _el("POST", f"/v1/text-to-speech/{urllib.parse.quote(voice)}?output_format=pcm_22050", body, roh=True, timeout=60)
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(22050)
+        w.writeframes(pcm)
+    data = buf.getvalue()
+    with open(fp, "wb") as f:
+        f.write(data)
+    dateien = sorted((os.path.join(d, x) for x in os.listdir(d)), key=os.path.getmtime)
+    for alt in dateien[:-300]:  # Zwischenspeicher klein halten
+        os.remove(alt)
+    return data
 
 
 def aussprache() -> dict:
@@ -1326,7 +1419,16 @@ def _piper_prozess(modell: str, tempo: float) -> dict:
 
 
 def sprechen(text: str, stimme: str, tempo: float = 1.0) -> bytes:
-    """Ein Stück Text (am besten ein Satz) mit einer Pi-Stimme → WAV-Bytes."""
+    """Ein Stück Text (am besten ein Satz) mit einer Pi- oder ElevenLabs-Stimme → WAV-Bytes."""
+    if stimme.startswith("el:"):
+        t = " ".join(str(text).split())[:1200]  # kein Aussprache-Wörterbuch: englische Namen spricht die Stimme selbst richtig
+        if not t:
+            raise ValueError("Kein Text.")
+        try:
+            return el_sprechen(t, stimme[3:], float(tempo or 1.0))
+        except Exception as e:  # noqa: BLE001
+            log("ElevenLabs → Thorsten:", e)  # Kontingent leer oder offline – dann eben der Pi
+            stimme = STANDARD_STIMME
     sid = stimme.removeprefix("pi:") or STANDARD_STIMME.removeprefix("pi:")
     eintrag = next((x for x in STIMMEN if x[0] == sid), None)
     if not eintrag:
@@ -3756,7 +3858,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, {"konten": k["konten"], "db": k["db"], "gitlab": k["gitlab"], "statistik": k["statistik"],
                                     "slack": k["slack"], "kanaele": k["kanaele"]})
         if p == "/api/stimmen":
-            return self._send(200, {"stimmen": stimmen_liste(), "standard": STANDARD_STIMME, "aussprache": aussprache()})
+            return self._send(200, {"stimmen": stimmen_liste(), "standard": STANDARD_STIMME, "aussprache": aussprache(),
+                                    "elevenlabs": el_kontingent() if q.get("kontingent") else bool(el_conf().get("api_key"))})
         if p == "/api/gesundheit/info":
             return self._send(200, gesundheit_info())
         if p == "/api/claude":
