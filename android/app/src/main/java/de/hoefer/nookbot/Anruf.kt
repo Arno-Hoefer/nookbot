@@ -25,6 +25,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -42,6 +43,22 @@ object Anruf {
     data class Info(val id: Long, val bot: String, val name: String, val sid: String, val text: String, val titel: String, val eingehend: Boolean)
 
     enum class Zustand { Frei, Klingelt, Laeuft }
+
+    /** Kurzes Protokoll je Gespräch (Pegel, erkannter Text, Fehler – kein Ton) – geht beim Auflegen an den Pi. */
+    private val zeilen = java.util.Collections.synchronizedList(mutableListOf<String>())
+    private val zeitFmt = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.GERMANY)
+    fun protokoll(z: String) { if (zeilen.size < 200) zeilen.add(zeitFmt.format(java.util.Date()) + " " + z) }
+    private fun protokollSenden(ctx: Context) {
+        val z = synchronized(zeilen) { zeilen.toList().also { zeilen.clear() } }
+        if (z.isEmpty()) return
+        val s = Settings(ctx)
+        Thread {
+            runCatching {
+                de.hoefer.nookbot.net.Api({ s.serverUrl }, { s.chatToken }).post("/api/diagnose", JSONObject().put("art", "anruf")
+                    .put("app", BuildConfig.VERSION_NAME).put("geraet", Build.MODEL).put("zeilen", org.json.JSONArray(z)))
+            }
+        }.start()
+    }
 
     val zustand = MutableStateFlow(Zustand.Frei)
     @Volatile var aktuell: Info? = null
@@ -122,6 +139,8 @@ object Anruf {
     }
 
     fun ende(ctx: Context) {
+        protokoll("aufgelegt")
+        protokollSenden(ctx)
         ctx.getSystemService(NotificationManager::class.java).cancel(NOTIF_ANRUF)
         if (zustand.value == Zustand.Laeuft) ctx.startService(Intent(ctx, AnrufDienst::class.java).setAction(AnrufDienst.AUFLEGEN))
         zustand.value = Zustand.Frei
@@ -230,13 +249,22 @@ class AnrufDienst : Service() {
                 onSetActive = { }, onSetInactive = { }) {
                 Anruf.control = this
                 vordergrund()  // Anruf-Benachrichtigung nach dem Anmelden noch einmal – Telecom wartet darauf
+                // Ton auf den Lautsprecher (Android nimmt bei Anrufen sonst die Hörmuschel) – außer Headset oder Auto sind verbunden
+                launch {
+                    val ziele = availableEndpoints.first()
+                    val ziel = ziele.firstOrNull { it.type == androidx.core.telecom.CallEndpointCompat.TYPE_BLUETOOTH }
+                        ?: ziele.firstOrNull { it.type == androidx.core.telecom.CallEndpointCompat.TYPE_WIRED_HEADSET }
+                        ?: ziele.firstOrNull { it.type == androidx.core.telecom.CallEndpointCompat.TYPE_SPEAKER }
+                    if (ziel != null) Anruf.protokoll("Ton: ${ziel.name} (${requestEndpointChange(ziel)})")
+                }
                 launch {
                     android.util.Log.i("NookBot", "Telecom angemeldet, setze aktiv")
                     val r = runCatching { setActive() }
                     android.util.Log.i("NookBot", "Telecom aktiv: ${r.getOrNull()} ${r.exceptionOrNull()}")
+                    Anruf.protokoll("Telecom aktiv: ${r.getOrNull() ?: r.exceptionOrNull()}")
                 }
             }
-        }.onFailure { android.util.Log.w("NookBot", "Telecom", it) }  // ohne Telecom geht das Gespräch trotzdem
+        }.onFailure { android.util.Log.w("NookBot", "Telecom", it); Anruf.protokoll("Telecom-Fehler: $it") }  // ohne Telecom geht das Gespräch trotzdem
     }
 
     private fun warten() = scope.launch {

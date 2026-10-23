@@ -62,10 +62,12 @@ fun Sprachmodus(vm: NookViewModel, sid: String, b: Bot?, erst: String? = null, t
     var stumm by remember { mutableStateOf(false) }
     var fehler by remember { mutableStateOf<String?>(null) }
     var schonGesagt by remember { mutableStateOf(false) }
+    var hinweis by remember { mutableStateOf<String?>(null) }
+    var spitze by remember { mutableFloatStateOf(0f) }
     var erlaubt by remember { mutableStateOf(ctx.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) }
     val perm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok -> erlaubt = ok; if (!ok) fehler = "Ohne Mikrofon geht der Sprachmodus nicht." }
     val modell = remember(fortschritt) { WhisperModels.installedPreferred(ctx) }
-    val aufnahme = remember { Sprachaufnahme { level = it } }
+    val aufnahme = remember { Sprachaufnahme { level = it; if (it > spitze) spitze = it } }
     val tts = remember { Vorleser(ctx, vm) }
     val botFarbe = b?.let { Color(it.farbe) } ?: A.accent
     val name = b?.name ?: "Bot"
@@ -87,6 +89,7 @@ fun Sprachmodus(vm: NookViewModel, sid: String, b: Bot?, erst: String? = null, t
             phase = Phase.Spricht
             tts.sprechen(sprechtext(erst), b?.stimme ?: "pi:thorsten-high") { zeile = it }
         }
+        de.hoefer.nookbot.Anruf.protokoll("Start: Mikro ${if (erlaubt) "erlaubt" else "NICHT erlaubt"}, Modell ${modell?.name ?: "FEHLT"}, Stimme ${b?.stimme ?: "-"}")
         if (!erlaubt || modell == null || stumm) { if (stumm) phase = Phase.Stumm; return@LaunchedEffect }
         val w = runCatching { withContext(Dispatchers.IO) { WhisperSitzung(WhisperModels.file(ctx, modell)) } }
             .getOrElse { fehler = it.message; return@LaunchedEffect }
@@ -94,14 +97,19 @@ fun Sprachmodus(vm: NookViewModel, sid: String, b: Bot?, erst: String? = null, t
             while (isActive) {
                 phase = Phase.Hoert
                 zeile = ""
-                val samples = withContext(Dispatchers.IO) { runCatching { aufnahme.hoeren() }.getOrElse { fehler = it.message; null } } ?: break
-                if (samples.isEmpty()) continue
+                spitze = 0f
+                val samples = withContext(Dispatchers.IO) { runCatching { aufnahme.hoeren() }.getOrElse { fehler = it.message; de.hoefer.nookbot.Anruf.protokoll("Mikro-Fehler: ${it.message}"); null } } ?: break
+                de.hoefer.nookbot.Anruf.protokoll("gehört: ${samples.size / 16000.0}s, Spitze ${"%.2f".format(spitze)}")
+                if (samples.isEmpty()) { hinweis = "Nichts gehört – sprich etwas lauter."; continue }
                 phase = Phase.Versteht
                 val text = withContext(Dispatchers.Default) { w.text(samples) }
-                if (text.isBlank() || text.length < 2) continue
+                de.hoefer.nookbot.Anruf.protokoll("erkannt: ${text.length} Zeichen")
+                if (text.isBlank() || text.length < 2) { hinweis = "Nicht verstanden – bitte noch einmal."; continue }
+                hinweis = null
                 zeile = text
                 val vorher = vm.msgs.value.size
                 vm.send(text)
+                de.hoefer.nookbot.Anruf.protokoll("an den Bot geschickt (Chat ${vm.current ?: "KEINER"})")
                 phase = Phase.Denkt
                 // warten, bis der Bot fertig ist (Adapter meldet busy=false), höchstens 10 Minuten
                 withTimeoutOrNull(600_000) {
@@ -109,6 +117,7 @@ fun Sprachmodus(vm: NookViewModel, sid: String, b: Bot?, erst: String? = null, t
                     while (sid in vm.busy.value) delay(300)
                 }
                 val antwort = vm.msgs.value.drop(vorher).lastOrNull { it.role == "bot" && it.text.isNotBlank() }?.text ?: continue
+                de.hoefer.nookbot.Anruf.protokoll("Antwort: ${antwort.length} Zeichen")
                 phase = Phase.Spricht
                 tts.sprechen(sprechtext(antwort), b?.stimme ?: "pi:thorsten-high") { zeile = it }
             }
@@ -152,7 +161,7 @@ fun Sprachmodus(vm: NookViewModel, sid: String, b: Bot?, erst: String? = null, t
                 fehler != null -> fehler ?: ""
                 modell == null -> "Für die Spracherkennung auf dem Handy einmalig ein Modell laden:"
                 phase == Phase.Laden -> "Starte …"
-                phase == Phase.Hoert -> "Ich höre zu – sprich einfach. Tippen schließt ab."
+                phase == Phase.Hoert -> hinweis ?: "Ich höre zu – sprich einfach. Tippen schließt ab."
                 phase == Phase.Versteht -> "Verstehe …"
                 phase == Phase.Denkt -> "$name denkt nach …" + (werkzeug?.let { "\n$it" } ?: "")
                 phase == Phase.Spricht -> "Tippen unterbricht"

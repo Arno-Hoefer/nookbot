@@ -45,7 +45,9 @@ class AnrufActivity : ComponentActivity() {
                 val b = bots.firstOrNull { it.id == info.bot }
                 when (zustand) {
                     Anruf.Zustand.Klingelt -> Klingeln(info.name, b, { Anruf.annehmen(this) }) { Anruf.ende(this) }
-                    Anruf.Zustand.Laeuft -> Sprachmodus(vm, info.sid, b, erst = info.text.takeIf { it.isNotBlank() }, titel = "Anruf") { Anruf.ende(this) }
+                    // Ruft man selbst an, meldet sich der Bot wie am Telefon (fester Satz, kostet kein Modell – und kommt danach aus dem Zwischenspeicher)
+                    Anruf.Zustand.Laeuft -> Sprachmodus(vm, info.sid, b, titel = "Anruf",
+                        erst = info.text.takeIf { it.isNotBlank() } ?: "Hallo, hier ist ${info.name}. Was kann ich für dich tun?") { Anruf.ende(this) }
                     Anruf.Zustand.Frei -> {}
                 }
             }

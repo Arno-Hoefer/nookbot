@@ -4169,6 +4169,11 @@ class Handler(BaseHTTPRequestHandler):
             aktivitaet(str(f.get("bot") or "app"), "freigabe", "Freigabe ausgeführt" if ja else "Freigabe abgelehnt",
                        f"{m.group(1)} · {f.get('text') or f.get('tool') or ''}"[:200], ok=not res.get("error"))
             return self._send(200, res)
+        if p == "/api/diagnose":  # Protokolle der App (z. B. je Anruf: Pegel, erkannte Zeichen, Fehler – keine Inhalte)
+            with _lock:
+                lst = (read_json(path("diagnose.json"), []) + [dict(d, empfangen=time.strftime("%Y-%m-%d %H:%M:%S"))])[-50:]
+                write_json(path("diagnose.json"), lst)
+            return self._send(200, {"ok": True})
         if p == "/api/absturz":  # Absturzberichte der App (ohne Chat-Inhalte) – zum Nachsehen auf dem Pi
             with _lock:
                 lst = read_json(path("abstuerze.json"), [])
