@@ -196,20 +196,59 @@ def ablauf_loeschen(aid: str):
         sitzungen.SESS.save(a["sitzung"])
 
 
+def _ablauf_kopf(a: dict) -> str:
+    desc = (a.get("beschreibung") or a["name"]).replace("\n", " ")
+    return basis.n(f"---\nname: ablauf-{a['id']}\ndescription: Ablauf „{a['name']}“ – {desc}\n---\n\n# Ablauf: {a['name']}\n\n"
+                   f"Von %NUTZER% bestätigt. Folge diesen Schritten, wenn %NUTZER% danach fragt („{a['name']}“) oder eine Routine "
+                   f"diesen Ablauf nennt. Fehlt eine Angabe (z. B. Zeitraum), nimm den naheliegenden Standard und sag, welchen.\n\n")
+
+
+def ablaeufe_zuruecksichern(b: dict) -> list[str]:
+    """Hat der Bot die SKILL.md eines Ablaufs selbst ergänzt, kommt das in die Schritte des Ablaufs – sonst überschriebe
+    der nächste Abgleich (jeder Neustart) seine Änderung. Maßstab: Stand beim letzten Abgleich, sonst der erzeugte Text."""
+    import hashlib
+    sk = os.path.join(bots.workspace(b), "skills")
+    man = basis.read_json(os.path.join(sk, ".abgleich.json"), {})
+    lst, geaendert = ablaeufe(), []
+    for a in lst:
+        p = os.path.join(sk, f"ablauf-{a['id']}", "SKILL.md")
+        if a["status"] != "aktiv" or a["fuer"] not in ("global", b["id"]) or not os.path.isfile(p):
+            continue
+        text = open(p, encoding="utf-8").read()
+        soll = _ablauf_kopf(a) + a["schritte"] + "\n"
+        vorher = man.get(a["id"]) or hashlib.sha1(soll.encode()).hexdigest()
+        if hashlib.sha1(text.encode()).hexdigest() == vorher:
+            continue
+        kopf = _ablauf_kopf(a)
+        # Kopf weg (auch wenn Name/Beschreibung inzwischen anders lauten); übrig bleiben die Schritte
+        marke = "sag, welchen.\n\n"
+        neu = text[len(kopf):] if text.startswith(kopf) else text.split(marke, 1)[-1] if marke in text else text.split("\n---\n", 1)[-1]
+        a["schritte"] = neu.strip("\n")
+        a["geaendert"] = time.time()
+        geaendert.append(a["id"])
+    if geaendert:
+        basis.write_json(basis.path("ablaeufe.json"), lst)
+        basis.log("Abläufe von", b["id"], "übernommen:", ", ".join(geaendert))
+    return geaendert
+
+
 def sync_ablaeufe(b: dict):
+    import hashlib
+    ablaeufe_zuruecksichern(b)
     sk = os.path.join(bots.workspace(b), "skills")
     if os.path.isdir(sk):
         for d in os.listdir(sk):
             if d.startswith("ablauf-"):
                 shutil.rmtree(os.path.join(sk, d), ignore_errors=True)
+    man = {}
     for a in ablaeufe():
         if a["status"] != "aktiv" or a["fuer"] not in ("global", b["id"]):
             continue
-        desc = (a.get("beschreibung") or a["name"]).replace("\n", " ")
-        bots.write_text(os.path.join(sk, f"ablauf-{a['id']}", "SKILL.md"),
-                   basis.n(f"---\nname: ablauf-{a['id']}\ndescription: Ablauf „{a['name']}“ – {desc}\n---\n\n# Ablauf: {a['name']}\n\n"
-                     f"Von %NUTZER% bestätigt. Folge diesen Schritten, wenn %NUTZER% danach fragt („{a['name']}“) oder eine Routine "
-                     f"diesen Ablauf nennt. Fehlt eine Angabe (z. B. Zeitraum), nimm den naheliegenden Standard und sag, welchen.\n\n{a['schritte']}\n"))
+        text = _ablauf_kopf(a) + a["schritte"] + "\n"
+        bots.write_text(os.path.join(sk, f"ablauf-{a['id']}", "SKILL.md"), text)
+        man[a["id"]] = hashlib.sha1(text.encode()).hexdigest()
+    if os.path.isdir(sk):
+        basis.write_json(os.path.join(sk, ".abgleich.json"), man)
 
 
 def ablauf_text(a: dict) -> str:

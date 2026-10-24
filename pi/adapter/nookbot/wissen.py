@@ -430,19 +430,56 @@ def resync_wissen(scope: str):
     ereignisse.EV.emit({"t": "bots"})
 
 
+def _hash(p: str) -> str:
+    import hashlib
+    with open(p, "rb") as f:
+        return hashlib.sha1(f.read()).hexdigest()
+
+
+def wissen_zuruecksichern(b: dict) -> list[str]:
+    """Was der Bot selbst in wissen/ geschrieben oder geändert hat, in seine Ablage übernehmen – sonst ginge es beim nächsten
+    Abgleich (jeder Neustart) verloren. Maßstab ist der Stand beim letzten Abgleich (.abgleich.json), sonst die Ablage selbst.
+    Geänderte globale Dateien landen als eigene Fassung beim Bot, gelöschte bleiben in der Ablage."""
+    tgt = os.path.join(bots.workspace(b), "wissen")
+    man = basis.read_json(os.path.join(tgt, ".abgleich.json"), {})
+    gesichert = []
+    for scope, sub in (("global", "global"), (b["id"], "eigen")):
+        d = os.path.join(tgt, sub)
+        if not os.path.isdir(d):
+            continue
+        for n in sorted(os.listdir(d)):
+            p = os.path.join(d, n)
+            if n.startswith(".") or not os.path.isfile(p):
+                continue
+            quelle = os.path.join(wissen_dir(scope), n)
+            vorher = man.get(f"{sub}/{n}") or (_hash(quelle) if os.path.isfile(quelle) else None)
+            if _hash(p) != vorher:
+                ziel = wissen_dir(b["id"])
+                os.makedirs(ziel, exist_ok=True)
+                shutil.copyfile(p, os.path.join(ziel, n))
+                gesichert.append(n)
+    if gesichert:
+        basis.log("Wissen von", b["id"], "übernommen:", ", ".join(gesichert))
+    return gesichert
+
+
 def sync_wissen(b: dict):
     ws = bots.workspace(b)
     tgt = os.path.join(ws, "wissen")
+    wissen_zuruecksichern(b)
     if os.path.isdir(tgt):
         shutil.rmtree(tgt)
-    lines = []
+    lines, man = [], {}
     for scope, sub in (("global", "global"), (b["id"], "eigen")):
         src = wissen_dir(scope)
         if os.path.isdir(src):
             os.makedirs(os.path.join(tgt, sub), exist_ok=True)
             for n in sorted(os.listdir(src)):
                 shutil.copyfile(os.path.join(src, n), os.path.join(tgt, sub, n))
+                man[f"{sub}/{n}"] = _hash(os.path.join(tgt, sub, n))
                 lines.append(f"- `wissen/{sub}/{n}`")
+    if man:
+        basis.write_json(os.path.join(tgt, ".abgleich.json"), man)
     sk = os.path.join(ws, "skills", "wissen")
     if lines:
         bots.write_text(os.path.join(sk, "SKILL.md"),
