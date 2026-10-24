@@ -553,6 +553,22 @@ fun SettingsScreen(vm: NookViewModel) {
             }
             Row(Modifier.padding(top = 6.dp)) { SideButton("Testanruf") { vm.testAnruf(vm.bots.value.firstOrNull { it.kapitaen }?.id ?: "") } }
 
+            var vorAktiv by remember { mutableStateOf(true) }
+            var vorZeit by remember { mutableStateOf("") }
+            LaunchedEffect(Unit) { vm.vorschlagEinstellungen { a, z -> vorAktiv = a; vorZeit = z } }
+            Section("Vorschläge", "Wiederholt sich etwas – derselbe Text mehrfach eingefügt, dieselbe Frage an mehreren Tagen, ein Werkzeug scheitert immer " +
+                "wieder –, bietet der Kapitän an, es dauerhaft zu lösen. Die Muster sucht der Pi ohne KI; der Kapitän wird nur gefragt, wenn es etwas Neues gibt. " +
+                "Umgesetzt wird erst nach deinem Ja, Abgelehntes kommt nicht wieder.")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Tägliche Durchsicht", color = P.fg, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                Switch(vorAktiv, { vorAktiv = it; vm.vorschlagSetzen(it, vorZeit) }, colors = SwitchDefaults.colors(checkedTrackColor = A.accent))
+            }
+            if (vorAktiv && vorZeit.isNotBlank()) Field("Uhrzeit (HH:MM)", vorZeit) {
+                vorZeit = it
+                if (Regex("^([01]\\d|2[0-3]):[0-5]\\d$").matches(it)) vm.vorschlagSetzen(true, it)
+            }
+            Row(Modifier.padding(top = 6.dp)) { SideButton("Jetzt durchsehen") { vm.durchsichtJetzt() } }
+
             Text("NookBot ${BuildConfig.VERSION_NAME}", color = P.mut, fontSize = 12.sp, modifier = Modifier.padding(top = 28.dp, bottom = 24.dp))
         }
     }

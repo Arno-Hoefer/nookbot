@@ -438,7 +438,7 @@ fun ChatScreen(vm: NookViewModel, sid: String) {
     }
 }
 
-/** Karten vom Adapter im Chat: Gedächtnis-Hinweis, Ablauf-Entwurf, verteilte Aufträge. */
+/** Karten vom Adapter im Chat: Gedächtnis-Hinweis, Ablauf-Entwurf, Vorschlag, verteilte Aufträge. */
 @Composable
 private fun InfoKarte(vm: NookViewModel, m: Msg) {
     val ablaeufe by vm.ablaeufe.collectAsState()
@@ -478,6 +478,19 @@ private fun InfoKarte(vm: NookViewModel, m: Msg) {
                 }
             }
             if (aendern && a != null) AblaufDialog(vm, a) { aendern = false }
+        }
+        "vorschlag" -> Card(Modifier.padding(vertical = 8.dp), border = if (m.status == "offen") A.amber.copy(alpha = 0.6f) else P.line) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Badge("VORSCHLAG", if (m.status == "angenommen") A.green else A.amber)
+                Spacer(Modifier.weight(1f))
+                Text(when (m.status) { "angenommen" -> "angenommen ✓"; "abgelehnt" -> "abgelehnt"; else -> "" }, color = P.mut, fontSize = 12.sp)
+            }
+            Text(m.text.removePrefix("💡 "), color = P.fg, fontSize = 14.sp, lineHeight = 20.sp, modifier = Modifier.padding(top = 8.dp))
+            if (m.status == "offen") Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                MainButton("Ja, mach das") { vm.vorschlagEntscheiden(m.ref, true) }
+                Spacer(Modifier.width(10.dp))
+                TextButton({ vm.vorschlagEntscheiden(m.ref, false) }) { Text("Nein danke", color = P.mut) }
+            }
         }
         "auftraege" -> {
             var zeigen by remember { mutableStateOf<String?>(null) }

@@ -54,6 +54,8 @@ Antworten sind JSON, Fehler kommen als `{"error": "…"}`.
 | GET/POST/DELETE | `/api/wissen…` | Wissen global und je Bot |
 | GET/PUT | `/api/datenbanken` · GET `/api/schema` | Datenbank-Bibliothek |
 | GET/POST/PUT/DELETE | `/api/gedaechtnis…`, `/api/ablaeufe…` | Gedächtnis, Abläufe |
+| GET/PUT | `/api/vorschlaege` | Vorschläge und Einstellungen (`aktiv`, `zeit`) |
+| POST | `/api/vorschlaege/<id>` (`entscheidung`: ja/nein) · `/api/vorschlaege/durchsicht` | Vorschlag entscheiden, Durchsicht sofort |
 | POST/GET | `/api/gesundheit`, `/api/gesundheit/info` | Health Connect vom Handy |
 
 **Sprache und Verbrauch**
@@ -80,6 +82,7 @@ Antworten sind JSON, Fehler kommen als `{"error": "…"}`.
 | `bots_liste`, `bot_fragen` | alle (mit Team) | anderen Bot beauftragen (nur ohne Mehr-Rechte) |
 | `auftraege_verteilen`, `bot_anlegen`, `bot_aendern` | Kapitän | Team steuern |
 | `merken`, `vergessen`, `ablauf_vorschlagen` | alle | Gedächtnis, Abläufe |
+| `vorschlag_machen` | alle (nicht in Team-Aufträgen) | Vorschlag als Karte, umgesetzt erst nach Ja |
 | `seite_lesen`, `seite_ansehen` | alle | öffentliche Seiten als Text oder Bild |
 | `dokument_ansehen` | alle | PDF-Seiten und Bilder mit einem Bildmodell |
 | `python_ausfuehren`, `arbeitsordner`, `datei_ablegen` | alle | Pi-Rechner |

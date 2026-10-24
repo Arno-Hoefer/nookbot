@@ -3,13 +3,14 @@ import hmac
 import json
 import os
 import re
+import threading
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler
 
-from . import basis, ereignisse, dienste, claude, gesundheit, stimmen, wissen, home, bots, sitzungen, gedaechtnis, rechner, automatik, team, mcp
+from . import basis, ereignisse, dienste, claude, gesundheit, stimmen, wissen, home, bots, sitzungen, gedaechtnis, rechner, automatik, team, vorschlaege, mcp
 
 
 # ── HTTP ───────────────────────────────────────────────────────────
@@ -108,6 +109,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, {"eintraege": gedaechtnis.gedaechtnis()})
         if p == "/api/ablaeufe":
             return self._send(200, {"ablaeufe": gedaechtnis.ablaeufe()})
+        if p == "/api/vorschlaege":
+            return self._send(200, {"vorschlaege": vorschlaege.liste()[::-1], "einstellungen": vorschlaege.einstellungen()})
         if p == "/api/freigaben":
             return self._send(200, home.freigaben_proxy("GET", "/app/freigaben" + ("?offen=1" if q.get("offen") else "")))
         if p == "/api/events":
@@ -418,6 +421,12 @@ class Handler(BaseHTTPRequestHandler):
             r = automatik.add_routine({"name": a["name"], "bot": bid, "auftrag": gedaechtnis.ablauf_text(a), "zeit": d.get("zeit"), "datum": d.get("datum"),
                              "tage": d.get("tage")})
             return self._send(200, r)
+        if p == "/api/vorschlaege/durchsicht":
+            threading.Thread(target=vorschlaege.durchsicht, daemon=True).start()
+            return self._send(200, {"ok": True})
+        m = re.match(r"^/api/vorschlaege/([a-z0-9]+)$", p)
+        if m:
+            return self._send(200, vorschlaege.entscheiden(m.group(1), str(d.get("entscheidung") or "").lower() == "ja"))
         m = re.match(r"^/api/freigaben/(F-[0-9a-f]{6})/rueckgaengig$", p)
         if m:
             try:
@@ -514,6 +523,8 @@ class Handler(BaseHTTPRequestHandler):
                 neu = {str(k).strip()[:60]: str(v).strip()[:80] for k, v in (d.get("aussprache") or {}).items() if str(k).strip() and str(v).strip()}
                 basis.write_json(basis.path("aussprache.json"), neu)
                 return self._send(200, {"aussprache": neu})
+            if p == "/api/vorschlaege":
+                return self._send(200, {"einstellungen": vorschlaege.einstellungen_setzen(d)})
             if p == "/api/gedaechtnis":
                 return self._send(200, {"eintraege": gedaechtnis.ged_set(list(d.get("eintraege") or []))})
             m = re.match(r"^/api/ablaeufe/([a-z0-9]+)$", p)

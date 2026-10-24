@@ -18,7 +18,8 @@
   (Ollama Cloud oder Claude über den Proxy). Werkzeuge holen sie sich per MCP vom Adapter.
 - **Der Adapter** hält je Unterhaltung eine WebSocket-Verbindung zum Bot und speichert jede Nachricht. Die App kann deshalb zu sein.
   Ereignisse gehen per Server-Sent Events an App und Web. Er schreibt AGENT.md, SOUL.md, MEMORY.md und die Skills der Bots.
-  Außerdem steuert er Rechte, Regeln, Routinen, Auslöser und Anrufe.
+  Außerdem steuert er Rechte, Regeln, Routinen, Auslöser und Anrufe. Was ein Bot selbst an seinem Wissen oder an Ablauf-Skills
+  ändert, übernimmt der Adapter vor jedem Abgleich in seine Ablage (Vergleich mit `.abgleich.json`), statt es zu überschreiben.
 - **home-mcp** ([eigenes Repo](https://github.com/Arno-Hoefer/home-mcp)) ist ein eigener MCP-Server mit OAuth. Er hat einen Schlüssel für alle Bots. Welcher Bot was darf, regelt
   der Adapter (`/homemcp/<bot>` filtert Werkzeuge, Konten, Kanäle und Datenbanken).
 
@@ -41,6 +42,7 @@
 | `rechner` | Arbeitsordner, `python_ausfuehren` (bubblewrap), `seite_ansehen`, Regeln je Aktion |
 | `automatik` | Routinen, Erinnerungen, Auslöser, Aktivität, Anrufe |
 | `team` | Runden (mit Gespräch), Aufträge verteilen |
+| `vorschlaege` | Vorschläge der Bots, Muster ohne Modell, tägliche Durchsicht |
 | `mcp` | MCP-Werkzeuge der Bots (`MCP_TOOLS`, `mcp_rpc`) |
 | `schnittstelle` | HTTP-Handler (App, Web, MCP) |
 | `start` | `main()`: lauschen, Bots starten, Hintergrund-Threads |
@@ -55,6 +57,7 @@ in `__init__.py`). Darauf bauen Tests und Werkzeuge.
 | `watchdog` | 2 s | Antworten beenden (Ruhe nach Text), Verbindungsabbrüche, Gedächtnis prüfen, Aufräumen (Anhänge, Aktivität, Piper) |
 | `scheduler` | 15 s | Routinen zur Minute starten |
 | `waechter` | 30 s | Auslöser im eingestellten Takt prüfen (ohne Modell) |
+| `planer` | 30 s | einmal am Tag: Muster suchen, nur bei Neuem den Kapitän nach Vorschlägen fragen |
 
 ## Daten auf dem Pi (`/srv/picoclaw/nookbot/`)
 
@@ -66,6 +69,7 @@ in `__init__.py`). Darauf bauen Tests und Werkzeuge.
 | `routinen.json`, `erinnerungen.json`, `ausloeser.json` (+ `ausloeser/` Seitenstände) | Automatik |
 | `aktivitaet.jsonl` | Aktivität, 30 Tage |
 | `anrufe.json`, `notify.json` | Warteschlangen für Anrufe und Meldungen |
+| `vorschlaege.json` | Vorschläge mit Entscheidung, gesehene Muster |
 | `gedaechtnis.json`, `ablaeufe.json`, `datenbanken.json`, `aussprache.json` | Gedächtnis, Abläufe, Datenbank-Bibliothek, Aussprache |
 | `wissen/` | globales Wissen (je Bot liegt es im Arbeitsbereich des Bots) |
 | `arbeit/` | gemeinsamer Arbeitsordner |

@@ -191,6 +191,10 @@ def agent_md(b: dict) -> str:
                  "Gespräch mit `ablauf_vorschlagen` zusammen: Name, wann er passt, und die Schritte (welche Werkzeuge, welche Abfragen/Dateien, "
                  "welches Ergebnisformat) – so konkret, dass du ihn später ohne das Gespräch ausführen kannst. Gespeichert wird erst nach "
                  "%NUTZER%s OK in der App. Bestätigte Abläufe findest du als Skills `ablauf-…`.\n")
+    parts.append("## Vorschläge\n\nFällt dir auf, dass sich etwas wiederholt – %NUTZER% kopiert dieselben Daten in den Chat, stellt dieselbe "
+                 "Frage immer wieder, ein Umweg kostet jedes Mal Zeit –, biete am Ende deiner Antwort **einmal** mit `vorschlag_machen` an, es "
+                 "dauerhaft zu lösen (Ablauf, Routine, Auslöser, Gedächtnis, Wissensdatei). Nie ungefragt umsetzen, nie bei Kleinigkeiten, nie "
+                 "Gesundheitsdaten. Daten anderer Menschen (Adressen, Geburtstage …) nur speichern, wenn %NUTZER% Ja sagt.\n")
     if b.get("kapitaen") and others:
         parts.append("## Aufgaben verteilen\n\nBei größeren Aufgaben, die sich in unabhängige Teile zerlegen lassen (z. B. mehrere Quellen, "
                      "Pro und Contra, verschiedene Fachgebiete), gibst du die Teile mit `auftraege_verteilen` **gleichzeitig** an passende Bots "

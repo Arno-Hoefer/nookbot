@@ -20,6 +20,7 @@ pi/adapter/nookbot/            der Adapter in Modulen (Ladereihenfolge in __init
   wissen, home, bots               Wissen/Anhänge/Dokumente ansehen, Rechte + home-mcp-Proxy, Bots + AGENT.md/SOUL.md
   sitzungen, seiten, gedaechtnis   Verlauf + Bot-Verbindungen, Seiten lesen, Gedächtnis + Abläufe
   rechner, automatik, team         Arbeitsordner/Python/Seitenbild/Regeln, Routinen/Erinnerungen/Auslöser/Aktivität/Anrufe, Runden/Aufträge
+  vorschlaege                      Vorschläge der Bots, Muster ohne Modell, tägliche Durchsicht
   mcp, schnittstelle, start        MCP-Werkzeuge der Bots, HTTP-Handler, main()
 pi/adapter/web/index.html      Web-Oberfläche (eine Datei, ohne Build)
 pi/adapter/tests/              unittest (ohne Pi): python3 -m unittest discover -s tests
@@ -42,6 +43,8 @@ docs/                          Doku + Screenshots (nur Demo-Daten)
   nur bestimmte Bots sehen sollen, in `mcp.mcp_rpc` (tools/list) filtern.
 - **Gesundheitsdaten** gehören nie zu „Alles“, kommen nie ins Gedächtnis und gehen nie an andere Bots.
 - **Tests** laufen lassen: `cd pi/adapter && python3 -m unittest discover -s tests`. Für neue Funktionen einen Test dazuschreiben.
+- **Arbeitsbereich der Bots:** Der Adapter baut `wissen/` und `skills/ablauf-*` bei jedem Start neu auf. Änderungen der Bots daran
+  übernimmt er vorher in seine Ablage – neue Dinge, die Bots selbst schreiben dürfen, genauso absichern, sonst gehen sie beim Neustart verloren.
 - Texte, Bezeichner und Kommentare auf Deutsch, knapp. Kommentare erklären das *Warum*.
 - App-Version in `android/app/build.gradle.kts` (versionCode + versionName) und `basis.VERSION` im Adapter gemeinsam hochzählen.
 

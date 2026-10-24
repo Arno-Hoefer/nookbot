@@ -65,7 +65,7 @@ header.kopf .sub{font-size:13px;color:var(--mut);font-weight:400}
 .karte{align-self:stretch;border:1px solid var(--line);border-left:4px solid var(--blue);border-radius:var(--radius);background:var(--panel);padding:12px 14px}
 .karte.ged{border-left-color:var(--violet);padding:8px 12px;display:flex;gap:10px;align-items:center;font-size:14px}
 .karte.ged.zurueck{opacity:.5;text-decoration:line-through}
-.karte.abl{border-left-color:var(--amber)}
+.karte.abl,.karte.vor{border-left-color:var(--amber)}
 .karte.frei{border-left-color:var(--accent)}
 .karte .titel{font-weight:700;margin-bottom:6px}
 .karte .knoepfe{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
@@ -423,6 +423,12 @@ function karte(m) {
       ${a ? `<pre class="schritte">${esc(a.schritte)}</pre>` : ''}
       ${st === 'entwurf' && a ? `<div class="knoepfe"><button class="pri klein" data-abl-ok="${esc(a.id)}">Speichern</button><button class="klein" data-abl-edit="${esc(a.id)}">Ändern</button><button class="klein text" data-abl-weg="${esc(a.id)}">Verwerfen</button></div>` : ''}</div>`;
   }
+  if (m.art === 'vorschlag') {
+    const st = m.status || 'offen';
+    return `<div class="karte vor"><div class="titel">💡 Vorschlag <span class="mut">${st === 'angenommen' ? '· angenommen ✓' : st === 'abgelehnt' ? '· abgelehnt' : ''}</span></div>
+      <div>${esc((m.text || '').replace(/^💡 /, ''))}</div>
+      ${st === 'offen' ? `<div class="knoepfe"><button class="pri klein" data-vor-ja="${esc(m.ref)}">Ja, mach das</button><button class="klein text" data-vor-nein="${esc(m.ref)}">Nein danke</button></div>` : ''}</div>`;
+  }
   if (m.art === 'auftraege') {
     return `<div class="karte"><div class="titel">🧭 Aufträge verteilt</div>${m.ziel ? `<div class="mut">${esc(m.ziel)}</div>` : ''}
       ${(m.teile || []).map((t) => `<div class="teil">${ava(bot(t.bot), 22)}<div style="flex:1;min-width:0"><b>${esc(t.name)}</b> <span class="mut">${esc(t.auftrag.slice(0, 140))}</span></div>
@@ -450,6 +456,8 @@ document.addEventListener('click', async (ev) => {
     if (t.dataset.vergessen) { await api('DELETE', '/api/gedaechtnis/' + t.dataset.vergessen); toast('Vergessen'); }
     if (t.dataset.ablOk) { await api('PUT', '/api/ablaeufe/' + t.dataset.ablOk, {status: 'aktiv'}); toast('Ablauf gespeichert – die Bots kennen ihn jetzt'); }
     if (t.dataset.ablWeg) { if (confirm('Entwurf verwerfen?')) await api('DELETE', '/api/ablaeufe/' + t.dataset.ablWeg); }
+    if (t.dataset.vorJa) { await api('POST', '/api/vorschlaege/' + t.dataset.vorJa, {entscheidung: 'ja'}); toast('Angenommen – der Bot legt los'); }
+    if (t.dataset.vorNein) { await api('POST', '/api/vorschlaege/' + t.dataset.vorNein, {entscheidung: 'nein'}); toast('Abgelehnt – kommt nicht wieder'); }
     if (t.dataset.ablEdit) ablaufDialog(S.ablaeufe.find((x) => x.id === t.dataset.ablEdit));
     if (t.dataset.intern) internZeigen(t.dataset.intern);
     if (t.dataset.freiAendern) {
@@ -576,7 +584,7 @@ const WERKZEUGE = {termin_anlegen: 'Termin zur Freigabe', termin_gaeste: 'Einlad
   bot_fragen: 'Anderen Bot gefragt', bots_liste: 'Team angesehen', auftraege_verteilen: 'Aufträge verteilt', erinnerung_anlegen: 'Erinnerung gestellt',
   erinnerungen_liste: 'Erinnerungen angesehen', erinnerung_loeschen: 'Erinnerung gelöscht', routine_anlegen: 'Routine angelegt',
   routinen_liste: 'Routinen angesehen', routine_loeschen: 'Routine gelöscht', bot_anlegen: 'Neuen Bot angelegt', bot_aendern: 'Bot angepasst',
-  merken: 'Etwas gemerkt', vergessen: 'Etwas vergessen', ablauf_vorschlagen: 'Ablauf vorgeschlagen', pakete: 'Pakete angesehen',
+  merken: 'Etwas gemerkt', vorschlag_machen: 'Vorschlag gemacht', vergessen: 'Etwas vergessen', ablauf_vorschlagen: 'Ablauf vorgeschlagen', pakete: 'Pakete angesehen',
   paket_hinzufuegen: 'Paket eingetragen', gesundheit: 'Gesundheitsdaten gelesen', statistik: 'Besucherstatistik', drive_suche: 'Drive durchsucht',
   drive_lesen: 'Datei aus Drive gelesen', sheets_lesen: 'Tabelle gelesen', sheets_schreiben: 'Tabelle ändern – Freigabe',
   sheets_anhaengen: 'Zeilen anhängen – Freigabe', sheet_anlegen: 'Neue Tabelle – Freigabe', doc_anlegen: 'Neues Dokument – Freigabe',
@@ -1047,8 +1055,8 @@ async function seiteZugriffe() {
 // ── Einstellungen ──
 async function seiteEinstellungen() {
   $('#haupt').innerHTML = kopf('Einstellungen') + '<div class="seite"><div class="bl" id="eL"><div class="box mut">lädt …</div></div></div>';
-  const [g, c, st, ge] = await Promise.all([api('GET', '/api/guthaben').catch(() => null), api('GET', '/api/claude').catch(() => null),
-    api('GET', '/api/stimmen').catch(() => ({aussprache: {}})), api('GET', '/api/gesundheit/info').catch(() => null)]);
+  const [g, c, st, ge, vo] = await Promise.all([api('GET', '/api/guthaben').catch(() => null), api('GET', '/api/claude').catch(() => null),
+    api('GET', '/api/stimmen').catch(() => ({aussprache: {}})), api('GET', '/api/gesundheit/info').catch(() => null), api('GET', '/api/vorschlaege').catch(() => null)]);
   const usd = (x) => (Math.round((x || 0) * 100) / 100).toFixed(2) + ' $';
   const inc = g?.included; const rest = inc ? (inc.balance_usd || 0) + (g.purchased?.balance_usd || 0) : null;
   const aus = Object.entries(st.aussprache || {}).sort((a, b) => a[0].localeCompare(b[0]));
@@ -1064,6 +1072,9 @@ async function seiteEinstellungen() {
     <div class="box"><h3>Aussprache</h3><p class="mut">Wie Namen vorgelesen werden – gilt für alle Stimmen.</p>
       ${aus.map(([w, l]) => `<div class="teil"><span style="flex:1">${esc(w)}</span><span style="flex:1" class="mut">→ ${esc(l)}</span><button class="klein text" data-aus-probe="${esc(l)}">▶</button><button class="klein text" data-aus-weg="${esc(w)}">✕</button></div>`).join('')}
       <div class="zeilen" style="margin-top:8px"><input id="aW" placeholder="Wort" style="flex:1"><input id="aL" placeholder="so sprechen" style="flex:1"><button class="klein" id="aOk">Hinzufügen</button></div></div>
+    ${vo ? `<div class="box"><h3>Vorschläge</h3><p class="mut">Wiederholt sich etwas (derselbe Text mehrfach eingefügt, dieselbe Frage an mehreren Tagen, wiederkehrende Fehler), bietet der Kapitän an, es dauerhaft zu lösen. Gesucht wird ohne KI; gefragt wird er nur bei Neuem. Umgesetzt wird erst nach deinem Ja.</p>
+      ${schalter('vAktiv', 'Tägliche Durchsicht', vo.einstellungen.aktiv)}<div class="zeilen" style="margin-top:8px"><input id="vZeit" type="time" value="${esc(vo.einstellungen.zeit)}"><button class="klein" id="vJetzt">Jetzt durchsehen</button></div>
+      ${vo.vorschlaege.slice(0, 8).map((v) => `<div class="teil"><span style="flex:1">${esc(v.text)}</span><span class="mut">${{offen: 'offen', angenommen: 'angenommen', abgelehnt: 'abgelehnt'}[v.status]}</span></div>`).join('')}</div>` : ''}
     <div class="box"><h3>Im Browser</h3>${schalter('eVorlesen', 'Antworten vorlesen (Stimme des Bots)', vorlesenAn())}${schalter('eMelden', 'Benachrichtigen, wenn ein Bot fertig ist (solange dieser Tab offen ist)', melden)}</div>
     ${ge ? `<div class="box"><h3>Gesundheit</h3><p class="mut">${ge.tage ? `${ge.tage} Tage auf dem Pi (${esc(ge.von)} – ${esc(ge.bis)}) · Quellen: ${esc(Object.keys(ge.quellen || {}).map((q) => q.includes('fitbit') ? 'Fitbit' : q.includes('renpho') ? 'Renpho' : q.includes('egym') ? 'EGYM' : q.includes('healthconnect') ? 'Handy' : q).join(', '))}` : 'Noch keine Daten.'} Freigeben und abgleichen geht in der App.</p></div>` : ''}
     <div class="box"><h3>Sitzung</h3><button class="klein" onclick="abmelden()">Abmelden</button></div>`;
@@ -1074,6 +1085,11 @@ async function seiteEinstellungen() {
   $('#aOk').onclick = () => { const w = $('#aW').value.trim(); const l = $('#aL').value.trim(); if (w && l) ausSpeichern({...st.aussprache, [w]: l}); };
   $('#eL').querySelectorAll('[data-aus-weg]').forEach((x) => x.onclick = () => { const m = {...st.aussprache}; delete m[x.dataset.ausWeg]; ausSpeichern(m); });
   $('#eL').querySelectorAll('[data-aus-probe]').forEach((x) => x.onclick = () => vorlesen(x.dataset.ausProbe, 'pi:thorsten-high'));
+  if ($('#vAktiv')) {
+    const vSetzen = async () => { try { await api('PUT', '/api/vorschlaege', {aktiv: $('#vAktiv').checked, zeit: $('#vZeit').value}); toast('Gespeichert'); } catch (e) { toast(e.message); } };
+    $('#vAktiv').onchange = vSetzen; $('#vZeit').onchange = vSetzen;
+    $('#vJetzt').onclick = async () => { try { await api('POST', '/api/vorschlaege/durchsicht'); toast('Durchsicht läuft – Vorschläge erscheinen im Chat des Kapitäns'); } catch (e) { toast(e.message); } };
+  }
   $('#eVorlesen').onchange = (e) => store.set('nb_vorlesen', e.target.checked ? '1' : null);
   $('#eMelden').onchange = async (e) => {
     if (e.target.checked && 'Notification' in window && Notification.permission !== 'granted') {

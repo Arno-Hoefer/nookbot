@@ -4,7 +4,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from . import basis, claude, gesundheit, wissen, home, bots, sitzungen, seiten, gedaechtnis, rechner, automatik, team
+from . import basis, claude, gesundheit, wissen, home, bots, sitzungen, seiten, gedaechtnis, rechner, automatik, team, vorschlaege
 
 
 # ── MCP für die Bots: Routinen, Erinnerungen (alle), Team (Aufträge an andere Bots), Bots anlegen (Kapitän) ──
@@ -104,6 +104,14 @@ MCP_TOOLS = {
                                                                              "Platzhaltern wie {zeitraum} und dem gewünschten Ergebnisformat"},
                                "fuer_alle": {"type": "boolean", "description": "für alle Bots statt nur für dich"}},
                             "required": ["name", "schritte"]}),
+    "vorschlag_machen": ("Bietet %NUTZER% an, etwas Wiederkehrendes dauerhaft zu lösen (Ablauf, Routine, Auslöser, Gedächtnis, Wissensdatei …). "
+                         "Erscheint als Karte mit Ja/Nein; erst nach dem Ja bekommst du den Auftrag. Sparsam: höchstens einmal je Thema, "
+                         f"insgesamt {vorschlaege.VORSCHLAG_MAX_TAG} am Tag; Abgelehntes nie wiederholen.",
+                         {"type": "object", "properties": {
+                             "text": {"type": "string", "description": "das Angebot an %NUTZER%, ein Satz (z. B. „Soll ich … als Ablauf speichern?“)"},
+                             "aktion": {"type": "string", "description": "was du nach dem Ja konkret tust – mit welchen Werkzeugen"},
+                             "grund": {"type": "string", "description": "woran du es gemerkt hast (kurz)"}},
+                          "required": ["text", "aktion"]}),
     "ausloeser_anlegen": ("Legt einen Auslöser an: Bei einem Ereignis bekommst du automatisch einen Auftrag – neue Mail zu einer Gmail-Suche, "
                           "neue Slack-Nachricht zu einer Slack-Suche, Änderung einer Webseite oder neuer Paketstatus. Geprüft wird ohne KI im Takt; "
                           "nur wenn etwas Neues da ist, arbeitest du. Nur anlegen, wenn %NUTZER% das will.",
@@ -274,6 +282,13 @@ def mcp_rpc(msg: dict, caller: dict):
                                      "text": f"📋 Ablauf-Entwurf: {ab['name']}\n\n{ab['schritte']}"})
                 text = (f"Entwurf „{ab['name']}“ (id {ab['id']}) liegt %NUTZER% als Karte im Chat vor. Erst nach seinem OK ist er als Skill "
                         "verfügbar – sag ihm das kurz, ohne die Schritte zu wiederholen.")
+            elif name == "vorschlag_machen":
+                cs = caller_session(caller["id"]) or ""
+                if cs.startswith("auftrag-"):
+                    raise ValueError("Während eines Auftrags aus dem Team keine Vorschläge.")
+                v = vorschlaege.vorschlag_neu(caller["id"], str(a.get("text") or ""), str(a.get("aktion") or ""), str(a.get("grund") or ""), cs,
+                                              "durchsicht" if cs.startswith("intern-vorschlag-") else "bot")
+                text = f"Vorschlag {v['id']} liegt %NUTZER% als Karte vor. Nicht selbst umsetzen – nach seinem Ja bekommst du den Auftrag."
             elif name == "bot_fragen":
                 b = bots.bot(str(a.get("bot", "")))
                 if not b or b["id"] == caller["id"]:

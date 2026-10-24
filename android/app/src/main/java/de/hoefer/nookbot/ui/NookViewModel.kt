@@ -541,6 +541,24 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
         runCatching { de.hoefer.nookbot.AnrufDienst.erreichbar(getApplication(), an) }.onFailure { toast.value = it.message }
     }
 
+    // ── Vorschläge der Bots (Ja → der Bot bekommt den Auftrag, Nein → kommt nicht wieder) ──
+    fun vorschlagEntscheiden(id: String, ja: Boolean) = io {
+        api.post("/api/vorschlaege/$id", JSONObject().put("entscheidung", if (ja) "ja" else "nein"))
+        toast.value = if (ja) "Angenommen – der Bot legt los" else "Abgelehnt – kommt nicht wieder"
+    }
+
+    fun vorschlagEinstellungen(fertig: (Boolean, String) -> Unit) = io {
+        val o = api.get("/api/vorschlaege").optJSONObject("einstellungen") ?: JSONObject()
+        withContext(Dispatchers.Main) { fertig(o.optBoolean("aktiv", true), o.optString("zeit", "17:30")) }
+    }
+
+    fun vorschlagSetzen(aktiv: Boolean, zeit: String) = io { api.put("/api/vorschlaege", JSONObject().put("aktiv", aktiv).put("zeit", zeit)) }
+
+    fun durchsichtJetzt() = io {
+        api.post("/api/vorschlaege/durchsicht")
+        toast.value = "Durchsicht läuft – Vorschläge erscheinen im Chat des Kapitäns"
+    }
+
     fun testAnruf(bot: String) = io { api.post("/api/anrufe/test", JSONObject().put("bot", bot)); withContext(Dispatchers.Main) { toast.value = "Gleich klingelt es …" } }
 
     fun loadArbeit() = io {

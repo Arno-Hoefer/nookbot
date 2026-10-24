@@ -63,6 +63,12 @@ Alle Bilder zeigen Demo-Daten. App links bzw. oben, Web-Oberfläche darunter.
   - Geprüft wird **ohne KI**. Beim ersten Mal merkt sich der Pi nur den Stand.
   - Je Auslöser gibt es ein Tageslimit.
 - **Aktivität:** jedes Werkzeug, jede Routine, jeder Auslöser, jede Freigabe und jeder Anruf, Filter „nur im Hintergrund“, 30 Tage.
+- **Vorschläge:** Bots bieten von sich aus an, Wiederkehrendes dauerhaft zu lösen – als Karte mit **„Ja, mach das“ / „Nein danke“**.
+  - Im Gespräch mit `vorschlag_machen`, wenn dem Bot eine Wiederholung auffällt.
+  - Tägliche Durchsicht (Standard 17:30, abschaltbar): Der Pi sucht **ohne KI** nach Mustern der letzten 14 Tage – derselbe Text
+    mehrfach eingefügt, dieselbe Bitte an mehreren Tagen, ein Werkzeug scheitert immer wieder. Nur bei Neuem fragt er den Kapitän.
+  - Höchstens 3 Vorschläge am Tag. Nach dem Ja bekommt der Bot den Auftrag, Schreibendes läuft weiter über Freigaben. Abgelehntes kommt nicht wieder.
+- **Wissen und Abläufe, die ein Bot selbst ändert**, übernimmt der Adapter in seine Ablage – sie überstehen jeden Neustart.
 
 ![Web: Auslöser](screenshots/web/ausloeser.png)
 
