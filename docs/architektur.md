@@ -8,7 +8,7 @@
                                │                       ├─▶ /mcp/<bot>      eigene Werkzeuge (Routinen, Team, Python, …)
                                │                       ├─▶ /homemcp/<bot>  home-mcp mit den Rechten dieses Bots
                                │                       ├─▶ /anthropic/*    Claude-Proxy (Verbrauch wird gezählt)
-                               │                       ├─▶ Piper / ElevenLabs (Stimmen), whisper.cpp (Diktat im Web)
+                               │                       ├─▶ Phonon / Piper / ElevenLabs (Stimmen), whisper.cpp (Diktat im Web)
                                │                       ├─▶ Pi-Browser (Seiten lesen, Seitenbilder), bubblewrap (Python)
                                │                       └─▶ ntfy (Benachrichtigungen, optional)
  home-mcp (eigener Server) ◀───┘  Kalender, Mail, Drive/Docs/Sheets, Slack, GitLab, Datenbank, Freigaben
@@ -32,7 +32,7 @@
 | `dienste` | systemd-Aufrufe, ntfy |
 | `claude` | Claude-Proxy (OpenAI-Format → Anthropic), Verbrauch, Preise, Guthaben mit Aufladung |
 | `gesundheit` | Health Connect: Tageswerte speichern, verdichten, abfragen |
-| `stimmen` | Piper, ElevenLabs (Zwischenspeicher, Kontingent, Butler-Klang), `sprechbar()`, Aussprache, Diktat (whisper.cpp) |
+| `stimmen` | Phonon (`ph:`), Piper (`pi:`), ElevenLabs (`el:`) (Zwischenspeicher, Kontingent, Butler-Klang), `sprechbar()`, Aussprache, Diktat (whisper.cpp) |
 | `wissen` | Wissen je Bot und global, Anhänge, Dokumente in Text, `dokument_ansehen` (Claude oder Ollama-Bildmodelle) |
 | `home` | Rechte je Bot, Katalog von home-mcp, `home_aufruf` mit Grenzen, Regeln und „frei“ |
 | `bots` | Bots anlegen und ändern, AGENT.md und SOUL.md, PicoClaw-Konfiguration |

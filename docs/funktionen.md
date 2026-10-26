@@ -110,7 +110,9 @@ Alle Bilder zeigen Demo-Daten. App links bzw. oben, Web-Oberfläche darunter.
   - Selbst anrufen geht im Chat über ⋮.
   - Das Gespräch ist bei Android als Anruf angemeldet: Ton über Lautsprecher, Hörmuschel, Kopfhörer oder Uhr, und ein echter Anruf hat Vorrang.
 - **Stimmen:**
-  - **Piper auf dem Pi** (Thorsten u. a.).
+  - **Phonon auf dem Pi** (Gradium, 13 deutsche Stimmen wie Anton, Henrik, Josefine): natürlich, ohne Cloud und Kontingent.
+    Der erste Satz kommt nach gut 1 s, danach schneller als Echtzeit. Lizenz CC BY-NC – nur privat.
+  - **Piper auf dem Pi** (Thorsten u. a.) – einfacher, springt ein, wenn Phonon oder ElevenLabs ausfallen.
   - **ElevenLabs** (auch im kostenlosen Tarif): Britische Stimmen sprechen Deutsch mit Einschlag, auf Wunsch mit „Butler-Klang“.
   - Uhrzeiten, Wochentage und Abkürzungen werden ausgeschrieben vorgelesen.
   - Ist das Kontingent leer, spricht der Pi.

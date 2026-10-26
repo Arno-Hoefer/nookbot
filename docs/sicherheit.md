@@ -62,5 +62,6 @@ Getestet: Netz gesperrt, Konfiguration nicht sichtbar, Endlosschleife nach 2 Min
 
 - Die Erkennung läuft auf dem Handy (whisper.cpp), das Audio verlässt das Gerät nicht. Im Web geht es bis zum Pi
   und wird nach dem Umwandeln verworfen.
+- Phonon läuft auf dem Pi ohne Netz (`HF_HUB_OFFLINE`); das Hugging-Face-Token braucht nur die Einrichtung und wird nicht gespeichert.
 - Cloud-Stimmen (ElevenLabs) bekommen nur den vorzulesenden Text. Gleiche Sätze kommen aus dem Zwischenspeicher.
 - Das Anruf-Protokoll (`/api/diagnose`) enthält Pegel, Zeichenzahlen und Fehler, aber keine Inhalte.

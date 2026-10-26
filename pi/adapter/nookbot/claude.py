@@ -309,7 +309,7 @@ def update_bot(bid: str, d: dict) -> dict:
             b["merken"] = bool(d["merken"])
         if "regeln" in d and isinstance(d["regeln"], dict):
             b["regeln"] = rechner.regeln_norm(d["regeln"])
-        if "stimme" in d and (not d["stimme"] or str(d["stimme"]).startswith(("pi:", "handy:", "el:"))):
+        if "stimme" in d and (not d["stimme"] or str(d["stimme"]).startswith(("pi:", "handy:", "el:", "ph:"))):
             b["stimme"] = str(d["stimme"] or "")[:120]
         bots.save_bots(all_b)
     if d.get("modell"):

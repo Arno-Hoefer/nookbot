@@ -1,4 +1,4 @@
-"""Stimmen: Piper auf dem Pi, ElevenLabs, Aussprache, Vorlesetext, Diktat (whisper.cpp)."""
+"""Stimmen: Piper und Phonon auf dem Pi, ElevenLabs, Aussprache, Vorlesetext, Diktat (whisper.cpp)."""
 import json
 import os
 import re
@@ -43,7 +43,51 @@ _piper_lock = threading.Lock()
 def stimmen_liste() -> list:
     da = set(os.listdir(os.path.join(PIPER, "stimmen"))) if os.path.isdir(os.path.join(PIPER, "stimmen")) else set()
     pi = [{"id": "pi:" + i, "name": n, "beschreibung": b} for i, n, b, _ in STIMMEN if f"de_DE-{i.split(':')[0]}.onnx" in da]
-    return el_stimmen() + pi
+    return ph_stimmen() + el_stimmen() + pi
+
+
+# ── Phonon (Gradium, auf dem Pi) ───────────────────────────────────
+# Kleines neuronales Modell (40M, deutsch), klingt deutlich natürlicher als Piper und kostet kein Kontingent. Programm und
+# Modell unter /opt/phonon (einrichtung/12-phonon.sh): ptts, modell/ (config.json, model.safetensors, tokenizer.json),
+# stimmen/<Name>.safetensors. Lizenz der 40M-Modelle: CC BY-NC 4.0 – nur privat, nicht für Kundenprojekte.
+# Je Satz ein Aufruf (Laden ~0,2 s, 8-Bit ~2,5× schneller als Echtzeit auf dem Pi 5); einer nach dem anderen, sonst
+# teilen sich zwei Aufrufe die vier Kerne und beide werden langsam.
+
+PHONON = os.environ.get("NOOKBOT_PHONON", "/opt/phonon")
+PH_STIMMEN = [  # Name, Beschreibung (aus dem Katalog gradium/phonon-voices)
+    ("Anton", "männlich, lebendig, erklärend"), ("Henrik", "männlich, ruhig, freundlich"), ("Mats", "männlich, aufmerksam, zügig"),
+    ("Mika", "männlich, knapp, fester Kern"), ("Mirko", "männlich, markant"), ("Leon", "männlich, hell, einladend"),
+    ("Annika", "weiblich, aufmerksam"), ("Josefine", "weiblich, ruhig, gleichmäßig"), ("Nele", "weiblich, offen, fließend"),
+    ("Svea", "weiblich, knapp"), ("Jette", "weiblich, jung, munter"), ("Jule", "weiblich, hell, fröhlich"), ("Lotta", "weiblich, energisch"),
+]
+_ph_lock = threading.Lock()
+
+
+def ph_stimmen() -> list:
+    d = os.path.join(PHONON, "stimmen")
+    if not os.path.isfile(os.path.join(PHONON, "ptts")) or not os.path.isdir(d):
+        return []
+    da = set(os.listdir(d))
+    return [{"id": "ph:" + n, "name": f"{n} (Phonon)", "beschreibung": b + " · auf dem Pi, ohne Kontingent"} for n, b in PH_STIMMEN if f"{n}.safetensors" in da]
+
+
+def ph_sprechen(text: str, name: str) -> bytes:
+    stimme = os.path.join(PHONON, "stimmen", f"{name}.safetensors")
+    if not re.fullmatch(r"[A-Za-zÄÖÜäöüé]+", name) or not os.path.isfile(stimme):
+        raise ValueError("Diese Phonon-Stimme gibt es nicht.")
+    ziel = f"/tmp/phonon-{secrets.token_hex(6)}.wav"
+    with _ph_lock:
+        r = subprocess.run([os.path.join(PHONON, "ptts"), "-m", os.path.join(PHONON, "modell"), "--quant", "q8_0", "--lang", "de",
+                            "-v", stimme, "-o", ziel, text], capture_output=True, timeout=60, cwd="/tmp",
+                           env={"PATH": "/usr/bin:/bin", "HF_HUB_OFFLINE": "1", "RUST_LOG": "error"})
+    try:
+        if r.returncode != 0 or not os.path.exists(ziel):
+            raise ValueError("Phonon: " + (r.stderr.decode(errors="replace").strip().splitlines() or ["kein Ton"])[-1][:200])
+        with open(ziel, "rb") as f:
+            return f.read()
+    finally:
+        if os.path.exists(ziel):
+            os.remove(ziel)
 
 
 # ── ElevenLabs (Cloud-Stimmen, optional) ────────────────────────────
@@ -247,7 +291,20 @@ def _piper_prozess(modell: str, tempo: float) -> dict:
 
 
 def sprechen(text: str, stimme: str, tempo: float = 1.0) -> bytes:
-    """Ein Stück Text (am besten ein Satz) mit einer Pi- oder ElevenLabs-Stimme → WAV-Bytes."""
+    """Ein Stück Text (am besten ein Satz) mit einer Pi-, Phonon- oder ElevenLabs-Stimme → WAV-Bytes."""
+    if stimme.startswith("ph:"):
+        t = aussprache_anwenden(sprechbar(" ".join(str(text).split())))[:1200]
+        if not t:
+            raise ValueError("Kein Text.")
+        try:
+            name, _, k = stimme[3:].partition("+")
+            w = ph_sprechen(t, name)
+            tempo = min(max(float(tempo or 1.0), 0.6), 1.6)
+            filt = ",".join(x for x in ((BUTLER_KLANG if k == "butler" else ""), (f"atempo={tempo:.2f}" if abs(tempo - 1) > 0.02 else "")) if x)
+            return klang(w, filt) if filt else w
+        except Exception as e:  # noqa: BLE001
+            basis.log("Phonon → Thorsten:", e)
+            stimme = STANDARD_STIMME
     if stimme.startswith("el:"):
         t = sprechbar(" ".join(str(text).split()))[:1200]  # kein Aussprache-Wörterbuch: englische Namen spricht die Stimme selbst richtig
         if not t:
