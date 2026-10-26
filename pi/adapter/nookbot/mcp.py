@@ -1,4 +1,5 @@
 """MCP-Werkzeuge für die Bots."""
+import secrets
 import time
 import urllib.error
 import urllib.parse
@@ -303,7 +304,22 @@ def mcp_rpc(msg: dict, caller: dict):
                 sid = f"auftrag-{b['id']}"
                 if not sitzungen.SESS.get(sid):
                     sitzungen.SESS.create(b["id"], art="auftrag", sid=sid, titel="Aufträge aus dem Team")
-                text = sitzungen.ask_sync(b["id"], sid, f"[Auftrag von {caller['name']}]\n\n{a.get('auftrag', '')}") or "(keine Antwort)"
+                # Dieselbe TEAM-Karte wie bei auftraege_verteilen – sonst sieht %NUTZER% nicht, dass der andere Bot gerade arbeitet
+                auftrag = str(a.get("auftrag") or "")
+                kid = "f" + secrets.token_hex(4)
+                teil = {"bot": b["id"], "name": b["name"], "auftrag": auftrag[:600], "status": "laeuft", "sitzung": sid}
+                if cs:
+                    sitzungen.SESS.upsert(cs, {"id": "auf-" + kid, "role": "info", "art": "auftraege", "ts": time.time(), "bot": caller["id"],
+                                               "text": f"{b['name']} gefragt", "ziel": "", "teile": [teil]})
+                try:
+                    text = sitzungen.ask_sync(b["id"], sid, f"[Auftrag von {caller['name']}]\n\n{auftrag}") or "(keine Antwort)"
+                    teil["status"] = "fertig"
+                except Exception:
+                    teil["status"] = "fehler"
+                    raise
+                finally:
+                    if cs:
+                        sitzungen.SESS.upsert(cs, {"id": "auf-" + kid, "teile": [teil]})
                 text = f"Antwort von {b['name']}:\n\n{text}"
             elif name == "python_ausfuehren":
                 text = rechner.python_ausfuehren(caller, str(a.get("code") or ""), caller_session(caller["id"]) or "")
