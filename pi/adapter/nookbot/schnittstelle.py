@@ -367,7 +367,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, sitzungen.SESS.meta(sitzungen.SESS.create(b["id"])))
         m = re.match(r"^/api/sessions/([a-z0-9-]+)/senden$", p)
         if m:
-            sitzungen.send(m.group(1), str(d.get("text") or ""))
+            sitzungen.send(m.group(1), str(d.get("text") or ""), zusatz=vorschlaege.im_chat(m.group(1)))
             return self._send(200, {"ok": True})
         if p == "/api/runden":
             return self._send(200, team.runde(str(d.get("frage") or "").strip(), list(d.get("bots") or []), d.get("kapitaen"), int(d.get("gespraech") or 0)))

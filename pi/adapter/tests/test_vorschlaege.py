@@ -28,6 +28,17 @@ class Vorschlaege(unittest.TestCase):
         with self.assertRaises(ValueError):
             vorschlaege.entscheiden(v["id"], False)  # schon entschieden
 
+    def test_antwort_im_chat(self):
+        v = vorschlaege.vorschlag_neu("reacher", "Soll ich die Abfrage mit der fertigen Zeitspalte beschleunigen?",
+                                      "Scout per bot_fragen die Abfrage in der Wissensdatei umstellen lassen.", sitzung=self.sid)
+        zusatz = vorschlaege.im_chat(self.sid)
+        self.assertIn("Scout per bot_fragen", zusatz)  # der Bot erfährt den Plan
+        self.assertNotIn("%NUTZER%", zusatz)
+        self.assertEqual(next(m for m in s.SESS.get(self.sid)["msgs"] if m.get("art") == "vorschlag")["status"], "im_chat")
+        self.assertEqual(vorschlaege.im_chat(self.sid), "")  # nur einmal
+        with self.assertRaises(ValueError):
+            vorschlaege.entscheiden(v["id"], True)  # später geklickt → nicht doppelt ausführen
+
     def test_abgelehnt_nicht_wiederholen_und_tageslimit(self):
         v = vorschlaege.vorschlag_neu("reacher", "Soll ich jeden Montag den Umsatzbericht automatisch schicken?",
                                       "Routine montags 8 Uhr mit dem Ablauf Umsatzbericht anlegen.")

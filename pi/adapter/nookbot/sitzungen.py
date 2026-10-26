@@ -259,7 +259,8 @@ def on_bot_event(bid: str, sid: str, raw: str):
         SESS.end_turn(sid, error=str(p.get("message") or p.get("code") or "Fehler"))
 
 
-def send(sid: str, text: str, as_user: bool = True) -> None:
+def send(sid: str, text: str, as_user: bool = True, zusatz: str = "") -> None:
+    """zusatz: Kontext nur für den Bot (steht nicht im Verlauf), z. B. offene Vorschläge, auf die sich %NUTZER% bezieht."""
     s = SESS.get(sid)
     if not s:
         raise KeyError("Unterhaltung gibt es nicht.")
@@ -274,7 +275,7 @@ def send(sid: str, text: str, as_user: bool = True) -> None:
     s["ungelesen"] = 0
     SESS.start_turn(sid, s["bot"])
     SESS.save(sid)
-    ws.send_json({"type": "message.send", "id": "m" + secrets.token_hex(4), "session_id": sid, "payload": {"content": text}})
+    ws.send_json({"type": "message.send", "id": "m" + secrets.token_hex(4), "session_id": sid, "payload": {"content": text + zusatz}})
 
 
 def ask_sync(bid: str, sid: str, text: str, timeout: int = 420, as_user: bool = True) -> str:

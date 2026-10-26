@@ -425,7 +425,7 @@ function karte(m) {
   }
   if (m.art === 'vorschlag') {
     const st = m.status || 'offen';
-    return `<div class="karte vor"><div class="titel">💡 Vorschlag <span class="mut">${st === 'angenommen' ? '· angenommen ✓' : st === 'abgelehnt' ? '· abgelehnt' : ''}</span></div>
+    return `<div class="karte vor"><div class="titel">💡 Vorschlag <span class="mut">${st === 'angenommen' ? '· angenommen ✓' : st === 'abgelehnt' ? '· abgelehnt' : st === 'im_chat' ? '· im Chat beantwortet' : ''}</span></div>
       <div>${esc((m.text || '').replace(/^💡 /, ''))}</div>
       ${st === 'offen' ? `<div class="knoepfe"><button class="pri klein" data-vor-ja="${esc(m.ref)}">Ja, mach das</button><button class="klein text" data-vor-nein="${esc(m.ref)}">Nein danke</button></div>` : ''}</div>`;
   }
@@ -1074,7 +1074,7 @@ async function seiteEinstellungen() {
       <div class="zeilen" style="margin-top:8px"><input id="aW" placeholder="Wort" style="flex:1"><input id="aL" placeholder="so sprechen" style="flex:1"><button class="klein" id="aOk">Hinzufügen</button></div></div>
     ${vo ? `<div class="box"><h3>Vorschläge</h3><p class="mut">Wiederholt sich etwas (derselbe Text mehrfach eingefügt, dieselbe Frage an mehreren Tagen, wiederkehrende Fehler), bietet der Kapitän an, es dauerhaft zu lösen. Gesucht wird ohne KI; gefragt wird er nur bei Neuem. Umgesetzt wird erst nach deinem Ja.</p>
       ${schalter('vAktiv', 'Tägliche Durchsicht', vo.einstellungen.aktiv)}<div class="zeilen" style="margin-top:8px"><input id="vZeit" type="time" value="${esc(vo.einstellungen.zeit)}"><button class="klein" id="vJetzt">Jetzt durchsehen</button></div>
-      ${vo.vorschlaege.slice(0, 8).map((v) => `<div class="teil"><span style="flex:1">${esc(v.text)}</span><span class="mut">${{offen: 'offen', angenommen: 'angenommen', abgelehnt: 'abgelehnt'}[v.status]}</span></div>`).join('')}</div>` : ''}
+      ${vo.vorschlaege.slice(0, 8).map((v) => `<div class="teil"><span style="flex:1">${esc(v.text)}</span><span class="mut">${{offen: 'offen', angenommen: 'angenommen', abgelehnt: 'abgelehnt', im_chat: 'im Chat beantwortet'}[v.status]}</span></div>`).join('')}</div>` : ''}
     <div class="box"><h3>Im Browser</h3>${schalter('eVorlesen', 'Antworten vorlesen (Stimme des Bots)', vorlesenAn())}${schalter('eMelden', 'Benachrichtigen, wenn ein Bot fertig ist (solange dieser Tab offen ist)', melden)}</div>
     ${ge ? `<div class="box"><h3>Gesundheit</h3><p class="mut">${ge.tage ? `${ge.tage} Tage auf dem Pi (${esc(ge.von)} – ${esc(ge.bis)}) · Quellen: ${esc(Object.keys(ge.quellen || {}).map((q) => q.includes('fitbit') ? 'Fitbit' : q.includes('renpho') ? 'Renpho' : q.includes('egym') ? 'EGYM' : q.includes('healthconnect') ? 'Handy' : q).join(', '))}` : 'Noch keine Daten.'} Freigeben und abgleichen geht in der App.</p></div>` : ''}
     <div class="box"><h3>Sitzung</h3><button class="klein" onclick="abmelden()">Abmelden</button></div>`;

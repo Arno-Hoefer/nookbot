@@ -483,7 +483,7 @@ private fun InfoKarte(vm: NookViewModel, m: Msg) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Badge("VORSCHLAG", if (m.status == "angenommen") A.green else A.amber)
                 Spacer(Modifier.weight(1f))
-                Text(when (m.status) { "angenommen" -> "angenommen ✓"; "abgelehnt" -> "abgelehnt"; else -> "" }, color = P.mut, fontSize = 12.sp)
+                Text(when (m.status) { "angenommen" -> "angenommen ✓"; "abgelehnt" -> "abgelehnt"; "im_chat" -> "im Chat beantwortet"; else -> "" }, color = P.mut, fontSize = 12.sp)
             }
             Text(m.text.removePrefix("💡 "), color = P.fg, fontSize = 14.sp, lineHeight = 20.sp, modifier = Modifier.padding(top = 8.dp))
             if (m.status == "offen") Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
