@@ -8,7 +8,7 @@
                                │                       ├─▶ /mcp/<bot>      eigene Werkzeuge (Routinen, Team, Python, …)
                                │                       ├─▶ /homemcp/<bot>  home-mcp mit den Rechten dieses Bots
                                │                       ├─▶ /anthropic/*    Claude-Proxy (Verbrauch wird gezählt)
-                               │                       ├─▶ Phonon / Piper / ElevenLabs (Stimmen), whisper.cpp (Diktat im Web)
+                               │                       ├─▶ Phonon / Piper (Stimmen), whisper.cpp (Diktat im Web)
                                │                       ├─▶ Pi-Browser (Seiten lesen, Seitenbilder), bubblewrap (Python)
                                │                       └─▶ ntfy (Benachrichtigungen, optional)
  home-mcp (eigener Server) ◀───┘  Kalender, Mail, Drive/Docs/Sheets, Slack, GitLab, Datenbank, Freigaben
@@ -32,7 +32,7 @@
 | `dienste` | systemd-Aufrufe, ntfy |
 | `claude` | Claude-Proxy (OpenAI-Format → Anthropic), Verbrauch, Preise, Guthaben mit Aufladung |
 | `gesundheit` | Health Connect: Tageswerte speichern, verdichten, abfragen |
-| `stimmen` | Phonon (`ph:`), Piper (`pi:`), ElevenLabs (`el:`) (Zwischenspeicher, Kontingent, Butler-Klang), `sprechbar()`, Aussprache, Diktat (whisper.cpp) |
+| `stimmen` | Phonon (`ph:`), Piper (`pi:`), Butler-Klang, `sprechbar()`, Aussprache, Diktat (whisper.cpp) |
 | `wissen` | Wissen je Bot und global, Anhänge, Dokumente in Text, `dokument_ansehen` (Claude oder Ollama-Bildmodelle) |
 | `home` | Rechte je Bot, Katalog von home-mcp, `home_aufruf` mit Grenzen, Regeln und „frei“ |
 | `bots` | Bots anlegen und ändern, AGENT.md und SOUL.md, PicoClaw-Konfiguration |
@@ -73,7 +73,7 @@ in `__init__.py`). Darauf bauen Tests und Werkzeuge.
 | `gedaechtnis.json`, `ablaeufe.json`, `datenbanken.json`, `aussprache.json` | Gedächtnis, Abläufe, Datenbank-Bibliothek, Aussprache |
 | `wissen/` | globales Wissen (je Bot liegt es im Arbeitsbereich des Bots) |
 | `arbeit/` | gemeinsamer Arbeitsordner |
-| `claude.json`, `claude_verbrauch.json`, `elevenlabs.json`, `stimmen-cache/` | Schlüssel und Verbrauch (privat) |
+| `claude.json`, `claude_verbrauch.json` | Schlüssel und Verbrauch (privat) |
 | `gesundheit/` | Tageswerte aus Health Connect |
 | `diagnose.json`, `abstuerze.json` | Protokolle der App (ohne Inhalte) |
 

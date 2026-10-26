@@ -152,11 +152,8 @@ class Handler(BaseHTTPRequestHandler):
             k = home.katalog(neu=q.get("neu") == "1")
             return self._send(200, {"konten": k["konten"], "db": k["db"], "gitlab": k["gitlab"], "statistik": k["statistik"],
                                     "slack": k["slack"], "kanaele": k["kanaele"]})
-        if p == "/api/elevenlabs":
-            return self._send(200, stimmen.el_kontingent() or {})
         if p == "/api/stimmen":
-            return self._send(200, {"stimmen": stimmen.stimmen_liste(), "standard": stimmen.STANDARD_STIMME, "aussprache": stimmen.aussprache(),
-                                    "elevenlabs": stimmen.el_kontingent() if q.get("kontingent") else bool(stimmen.el_conf().get("api_key"))})
+            return self._send(200, {"stimmen": stimmen.stimmen_liste(), "standard": stimmen.STANDARD_STIMME, "aussprache": stimmen.aussprache()})
         if p == "/api/gesundheit/info":
             return self._send(200, gesundheit.gesundheit_info())
         if p == "/api/claude":

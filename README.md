@@ -53,10 +53,10 @@ Ausführliche Doku mit Screenshots: **[docs/](docs/README.md)** (Funktionen, Arc
 **Sprache**
 - **Diktieren** und **Sprachmodus** – Erkennung **lokal** mit whisper.cpp (auf dem Handy; im Web auf dem Pi).
 - **Anrufe**: Routinen und Auslöser „als Anruf“ – das Handy klingelt auch gesperrt, der Bot liest sein Ergebnis vor und hört dann zu. Selbst anrufen geht aus dem Chat. Das Gespräch ist bei Android als Anruf angemeldet (Telecom: Lautsprecher, Headset, Uhr wählbar; echter Anruf hat Vorrang).
-- **Stimmen**: **Phonon** von Gradium auf dem Pi (13 natürliche deutsche Stimmen, ohne Cloud und Kontingent; Lizenz nur privat), Piper (Thorsten u. a.) oder **ElevenLabs** (auch im kostenlosen Tarif; britische Stimmen sprechen Deutsch mit Einschlag), je Stimme auch mit „Butler-Klang“. Uhrzeiten, Wochentage und Abkürzungen werden ausgeschrieben vorgelesen. Ist das Kontingent leer, spricht der Pi.
+- **Stimmen**: **Phonon** von Gradium auf dem Pi (13 natürliche deutsche Stimmen, ohne Cloud und Kontingent; Lizenz nur privat) oder Piper (Thorsten u. a.), je Stimme auch mit „Butler-Klang“. Uhrzeiten, Wochentage und Abkürzungen werden ausgeschrieben vorgelesen.
 
 **Oberflächen**
-- **App** (Android) und **Web-Oberfläche** (nur im Tailnet) mit denselben Bereichen; Statuszeile mit Ollama-, Claude- und ElevenLabs-Verbrauch.
+- **App** (Android) und **Web-Oberfläche** (nur im Tailnet) mit denselben Bereichen; Statuszeile mit Ollama- und Claude-Verbrauch.
 - Hell/Dunkel, Schriftgröße, Suche über alle Unterhaltungen, Benachrichtigungen ohne Dauerverbindung (oder „Für Anrufe erreichbar“).
 - **Gesundheit** (nur NookBot): Health Connect – Schritte, Schlaf, Puls, Trainings … als Tageswerte auf dem Pi.
 
@@ -78,7 +78,7 @@ App (Kotlin/Compose)  ──HTTPS im Tailnet──▶  nookbot-adapter (Python, 
   `ablauf_vorschlagen` …). Das Gedächtnis schreibt der Adapter als `memory/MEMORY.md`, bestätigte Abläufe als Skills `ablauf-<id>` –
   PicoClaw liest beides bei jeder Antwort neu, ohne Neustart. Unter `/` liefert er die Web-Oberfläche (`pi/adapter/web/`).
 - **Adapter-Code** (`pi/adapter/nookbot/`, Startpunkt `nookbot_server.py`): ein Modul je Bereich –
-  `basis` (Pfade, Konfiguration), `ereignisse` (SSE), `dienste` (Ollama, ntfy), `claude`, `gesundheit`, `stimmen` (Phonon, Piper, ElevenLabs,
+  `basis` (Pfade, Konfiguration), `ereignisse` (SSE), `dienste` (Ollama, ntfy), `claude`, `gesundheit`, `stimmen` (Phonon, Piper,
   Vorlesetext, Diktat), `wissen` (Wissen, Anhänge, Dokumente ansehen), `home` (home-mcp, Zugriffe je Bot), `bots`, `sitzungen`
   (Verlauf, WebSocket zu den Bots), `seiten` (Seiten lesen, Pakete), `gedaechtnis` (Gedächtnis, Abläufe), `rechner` (Arbeitsordner,
   Python, Regeln), `automatik` (Routinen, Erinnerungen, Aktivität, Auslöser, Anrufe), `team` (Runden, Aufträge verteilen), `vorschlaege` (Muster, Vorschläge), `mcp`,
@@ -109,8 +109,7 @@ Die Skripte unter `pi/einrichtung/` in dieser Reihenfolge ausführen (Keys werde
 8. `8-stimmen.sh` – optional: Piper-Stimmen für Sprachmodus und Anrufe
 9. `9-whisper.sh` – optional: Spracherkennung auf dem Pi fürs Diktat im Web
 10. `10-rechner.sh` – optional: Python-Sandkasten (bubblewrap) für die Bots
-11. `11-elevenlabs.sh` – optional: Cloud-Stimmen von ElevenLabs
-12. `12-phonon.sh` – optional: Phonon-Stimmen auf dem Pi (Hugging-Face-Token, Zugang zu gradium/phonon-40m-de)
+11. `11-phonon.sh` – optional: Phonon-Stimmen auf dem Pi (Hugging-Face-Token, Zugang zu gradium/phonon-40m-de)
 12. `nutzer-setzen.py <Name>` – wie die Bots dich nennen
 
 App bauen: `android/local.properties.example` nach `local.properties` kopieren, Adressen eintragen, dann

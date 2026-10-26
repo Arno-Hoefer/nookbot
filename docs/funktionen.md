@@ -10,7 +10,7 @@ Alle Bilder zeigen Demo-Daten. App links bzw. oben, Web-Oberfläche darunter.
 </p>
 
 - **Startseite:** oben der Kapitän, darunter die anderen Bots und die Runden. Unten steht die **Statuszeile** mit dem Verbrauch
-  bei Ollama, Claude und ElevenLabs.
+  bei Ollama und Claude.
 - **Chat:** Antworten mit Tabellen, kleine Zeilen für die Werkzeuge („Dokument angesehen“). Freigaben erscheinen direkt als Karte
   mit *Ausführen / Ändern / Ablehnen*.
 - **Anhänge** über „+“: Kamera, Galerie, jede Datei. Bilder werden auf dem Handy verkleinert und nach Text durchsucht.
@@ -112,16 +112,13 @@ Alle Bilder zeigen Demo-Daten. App links bzw. oben, Web-Oberfläche darunter.
 - **Stimmen:**
   - **Phonon auf dem Pi** (Gradium, 13 deutsche Stimmen wie Anton, Henrik, Josefine): natürlich, ohne Cloud und Kontingent.
     Der erste Satz kommt nach gut 1 s, danach schneller als Echtzeit. Lizenz CC BY-NC – nur privat.
-  - **Piper auf dem Pi** (Thorsten u. a.) – einfacher, springt ein, wenn Phonon oder ElevenLabs ausfallen.
-  - **ElevenLabs** (auch im kostenlosen Tarif): Britische Stimmen sprechen Deutsch mit Einschlag, auf Wunsch mit „Butler-Klang“.
+  - **Piper auf dem Pi** (Thorsten u. a.) – einfacher, springt ein, wenn Phonon ausfällt.
   - Uhrzeiten, Wochentage und Abkürzungen werden ausgeschrieben vorgelesen.
-  - Ist das Kontingent leer, spricht der Pi.
 
 ## Einstellungen und Verbrauch
 
-![Web: Einstellungen mit Ollama-, Claude- und Stimmen-Verbrauch](screenshots/web/einstellungen.png)
+![Web: Einstellungen mit Ollama- und Claude-Verbrauch](screenshots/web/einstellungen.png)
 
 - **Ollama:** Guthaben laut ollama.com.
 - **Claude:** Verbrauch wird je Anfrage mitgezählt; mit Startbetrag und monatlicher Aufladung ergibt sich der Rest.
-- **ElevenLabs:** Zeichen des Monats.
 - **Aussprache-Wörterbuch** für Namen, Design, Schriftgröße, Benachrichtigungen, „Für Anrufe erreichbar“, Testanruf.

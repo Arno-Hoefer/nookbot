@@ -16,7 +16,7 @@ Erreichbar ist alles nur im eigenen Tailscale-Netz.
 pi/adapter/nookbot_server.py   Startpunkt (systemd) – lädt das Paket, re-exportiert alle Namen
 pi/adapter/nookbot/            der Adapter in Modulen (Ladereihenfolge in __init__.py):
   basis, ereignisse, dienste       Pfade/JSON/Konfiguration, SSE-Ereignisse, systemd/ntfy
-  claude, gesundheit, stimmen      Claude-Proxy + Verbrauch, Health Connect, Piper/ElevenLabs/Vorlesetext/Diktat
+  claude, gesundheit, stimmen      Claude-Proxy + Verbrauch, Health Connect, Phonon/Piper/Vorlesetext/Diktat
   wissen, home, bots               Wissen/Anhänge/Dokumente ansehen, Rechte + home-mcp-Proxy, Bots + AGENT.md/SOUL.md
   sitzungen, seiten, gedaechtnis   Verlauf + Bot-Verbindungen, Seiten lesen, Gedächtnis + Abläufe
   rechner, automatik, team         Arbeitsordner/Python/Seitenbild/Regeln, Routinen/Erinnerungen/Auslöser/Aktivität/Anrufe, Runden/Aufträge

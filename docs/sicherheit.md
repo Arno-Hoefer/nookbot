@@ -56,12 +56,11 @@ Getestet: Netz gesperrt, Konfiguration nicht sichtbar, Endlosschleife nach 2 Min
 
 - Nie im Repo. Schlüssel liegen auf dem Pi in Dateien mit Rechten 600, in der App im Android-Keystore.
 - Die Einrichtungsskripte fragen Schlüssel verdeckt ab (`read -s`).
-- ElevenLabs-Schlüssel mit minimalen Rechten: Text to Speech, Voices: Read, User: Read.
 
 ## Sprache
 
 - Die Erkennung läuft auf dem Handy (whisper.cpp), das Audio verlässt das Gerät nicht. Im Web geht es bis zum Pi
   und wird nach dem Umwandeln verworfen.
 - Phonon läuft auf dem Pi ohne Netz (`HF_HUB_OFFLINE`); das Hugging-Face-Token braucht nur die Einrichtung und wird nicht gespeichert.
-- Cloud-Stimmen (ElevenLabs) bekommen nur den vorzulesenden Text. Gleiche Sätze kommen aus dem Zwischenspeicher.
+- Alle Stimmen laufen auf dem Pi, kein Text geht für die Sprachausgabe nach außen.
 - Das Anruf-Protokoll (`/api/diagnose`) enthält Pegel, Zeichenzahlen und Fehler, aber keine Inhalte.

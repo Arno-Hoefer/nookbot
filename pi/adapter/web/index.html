@@ -831,12 +831,10 @@ async function diktieren(txt, groesse) {
 
 // ── Statuszeile unten links: Pi, Ollama, Claude ──
 async function statusLaden() {
-  const [g, c, el] = await Promise.all([api('GET', '/api/guthaben').catch(() => null), api('GET', '/api/claude').catch(() => null),
-    api('GET', '/api/elevenlabs').catch(() => null)]);
+  const [g, c] = await Promise.all([api('GET', '/api/guthaben').catch(() => null), api('GET', '/api/claude').catch(() => null)]);
   const inc = g?.included; const teile = ['Pi verbunden'];
   if (inc?.allowance_usd) teile.push(`Ollama ${Math.round(100 - 100 * ((inc.balance_usd || 0) / inc.allowance_usd))} %`);
   if (c?.eingerichtet) teile.push(c.rest_usd != null ? `Claude ${c.rest_usd.toFixed(2)} $ übrig` : `Claude ${(c.eigen_monat_usd || 0).toFixed(2)} $ im Monat`);
-  if (el?.grenze) teile.push(`ElevenLabs ${Math.round(100 * (el.verbraucht || 0) / el.grenze)} %`);
   $('#statusT').textContent = teile.join(' · ');
 }
 $('#status').onclick = () => { S.ansicht = {art: 'einstellungen', id: null}; nav(); zeigen(); };

@@ -1,4 +1,4 @@
-"""Stimmen: Piper und Phonon auf dem Pi, ElevenLabs, Aussprache, Vorlesetext, Diktat (whisper.cpp)."""
+"""Stimmen: Phonon und Piper auf dem Pi, Aussprache, Vorlesetext, Diktat (whisper.cpp)."""
 import json
 import os
 import re
@@ -6,9 +6,6 @@ import secrets
 import subprocess
 import threading
 import time
-import urllib.error
-import urllib.parse
-import urllib.request
 
 from . import basis
 
@@ -43,12 +40,12 @@ _piper_lock = threading.Lock()
 def stimmen_liste() -> list:
     da = set(os.listdir(os.path.join(PIPER, "stimmen"))) if os.path.isdir(os.path.join(PIPER, "stimmen")) else set()
     pi = [{"id": "pi:" + i, "name": n, "beschreibung": b} for i, n, b, _ in STIMMEN if f"de_DE-{i.split(':')[0]}.onnx" in da]
-    return ph_stimmen() + el_stimmen() + pi
+    return ph_stimmen() + pi
 
 
 # ── Phonon (Gradium, auf dem Pi) ───────────────────────────────────
 # Kleines neuronales Modell (40M, deutsch), klingt deutlich natürlicher als Piper und kostet kein Kontingent. Programm und
-# Modell unter /opt/phonon (einrichtung/12-phonon.sh): ptts, modell/ (config.json, model.safetensors, tokenizer.json),
+# Modell unter /opt/phonon (einrichtung/11-phonon.sh): ptts, modell/ (config.json, model.safetensors, tokenizer.json),
 # stimmen/<Name>.safetensors. Lizenz der 40M-Modelle: CC BY-NC 4.0 – nur privat, nicht für Kundenprojekte.
 # Je Satz ein Aufruf (Laden ~0,2 s, 8-Bit ~2,5× schneller als Echtzeit auf dem Pi 5); einer nach dem anderen, sonst
 # teilen sich zwei Aufrufe die vier Kerne und beide werden langsam.
@@ -90,36 +87,7 @@ def ph_sprechen(text: str, name: str) -> bytes:
             os.remove(ziel)
 
 
-# ── ElevenLabs (Cloud-Stimmen, optional) ────────────────────────────
-# Schlüssel in elevenlabs.json (einrichtung/11-elevenlabs.sh). Stimmen-ids „el:<voice_id>“. Sprache spricht das Modell
-# mehrsprachig – britische Stimmen behalten beim Deutschen ihren Einschlag. Jeder Satz kostet Zeichen vom Kontingent;
-# gleiche Sätze kommen aus dem Zwischenspeicher. Ist das Kontingent leer oder ElevenLabs weg, spricht Thorsten auf dem Pi.
-
-EL_API = "https://api.elevenlabs.io"
-EL_MODELL = "eleven_flash_v2_5"  # schnell (~0,4 s je Satz); „eleven_multilingual_v2“ klingt etwas voller, braucht ~1,8 s
-_el_cache: dict = {"t": 0, "stimmen": []}
-EL_STANDARD = [("George", "JBFqnCBsd6RMkjVDRZzb", "britisch, männlich, warm"), ("Daniel", "onwK4e9ZLuTAKqWW03F9", "britisch, männlich, sachlich"),
-               ("Alice", "Xb7hH8MSUJpSbSDYk0k2", "britisch, weiblich")]
-
-
-def el_conf() -> dict:
-    return basis.read_json(basis.path("elevenlabs.json"), {})
-
-
-def _el(method: str, p: str, body: dict | None = None, roh: bool = False, timeout: int = 30):
-    key = el_conf().get("api_key")
-    if not key:
-        raise ValueError("ElevenLabs ist nicht eingerichtet.")
-    req = urllib.request.Request(EL_API + p, data=json.dumps(body).encode() if body is not None else None, method=method,
-                                 headers={"xi-api-key": key, "Content-Type": "application/json", "User-Agent": "NookBot/" + basis.VERSION})
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            data = r.read()
-    except urllib.error.HTTPError as e:
-        txt = e.read()[:300].decode(errors="replace")
-        raise ValueError(f"ElevenLabs {e.code}: {txt}") from None
-    return data if roh else json.loads(data or b"{}")
-
+# ── Klang (Butler: wärmer, präsenter, ein Hauch Raum; auch fürs Tempo) ──
 
 BUTLER_KLANG = ("highpass=f=75,equalizer=f=180:t=q:w=1:g=2,equalizer=f=2800:t=q:w=1.5:g=1.5,"
                 "aecho=0.9:0.4:14|23:0.06|0.04,loudnorm=I=-16")
@@ -142,89 +110,6 @@ def klang(wav: bytes, filt: str) -> bytes:
         w.setframerate(22050)
         w.writeframes(r.stdout)
     return buf.getvalue()
-
-
-def el_stimmen() -> list:
-    """Jede Cloud-Stimme auch als „· Butler“-Variante (…+butler)."""
-    return [y for x in _el_stimmen_roh() for y in (x, {"id": x["id"] + "+butler", "name": x["name"].replace(" (ElevenLabs)", " · Butler (ElevenLabs)"),
-                                                     "beschreibung": x["beschreibung"].replace(" · Cloud", ", wärmer mit etwas Raum · Cloud")})]
-
-
-def _el_stimmen_roh() -> list:
-    if not el_conf().get("api_key"):
-        return []
-    if time.time() - _el_cache["t"] > 3600:
-        try:
-            vs = _el("GET", "/v1/voices").get("voices", [])
-            out = []
-            for v in vs:
-                lab = v.get("labels") or {}
-                besch = ", ".join(x for x in (lab.get("accent"), lab.get("gender"), lab.get("descriptive") or lab.get("description"), lab.get("age")) if x)
-                out.append({"id": "el:" + v["voice_id"], "name": f"{v.get('name', '?').split(' - ')[0]} (ElevenLabs)",
-                            "beschreibung": (besch + " · " if besch else "") + "Cloud, Kontingent"})
-            # britische zuerst – passt zum Butler
-            out.sort(key=lambda x: (0 if "british" in x["beschreibung"].lower() else 1, x["name"]))
-            _el_cache.update(t=time.time(), stimmen=out)
-        except Exception as e:  # noqa: BLE001
-            basis.log("ElevenLabs Stimmen:", e)
-            _el_cache["t"] = time.time() - 3000  # in 10 Minuten noch einmal
-            if not _el_cache["stimmen"]:  # Schlüssel ohne „Voices: Read“ – die bekannten Standardstimmen gehen trotzdem
-                _el_cache["stimmen"] = [{"id": "el:" + i, "name": f"{nm} (ElevenLabs)", "beschreibung": f"{b} · Cloud, Kontingent"}
-                                        for nm, i, b in EL_STANDARD]
-    return _el_cache["stimmen"]
-
-
-_el_stand: dict = {"t": 0, "v": None}
-
-
-def el_kontingent(frisch: bool = False) -> dict | None:
-    """Verbrauch bei ElevenLabs – 2 Minuten zwischengespeichert (die App fragt bei jedem Laden)."""
-    if not el_conf().get("api_key"):
-        return None
-    if not frisch and time.time() - _el_stand["t"] < 120:
-        return _el_stand["v"]
-    _el_stand.update(t=time.time(), v=_el_kontingent())
-    return _el_stand["v"]
-
-
-def _el_kontingent() -> dict | None:
-    try:
-        o = _el("GET", "/v1/user/subscription")
-        return {"verbraucht": o.get("character_count"), "grenze": o.get("character_limit"), "tarif": o.get("tier"),
-                "neu_ab": o.get("next_character_count_reset_unix")}
-    except Exception as e:  # noqa: BLE001
-        return {"fehler": str(e)[:200]}
-
-
-def el_sprechen(text: str, voice: str, tempo: float = 1.0) -> bytes:
-    import hashlib as _h
-    import io
-    import wave
-    c = el_conf()
-    modell = c.get("modell") or EL_MODELL
-    d = basis.path("stimmen-cache")
-    os.makedirs(d, exist_ok=True)
-    fp = os.path.join(d, _h.sha1(f"{voice}|{modell}|{tempo:.2f}|{text}".encode()).hexdigest() + ".wav")
-    if os.path.exists(fp):
-        os.utime(fp)
-        return open(fp, "rb").read()
-    body = {"text": text, "model_id": modell,
-            "voice_settings": {"stability": float(c.get("stabilitaet", 0.55)), "similarity_boost": 0.75, "style": float(c.get("stil", 0.15)),
-                               "use_speaker_boost": True, "speed": min(max(tempo, 0.7), 1.2)}}
-    pcm = _el("POST", f"/v1/text-to-speech/{urllib.parse.quote(voice)}?output_format=pcm_22050", body, roh=True, timeout=60)
-    buf = io.BytesIO()
-    with wave.open(buf, "wb") as w:
-        w.setnchannels(1)
-        w.setsampwidth(2)
-        w.setframerate(22050)
-        w.writeframes(pcm)
-    data = buf.getvalue()
-    with open(fp, "wb") as f:
-        f.write(data)
-    dateien = sorted((os.path.join(d, x) for x in os.listdir(d)), key=os.path.getmtime)
-    for alt in dateien[:-300]:  # Zwischenspeicher klein halten
-        os.remove(alt)
-    return data
 
 
 def aussprache() -> dict:
@@ -291,7 +176,7 @@ def _piper_prozess(modell: str, tempo: float) -> dict:
 
 
 def sprechen(text: str, stimme: str, tempo: float = 1.0) -> bytes:
-    """Ein Stück Text (am besten ein Satz) mit einer Pi-, Phonon- oder ElevenLabs-Stimme → WAV-Bytes."""
+    """Ein Stück Text (am besten ein Satz) mit einer Phonon- oder Piper-Stimme → WAV-Bytes."""
     if stimme.startswith("ph:"):
         t = aussprache_anwenden(sprechbar(" ".join(str(text).split())))[:1200]
         if not t:
@@ -305,17 +190,8 @@ def sprechen(text: str, stimme: str, tempo: float = 1.0) -> bytes:
         except Exception as e:  # noqa: BLE001
             basis.log("Phonon → Thorsten:", e)
             stimme = STANDARD_STIMME
-    if stimme.startswith("el:"):
-        t = sprechbar(" ".join(str(text).split()))[:1200]  # kein Aussprache-Wörterbuch: englische Namen spricht die Stimme selbst richtig
-        if not t:
-            raise ValueError("Kein Text.")
-        try:
-            vid, _, k = stimme[3:].partition("+")
-            w = el_sprechen(t, vid, float(tempo or 1.0))
-            return klang(w, BUTLER_KLANG) if k == "butler" else w
-        except Exception as e:  # noqa: BLE001
-            basis.log("ElevenLabs → Thorsten:", e)  # Kontingent leer oder offline – dann eben der Pi
-            stimme = STANDARD_STIMME
+    if stimme.startswith("el:"):  # ElevenLabs gibt es nicht mehr – alte Einstellungen sprechen mit der Standardstimme
+        stimme = STANDARD_STIMME
     sid = stimme.removeprefix("pi:") or STANDARD_STIMME.removeprefix("pi:")
     eintrag = next((x for x in STIMMEN if x[0] == sid), None)
     if not eintrag:

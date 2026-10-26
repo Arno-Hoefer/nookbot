@@ -17,8 +17,7 @@ Die Skripte unter `pi/einrichtung/` der Reihe nach ausführen. Schlüssel werden
 | `8-stimmen.sh` | optional: Piper-Stimmen |
 | `9-whisper.sh` | optional: Spracherkennung auf dem Pi (Diktat im Web) |
 | `10-rechner.sh` | optional: Python-Sandkasten (bubblewrap, pandas, matplotlib, openpyxl) |
-| `11-elevenlabs.sh` | optional: Cloud-Stimmen von ElevenLabs |
-| `12-phonon.sh` | optional: Phonon-Stimmen auf dem Pi (Programm mit Prüfsumme, deutsches Modell, 13 Stimmen; ~150 MB) |
+| `11-phonon.sh` | optional: Phonon-Stimmen auf dem Pi (Programm mit Prüfsumme, deutsches Modell, 13 Stimmen; ~150 MB) |
 | `nutzer-setzen.py <Name>` | wie die Bots dich nennen |
 
 ## Aktualisieren
@@ -45,9 +44,8 @@ In der App zeigt **Aktivität**, welcher Bot wann welches Werkzeug benutzt hat. 
 | Ollama Cloud | Pauschale (Pro) | Statuszeile: genutzt in % |
 | Claude | nach Verbrauch, eigener Schlüssel | Statuszeile: Rest in $ (mit Startbetrag/Aufladung) bzw. Monatsverbrauch |
 | Phonon (Gradium) | lokal auf dem Pi, kostenlos (CC BY-NC, nur privat) | – |
-| ElevenLabs | Freitarif 10.000 Zeichen/Monat (~10 min), schnelles Modell `eleven_flash_v2_5` | Statuszeile: Zeichen in % |
 
-Ist das ElevenLabs-Kontingent leer, spricht Piper auf dem Pi. Gleiche Sätze kommen aus dem Zwischenspeicher (`stimmen-cache/`).
+Fällt Phonon aus, spricht Piper (Thorsten) auf dem Pi.
 
 ## Speicher
 

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# NookBot 12 (optional): Phonon-Stimmen von Gradium auf dem Pi – deutlich natürlicher als Piper, ohne Cloud und ohne Kontingent.
+# NookBot 11 (optional): Phonon-Stimmen von Gradium auf dem Pi – deutlich natürlicher als Piper, ohne Cloud und ohne Kontingent.
 # Lizenz der deutschen 40M-Modelle: CC BY-NC 4.0 – nur für private, nicht-kommerzielle Nutzung.
 # Vorher auf https://huggingface.co/gradium/phonon-40m-de einmal den Zugang anfordern (Freigabe kommt sofort)
 # und unter Settings → Access Tokens ein Read-Token anlegen.
-# Aufruf: sudo bash 12-phonon.sh   – das Token wird verdeckt abgefragt und nicht gespeichert.
+# Aufruf: sudo bash 11-phonon.sh   – das Token wird verdeckt abgefragt und nicht gespeichert.
 set -euo pipefail
 VER=0.4.2
 ARCH=$(uname -m)

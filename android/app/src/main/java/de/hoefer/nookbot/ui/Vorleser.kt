@@ -56,7 +56,7 @@ class Vorleser(private val ctx: Context, private val vm: NookViewModel) {
     suspend fun sprechen(text: String, stimme: String, onSatz: (String) -> Unit = {}) {
         abbruch = false
         val saetze = text.split(Regex("(?<=[.!?:;])\\s+|\\n+")).map { it.trim() }.filter { it.isNotEmpty() }
-        // Pi- und Cloud-Stimmen (pi:…, el:…) kommen vom Pi, nur handy:… spricht Android selbst
+        // Phonon- und Piper-Stimmen (ph:…, pi:…) kommen vom Pi, nur handy:… spricht Android selbst
         if (!stimme.startsWith("handy:")) piSprechen(saetze, stimme, onSatz) else saetze.forEach { s ->
             if (abbruch) return
             onSatz(s)

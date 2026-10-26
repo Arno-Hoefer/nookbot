@@ -62,11 +62,11 @@ Antworten sind JSON, Fehler kommen als `{"error": "…"}`.
 
 | Methode | Pfad | |
 |---|---|---|
-| GET | `/api/stimmen` | Stimmen (Pi + ElevenLabs), Aussprache |
+| GET | `/api/stimmen` | Stimmen (Phonon, Piper), Aussprache |
 | POST | `/api/sprechen` | `{"text","stimme","tempo"}` → WAV |
 | POST | `/api/diktat` | Aufnahme (Base64) → Text (whisper.cpp auf dem Pi) |
 | PUT | `/api/aussprache` · POST `/api/aussprache/anwenden` | Aussprache-Wörterbuch |
-| GET | `/api/guthaben`, `/api/claude`, `/api/elevenlabs` | Verbrauch Ollama, Claude, ElevenLabs |
+| GET | `/api/guthaben`, `/api/claude` | Verbrauch Ollama, Claude |
 | POST | `/api/claude/stand` | Startbetrag und Aufladung für Claude |
 | POST | `/api/diagnose`, `/api/absturz` | Protokolle der App (ohne Inhalte) |
 
