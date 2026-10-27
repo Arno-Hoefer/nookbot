@@ -58,6 +58,7 @@ header.kopf .sub{font-size:13px;color:var(--mut);font-weight:400}
 .m{max-width:88%;padding:10px 14px;border-radius:var(--radius);background:var(--panel);border:1px solid var(--line);overflow-wrap:anywhere}
 .m.user{align-self:flex-end;background:var(--soft);border-color:transparent;white-space:pre-wrap}
 .m.bot{align-self:flex-start}
+.m .zeit{display:block;font-size:11px;color:var(--mut);text-align:right;margin-top:4px;white-space:nowrap}
 .m.error{border-color:var(--accent);color:var(--accent)}
 .m.zus{border-color:var(--violet)}
 .m .wer{font-size:12px;color:var(--mut);margin-bottom:2px;font-weight:600}
@@ -385,6 +386,13 @@ async function wissenHoch(scope, f) {
   } catch (e) { toast(f.name + ': ' + e.message); }
 }
 
+// Uhrzeit unter einer Nachricht; ältere Tage mit Datum
+function uhrzeit(ts) {
+  if (!ts) return '';
+  const d = new Date(ts * 1000), heute = new Date().toDateString() === d.toDateString();
+  const z = d.toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit'});
+  return `<span class="zeit">${heute ? z : d.toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit'}) + ' ' + z}</span>`;
+}
 const FREI = /\bF-[0-9a-f]{6}\b/g;
 function chatZeichnen(unten) {
   const s = S.offen; if (!s) return;
@@ -395,12 +403,12 @@ function chatZeichnen(unten) {
     if (m.role === 'thought') continue;
     if (m.role === 'tool') { tools.push(m.text || 'werkzeug'); continue; }
     toolsRaus();
-    if (m.role === 'user') h += `<div class="m user">${esc(m.text)}</div>`;
+    if (m.role === 'user') h += `<div class="m user">${esc(m.text)}${uhrzeit(m.ts)}</div>`;
     else if (m.role === 'error') h += `<div class="m error">${esc(m.text)}</div>`;
     else if (m.role === 'info') h += karte(m);
     else if (m.role === 'bot' && m.text?.trim()) {
       const wer = s.art === 'runde' ? `<div class="wer">${esc(botName(m.bot))}${m.zusammenfassung ? ' · Zusammenfassung' : m.gespraech ? ' · Gespräch ' + m.gespraech : ''}</div>` : '';
-      h += `<div class="m bot md ${m.zusammenfassung ? 'zus' : ''}">${wer}${md(m.text)}</div>`;
+      h += `<div class="m bot md ${m.zusammenfassung ? 'zus' : ''}">${wer}${md(m.text)}${uhrzeit(m.ts)}</div>`;
       for (const fid of new Set(m.text.match(FREI) || [])) h += freigabeKarte(fid);
     }
   }

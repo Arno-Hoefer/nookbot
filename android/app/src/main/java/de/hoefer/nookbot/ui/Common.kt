@@ -152,6 +152,13 @@ fun Card(modifier: Modifier = Modifier, border: Color? = null, onClick: (() -> U
 @Composable
 fun Hint(t: String, modifier: Modifier = Modifier) = Text(t, color = P.mut, fontSize = 12.sp, lineHeight = 17.sp, modifier = modifier)
 
+/** Uhrzeit unter einer Chatnachricht; an anderen Tagen mit Datum. */
+fun uhrzeit(ts: Long): String {
+    if (ts <= 0) return ""
+    val heute = SimpleDateFormat("yyyyMMdd", Locale.GERMANY).let { it.format(Date()) == it.format(Date(ts)) }
+    return SimpleDateFormat(if (heute) "HH:mm" else "dd.MM. HH:mm", Locale.GERMANY).format(Date(ts))
+}
+
 fun whenText(ts: Long): String {
     if (ts <= 0) return ""
     val now = Calendar.getInstance()

@@ -566,9 +566,10 @@ private fun ChatDialoge(vm: NookViewModel, b: de.hoefer.nookbot.data.Bot?, neu: 
 private fun MessageView(m: Msg, from: de.hoefer.nookbot.data.Bot?) {
     when (m.role) {
         "user" -> Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.End) {
-            SelectionContainer {
-                Text(m.text, color = P.fg, fontSize = 15.sp, modifier = Modifier.widthIn(max = 300.dp)
-                    .clip(RoundedCornerShape(18.dp, 18.dp, 4.dp, 18.dp)).background(P.chip).padding(horizontal = 14.dp, vertical = 10.dp))
+            Column(Modifier.widthIn(max = 300.dp).clip(RoundedCornerShape(18.dp, 18.dp, 4.dp, 18.dp)).background(P.chip)
+                .padding(horizontal = 14.dp, vertical = 10.dp), horizontalAlignment = Alignment.End) {
+                SelectionContainer { Text(m.text, color = P.fg, fontSize = 15.sp) }
+                Zeit(m.ts)
             }
         }
         "thought" -> {
@@ -592,8 +593,14 @@ private fun MessageView(m: Msg, from: de.hoefer.nookbot.data.Bot?) {
                     fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 6.dp))
             }
             SelectionContainer { Text(markdown(m.text, P.fg2), color = P.fg, fontSize = 15.sp, lineHeight = 21.sp) }
+            Zeit(m.ts, Modifier.align(Alignment.End))
         }
     }
+}
+
+@Composable
+private fun Zeit(ts: Long, modifier: Modifier = Modifier) {
+    if (ts > 0) Text(uhrzeit(ts), color = P.mut, fontSize = 11.sp, modifier = modifier.padding(top = 4.dp))
 }
 
 @Composable
