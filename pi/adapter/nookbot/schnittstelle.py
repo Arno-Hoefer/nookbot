@@ -485,7 +485,7 @@ class Handler(BaseHTTPRequestHandler):
         if p == "/api/aussprache/anwenden":
             return self._send(200, {"text": stimmen.aussprache_anwenden(str(d.get("text") or ""))})
         if p == "/api/claude/stand":
-            claude.claude_stand_setzen(d.get("usd"), d.get("datum"), d.get("aufladung_usd"), d.get("aufladung_tag"))
+            claude.claude_stand_setzen(d.get("usd"), d.get("datum"), d.get("aufladung_usd"), d.get("aufladung_tag"), bool(d.get("jetzt")))
             return self._send(200, claude.claude_kosten())
         if p == "/api/test-push":
             dienste.push("NookBot", "Benachrichtigungen funktionieren ✓", prio="high")

@@ -143,9 +143,10 @@ class Sessions:
         if b and s.get("art") in ("chat", "routine"):
             fids = FREIGABE_RE.findall(txt)
             if fids:
-                dienste.push(f"{b['name']}: Freigabe wartet", txt[:300], sid, prio="high", tags="warning")
+                dienste.push(b["name"], "Freigabe wartet – " + txt[:300], sid, prio="high", tags="warning", bot=b)
             else:  # die App entscheidet, ob sie es zeigt (nicht, wenn die Unterhaltung gerade offen ist)
-                dienste.push(f"{b['name']}: {s.get('titel') or 'Antwort'}", (txt or error or "fertig")[:300], sid,
+                # Titel nur der Name – der Titel der Unterhaltung (oft die allererste Frage) verwirrte hinter dem Namen
+                dienste.push(b["name"], (txt or error or "fertig")[:300], sid, bot=b,
                      ntfy=s.get("art") == "routine" or ereignisse.EV.clients == 0)
         for bid in list(bots._pending_restart):
             if not any(self.running(x) for x in self.ids_for_bot(bid)):

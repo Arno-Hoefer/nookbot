@@ -635,6 +635,12 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
         toast.value = "Gespeichert"
     }
 
+    /** Korrektur: „so viel steht gerade in der Console“ – der Pi zählt ab jetzt (nicht ab Tagesbeginn), Aufladung bleibt. */
+    fun claudeKorrektur(usd: Double) = io {
+        claude.value = api.post("/api/claude/stand", JSONObject().put("usd", usd).put("jetzt", true))
+        toast.value = "Stand korrigiert"
+    }
+
     // ── Gesundheit (Health Connect → Pi) ──
 
     /** verfuegbar, erlaubt (Anzahl Datenarten), hintergrund, letzter Abgleich, Stand auf dem Pi */

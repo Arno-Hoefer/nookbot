@@ -811,7 +811,8 @@ private fun ClaudeBereich(vm: NookViewModel) {
     var bearbeiten by remember { mutableStateOf(false) }
 
     if (o.has("rest_usd")) Text("ca. ${"%.2f".format(o.optDouble("rest_usd"))} $ übrig", color = A.green, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-    if (o.has("rest_usd")) Text("Start ${"%.2f".format(st?.optDouble("usd") ?: 0.0)} $ am ${datumText(st?.optString("datum") ?: "")}" +
+    if (o.has("rest_usd")) Text((if (st?.has("um") == true) "Korrigiert" else "Start") + " ${"%.2f".format(st?.optDouble("usd") ?: 0.0)} $ am ${datumText(st?.optString("datum") ?: "")}" +
+        (st?.optString("um")?.takeIf { it.isNotBlank() }?.let { " um $it" } ?: "") +
         (if (o.optDouble("aufgeladen_usd", 0.0) > 0) " + ${"%.2f".format(o.optDouble("aufgeladen_usd"))} $ aufgeladen" else "") +
         " − ${"%.2f".format(o.optDouble("seit_stand_usd"))} $ verbraucht", color = P.fg2, fontSize = 13.sp)
     if (admin) Text("Diesen Monat laut Anthropic: ${"%.2f".format(o.optDouble("monat_usd", 0.0))} $", color = P.fg2, fontSize = 13.sp)
@@ -821,6 +822,14 @@ private fun ClaudeBereich(vm: NookViewModel) {
         (o.optString("naechste_aufladung").takeIf { it.isNotBlank() }?.let { " · nächste am ${datumText(it)}" } ?: ""), color = P.fg2, fontSize = 13.sp)
 
     if (!bearbeiten) {
+        if (st != null) {
+            var korrektur by remember(o) { mutableStateOf("") }
+            Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Field("Stand laut Console jetzt ($)", korrektur, number = true, modifier = Modifier.weight(1f).padding(end = 8.dp)) { korrektur = it.replace(',', '.') }
+                SideButton("Korrigieren") { korrektur.toDoubleOrNull()?.let { vm.claudeKorrektur(it); korrektur = "" } }
+            }
+            Hint("Trag ab und zu ein, was die Console unter Billing zeigt – ab dem Moment zählt der Pi weiter. Aufladungen bleiben.")
+        }
         TextButton({ bearbeiten = true }) { Text(if (st == null) "Guthaben und Aufladung eintragen" else "Guthaben/Aufladung ändern", color = A.accent) }
         Hint(if (admin) "Ausgaben laut Anthropic (Admin-Schlüssel)." else "Gezählt wird, was die Bots über den Pi an Claude schicken (Listenpreise). " +
             "Nutzt du denselben Schlüssel woanders, fehlt das hier – dann ab und zu den Startbetrag neu eintragen.")

@@ -1062,11 +1062,13 @@ async function seiteEinstellungen() {
   $('#eL').innerHTML = `
     <div class="box"><h3>Ollama</h3>${inc ? `${usd(rest)} von ${usd(inc.allowance_usd)} übrig · neu ab ${esc((inc.period?.until || '').slice(0, 10))}` : '<span class="mut">nicht abrufbar</span>'}</div>
     <div class="box"><h3>Claude (Anthropic)</h3>${!c?.eingerichtet ? '<p class="mut">Nicht eingerichtet (auf dem Pi: 7-claude.sh).</p>' : `
-      ${c.rest_usd != null ? `<p style="font-size:18px;color:var(--green);margin:0">ca. ${usd(c.rest_usd)} übrig</p><p class="mut">Start ${usd(c.stand?.usd)} am ${esc(c.stand?.datum)}${c.aufgeladen_usd ? ' + ' + usd(c.aufgeladen_usd) + ' aufgeladen' : ''} − ${usd(c.seit_stand_usd)} verbraucht</p>` : ''}
+      ${c.rest_usd != null ? `<p style="font-size:18px;color:var(--green);margin:0">ca. ${usd(c.rest_usd)} übrig</p><p class="mut">${c.stand?.um ? 'Korrigiert' : 'Start'} ${usd(c.stand?.usd)} am ${esc(c.stand?.datum)}${c.stand?.um ? ' um ' + esc(c.stand.um) : ''}${c.aufgeladen_usd ? ' + ' + usd(c.aufgeladen_usd) + ' aufgeladen' : ''} − ${usd(c.seit_stand_usd)} verbraucht</p>` : ''}
       <p class="mut">NookBot-Verbrauch: heute ${usd(c.eigen_heute_usd)} · diesen Monat ${usd(c.eigen_monat_usd)}${c.kosten ? ' · laut Anthropic ' + usd(c.monat_usd) : ''}${c.naechste_aufladung ? ' · nächste Aufladung ' + esc(c.naechste_aufladung) : ''}</p>
       <div class="reihe">${feld('Startbetrag ($)', `<input id="cS" type="number" step="0.01" value="${c.stand?.usd ?? ''}">`)}${feld('am', `<input id="cD" type="date" value="${esc(c.stand?.datum || ortszeit(Date.now()).slice(0, 10))}">`)}
         ${feld('Aufladung ($/Monat)', `<input id="cA" type="number" step="0.01" value="${c.aufladung?.usd ?? ''}">`)}${feld('am Tag', `<input id="cT" type="number" min="1" max="31" value="${c.aufladung?.tag ?? ''}">`)}</div>
-      <button class="klein" id="cOk">Speichern</button>`}</div>
+      <button class="klein" id="cOk">Speichern</button>
+      ${c.stand ? `<div class="zeilen" style="margin-top:10px"><input id="cK" type="number" step="0.01" placeholder="Stand laut Console jetzt ($)" style="flex:1"><button class="klein" id="cKok">Korrigieren</button></div>
+      <p class="mut">Ab dem Moment der Korrektur zählt der Pi weiter (nicht ab Tagesbeginn). Aufladungen bleiben.</p>` : ''}`}</div>
     <div class="box"><h3>Aussprache</h3><p class="mut">Wie Namen vorgelesen werden – gilt für alle Stimmen.</p>
       ${aus.map(([w, l]) => `<div class="teil"><span style="flex:1">${esc(w)}</span><span style="flex:1" class="mut">→ ${esc(l)}</span><button class="klein text" data-aus-probe="${esc(l)}">▶</button><button class="klein text" data-aus-weg="${esc(w)}">✕</button></div>`).join('')}
       <div class="zeilen" style="margin-top:8px"><input id="aW" placeholder="Wort" style="flex:1"><input id="aL" placeholder="so sprechen" style="flex:1"><button class="klein" id="aOk">Hinzufügen</button></div></div>
@@ -1076,6 +1078,10 @@ async function seiteEinstellungen() {
     <div class="box"><h3>Im Browser</h3>${schalter('eVorlesen', 'Antworten vorlesen (Stimme des Bots)', vorlesenAn())}${schalter('eMelden', 'Benachrichtigen, wenn ein Bot fertig ist (solange dieser Tab offen ist)', melden)}</div>
     ${ge ? `<div class="box"><h3>Gesundheit</h3><p class="mut">${ge.tage ? `${ge.tage} Tage auf dem Pi (${esc(ge.von)} – ${esc(ge.bis)}) · Quellen: ${esc(Object.keys(ge.quellen || {}).map((q) => q.includes('fitbit') ? 'Fitbit' : q.includes('renpho') ? 'Renpho' : q.includes('egym') ? 'EGYM' : q.includes('healthconnect') ? 'Handy' : q).join(', '))}` : 'Noch keine Daten.'} Freigeben und abgleichen geht in der App.</p></div>` : ''}
     <div class="box"><h3>Sitzung</h3><button class="klein" onclick="abmelden()">Abmelden</button></div>`;
+  if ($('#cKok')) $('#cKok').onclick = async () => {
+    if ($('#cK').value === '') return;
+    try { await api('POST', '/api/claude/stand', {usd: +$('#cK').value, jetzt: true}); toast('Stand korrigiert'); seiteEinstellungen(); statusLaden(); } catch (e) { toast(e.message); }
+  };
   if ($('#cOk')) $('#cOk').onclick = async () => {
     try { await api('POST', '/api/claude/stand', {usd: $('#cS').value === '' ? null : +$('#cS').value, datum: $('#cD').value, aufladung_usd: +$('#cA').value || 0, aufladung_tag: +$('#cT').value || 0}); toast('Gespeichert'); seiteEinstellungen(); } catch (e) { toast(e.message); }
   };

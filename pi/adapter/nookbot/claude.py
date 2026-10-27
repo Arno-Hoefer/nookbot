@@ -153,7 +153,8 @@ def claude_kosten() -> dict:
     if auf.get("tag"):
         out["naechste_aufladung"] = aufladungen(heute, heute + dt.timedelta(days=62), int(auf["tag"]))[0].isoformat()
     if st.get("usd") is not None and not c.get("admin_key"):
-        seit = round(claude_verbrauch(str(st.get("datum"))[:10]), 4)
+        # abzug: was am Tag der Korrektur vorher schon verbraucht war – steckt im eingetragenen Stand bereits drin
+        seit = round(max(0.0, claude_verbrauch(str(st.get("datum"))[:10]) - float(st.get("abzug") or 0)), 4)
         out["seit_stand_usd"] = seit
         dazu = claude_aufgeladen(st, auf, heute)
         out["aufgeladen_usd"] = dazu
@@ -227,12 +228,17 @@ def claude_aufgeladen(stand: dict, auf: dict, heute) -> float:
     return round(len(aufladungen(von, heute, int(auf["tag"]))) * float(auf["usd"]), 2)
 
 
-def claude_stand_setzen(usd, datum: str | None = None, auf_usd=None, auf_tag=None):
-    """Startbetrag (Guthaben an einem Tag) und optional monatliche Aufladung (Betrag an Tag X)."""
+def claude_stand_setzen(usd, datum: str | None = None, auf_usd=None, auf_tag=None, jetzt: bool = False):
+    """Startbetrag (Guthaben an einem Tag) und optional monatliche Aufladung (Betrag an Tag X).
+    jetzt: Korrektur „so steht es gerade in der Console“ – zählt ab diesem Moment, nicht ab Tagesbeginn."""
     import datetime as dt
     c = claude_conf()
     if usd in (None, ""):
         c.pop("stand", None)
+    elif jetzt:
+        heute = dt.date.today().isoformat()
+        c["stand"] = {"usd": round(float(usd), 2), "datum": heute, "abzug": round(claude_verbrauch(heute), 6),
+                      "um": time.strftime("%H:%M")}
     else:
         d = (datum or dt.date.today().isoformat())[:10]
         dt.date.fromisoformat(d)

@@ -86,7 +86,7 @@ def vorschlag_neu(bid: str, text: str, aktion: str, grund: str = "", sitzung: st
     automatik.aktivitaet(bid, "vorschlag", "Vorschlag gemacht", text, sitzung=sitzung)
     b = bots.bot(bid)
     if quelle == "durchsicht":  # im Gespräch sieht man die Karte ohnehin
-        dienste.push(f"{b['name'] if b else bid}: Vorschlag", text, sitzung, prio="low", tags="bulb")
+        dienste.push(b["name"] if b else bid, "💡 Vorschlag: " + text, sitzung, prio="low", tags="bulb", bot=b)
     ereignisse.EV.emit({"t": "vorschlaege"})
     return v
 

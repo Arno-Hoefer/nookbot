@@ -3,8 +3,16 @@ package de.hoefer.nookbot
 import android.app.AlarmManager
 import android.app.Notification
 import android.app.NotificationChannel
+import android.app.NotificationChannelGroup
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.app.Person
+import android.content.pm.ShortcutInfo
+import android.content.pm.ShortcutManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.drawable.Icon
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -82,6 +90,8 @@ class Benachrichtigung : BroadcastReceiver() {
                 Intent(Intent.ACTION_VIEW, Uri.parse("nookbot://chat/${sid ?: ""}"), ctx, MainActivity::class.java),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             val text = ev.optString("text").replace("**", "")
+            val bot = ev.optString("bot").takeIf { it.isNotBlank() && it != "null" }
+            if (bot != null) return botMeldung(ctx, bot, ev.optString("name").ifBlank { ev.optString("title") }, ev.optString("farbe"), sid, text, high, open)
             val n = Notification.Builder(ctx, if (high) CH_FREIGABE else CH_ANTWORT)
                 .setSmallIcon(R.drawable.ic_notify)
                 .setContentTitle(ev.optString("title"))
@@ -92,6 +102,47 @@ class Benachrichtigung : BroadcastReceiver() {
                 .setColor(0xFFFF3B4E.toInt())
                 .build()
             ctx.getSystemService(NotificationManager::class.java).notify((sid ?: ev.optString("title")).hashCode(), n)
+        }
+
+        /**
+         * Je Bot eine eigene Unterhaltung: eigener Kanal (Ton/Stumm je Bot in den Android-Einstellungen), Verknüpfung mit
+         * Name und Farbe – Android zeigt das unter „Unterhaltungen“ getrennt statt gebündelt als „NookBot (2)“.
+         */
+        private fun botMeldung(ctx: Context, bot: String, name: String, farbe: String, sid: String?, text: String, high: Boolean, open: PendingIntent) {
+            val nm = ctx.getSystemService(NotificationManager::class.java)
+            nm.createNotificationChannelGroup(NotificationChannelGroup("bots", "Bots"))
+            val ch = "bot-$bot"
+            nm.createNotificationChannel(NotificationChannel(ch, name, NotificationManager.IMPORTANCE_DEFAULT).apply {
+                group = "bots"; description = "Antworten, Routinen und Vorschläge von $name"
+            })
+            val icon = Icon.createWithBitmap(avatar(name, de.hoefer.nookbot.data.parseColor(farbe).toInt()))
+            val person = Person.Builder().setName(name).setIcon(icon).setKey(bot).setBot(true).build()
+            val sc = ShortcutInfo.Builder(ctx, ch).setShortLabel(name).setLongLived(true).setIcon(icon).setPerson(person)
+                .setIntent(Intent(Intent.ACTION_VIEW, Uri.parse("nookbot://chat/${sid ?: ""}"), ctx, MainActivity::class.java))
+                .build()
+            runCatching { ctx.getSystemService(ShortcutManager::class.java).addDynamicShortcuts(listOf(sc)) }
+            val ich = Person.Builder().setName("Ich").build()
+            val n = Notification.Builder(ctx, if (high) CH_FREIGABE else ch)
+                .setSmallIcon(R.drawable.ic_notify)
+                .setShortcutId(ch)
+                .setStyle(Notification.MessagingStyle(ich).addMessage(text, System.currentTimeMillis(), person))
+                .setContentIntent(open)
+                .setAutoCancel(true)
+                .setColor(de.hoefer.nookbot.data.parseColor(farbe).toInt())
+                .build()
+            nm.notify(ch.hashCode(), n)
+        }
+
+        /** Runder Kreis in der Farbe des Bots mit seinem Anfangsbuchstaben. */
+        private fun avatar(name: String, farbe: Int): Bitmap {
+            val g = 128
+            val b = Bitmap.createBitmap(g, g, Bitmap.Config.ARGB_8888)
+            val c = Canvas(b)
+            c.drawCircle(g / 2f, g / 2f, g / 2f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = farbe })
+            val p = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.WHITE; textSize = g * 0.5f; textAlign = Paint.Align.CENTER
+                typeface = android.graphics.Typeface.DEFAULT_BOLD }
+            c.drawText(name.take(1).uppercase(), g / 2f, g / 2f - (p.descent() + p.ascent()) / 2, p)
+            return b
         }
 
         private fun channels(ctx: Context) {

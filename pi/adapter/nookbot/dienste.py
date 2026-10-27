@@ -24,12 +24,16 @@ def modelle() -> list[str]:
 
 # ── Benachrichtigungen (ntfy) ──────────────────────────────────────
 
-def push(title: str, msg: str, sid: str | None = None, prio: str = "default", tags: str = "robot", ntfy: bool = True):
-    """Benachrichtigung: in den Meldungs-Speicher (die App holt ihn alle paar Minuten ab) und – falls eingerichtet – über ntfy."""
+def push(title: str, msg: str, sid: str | None = None, prio: str = "default", tags: str = "robot", ntfy: bool = True, bot: dict | None = None):
+    """Benachrichtigung: in den Meldungs-Speicher (die App holt ihn alle paar Minuten ab) und – falls eingerichtet – über ntfy.
+    bot: von wem – die App zeigt dann je Bot eine eigene Unterhaltung (Name, Farbe) statt einer gemeinsamen NookBot-Meldung."""
     with basis._lock:
         d = basis.read_json(basis.path("notify.json"), {"last": 0, "items": []})
         d["last"] += 1
-        d["items"] = (d["items"] + [{"id": d["last"], "ts": time.time(), "title": title, "text": msg[:500], "s": sid, "prio": prio}])[-100:]
+        it = {"id": d["last"], "ts": time.time(), "title": title, "text": msg[:500], "s": sid, "prio": prio}
+        if bot:
+            it.update(bot=bot["id"], name=bot["name"], farbe=bot.get("farbe") or "")
+        d["items"] = (d["items"] + [it])[-100:]
         basis.write_json(basis.path("notify.json"), d)
     n = basis.conf().get("ntfy") or {}
     if not n.get("url") or not ntfy:
