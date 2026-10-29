@@ -183,6 +183,7 @@ REGEL_WERKZEUGE = {
     "termin_anlegen": "Termin eintragen", "termine_anlegen": "Mehrere Termine eintragen", "termin_gaeste": "Gäste einladen",
     "entwurf_anlegen": "Mail-Entwurf anlegen", "sheets_anhaengen": "Zeilen an Tabelle anhängen", "sheets_schreiben": "Tabelle ändern",
     "sheet_anlegen": "Neue Tabelle", "doc_anlegen": "Neues Dokument", "doc_anhaengen": "Dokument ergänzen",
+    "drive_ordner_anlegen": "Neuer Drive-Ordner", "drive_hochladen": "Datei nach Drive hochladen", "drive_ordner_paket": "Drive-Ordner mit Inhalt anlegen",
 }
 REGEL_NIE_FREI = {"termin_gaeste"}  # betrifft andere Menschen – immer fragen
 REGEL_FREI_MAX = 10

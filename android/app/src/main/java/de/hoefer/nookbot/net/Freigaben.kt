@@ -21,6 +21,9 @@ data class Freigabe(
         "sheet_anlegen" -> "Neue Tabelle"
         "doc_anlegen" -> "Neues Dokument"
         "doc_anhaengen" -> "Dokument ergänzen"
+        "drive_ordner_anlegen" -> "Neuer Drive-Ordner"
+        "drive_hochladen" -> "Datei nach Drive hochladen"
+        "drive_ordner_paket" -> "Drive-Ordner mit Inhalt anlegen"
         else -> tool
     }
     val statusText: String get() = when (status) {
@@ -58,7 +61,7 @@ object FreigabeApi {
         try {
             c.requestMethod = method
             c.connectTimeout = 10_000
-            c.readTimeout = 90_000 // Ausführen kann dauern (Google)
+            c.readTimeout = 300_000 // Ausführen kann dauern (Google, Ordner-Pakete mit Uploads)
             c.setRequestProperty("Authorization", "Bearer $key")
             c.setRequestProperty("Accept", "application/json")
             if (body != null) {

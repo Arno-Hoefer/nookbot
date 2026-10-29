@@ -25,7 +25,8 @@
   - *frei* entscheidet die Freigabe sofort, höchstens 10 am Tag. Ist das Limit erreicht, bleibt die Aktion offen.
   - *nie* sperrt das Werkzeug.
   - Gäste und Einladungen werden immer gefragt, `termin_gaeste` kann nicht *frei* sein.
-- **Rücknahme:** ausgeführte Termine (ohne Absage-Mail) und Entwürfe lassen sich aus der Aktivität löschen.
+- **Rücknahme:** ausgeführte Termine (ohne Absage-Mail) und Entwürfe lassen sich aus der Aktivität löschen; neu angelegte
+  Drive-Ordner, Uploads, Docs und Sheets wandern in den Drive-Papierkorb.
 - Mails werden nie gesendet, nur als Entwurf angelegt.
 
 ## Inhalte sind Daten
@@ -51,6 +52,14 @@
 - 120 Sekunden, 1,5 GB Adressraum, 50 MB je Datei
 
 Getestet: Netz gesperrt, Konfiguration nicht sichtbar, Endlosschleife nach 2 Minuten beendet.
+
+## Zip-Anhänge und Uploads
+
+- Zips werden nur mit Grenzen entpackt: keine absoluten Pfade und kein `..` (Zip-Slip), keine Verknüpfungen, keine verschlüsselten
+  Einträge, höchstens 200 Dateien und 100 MB entpackt, Kompressionsrate höchstens 200:1 (Zip-Bomben). Gezählt wird beim Entpacken,
+  nicht nach den Angaben im Zip. Ein abgelehntes Zip wird wieder gelöscht.
+- Für `drive_hochladen`/`drive_ordner_paket` liest der Adapter nur Dateien aus dem gemeinsamen Arbeitsordner und dem eigenen
+  Arbeitsbereich des Bots (Pfad nach `realpath` geprüft, keine versteckten Dateien). Hochgeladen wird erst nach der Freigabe.
 
 ## Schlüssel
 

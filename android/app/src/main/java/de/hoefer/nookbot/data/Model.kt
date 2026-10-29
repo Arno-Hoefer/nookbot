@@ -277,6 +277,8 @@ private val TOOL_TEXT = linkedMapOf(
     "auftraege_verteilen" to "Aufträge verteilt", "drive_suche" to "Drive durchsucht", "drive_lesen" to "Datei aus Drive gelesen",
     "sheets_lesen" to "Tabelle gelesen", "sheets_schreiben" to "Tabelle ändern – zur Freigabe", "sheets_anhaengen" to "Zeilen anhängen – zur Freigabe",
     "sheet_anlegen" to "Neue Tabelle – zur Freigabe", "doc_anlegen" to "Neues Dokument – zur Freigabe", "doc_anhaengen" to "Dokument ergänzen – zur Freigabe",
+    "drive_ordner_anlegen" to "Drive-Ordner – zur Freigabe", "drive_hochladen" to "Upload nach Drive – zur Freigabe",
+    "drive_ordner_paket" to "Drive-Ordner mit Inhalt – zur Freigabe", "zip_entpacken" to "Zip entpackt",
     "statistik" to "Besucherstatistik gelesen",
     "list_dir" to "Ordner angesehen", "spawn" to "Teilaufgabe gestartet", "subagent" to "Teilaufgabe gestartet", "cron" to "Zeitplan bearbeitet",
 )

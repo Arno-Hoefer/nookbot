@@ -88,9 +88,15 @@ Antworten sind JSON, Fehler kommen als `{"error": "…"}`.
 | `seite_lesen`, `seite_ansehen` | alle | öffentliche Seiten als Text oder Bild |
 | `dokument_ansehen` | alle | PDF-Seiten und Bilder mit einem Bildmodell |
 | `python_ausfuehren`, `arbeitsordner`, `datei_ablegen` | alle | Pi-Rechner |
+| `zip_entpacken` | alle | Zip aus dem Arbeitsordner entpacken (Chat-Anhänge sind schon entpackt) |
 | `pakete`, `paket_hinzufuegen` | mit Recht „Pakete“ | Pakete aus Home |
 | `gesundheit` | mit Recht „Gesundheit“ | Tageswerte aus Health Connect |
 
 home-mcp liefert unter anderem `termine`, `termin_anlegen`, `termine_anlegen` (eine Sammelfreigabe), `termin_gaeste`, `mails_suchen`,
 `mail_lesen`, `entwurf_anlegen`, `drive_suche`, `drive_lesen`, `sheets_*`, `doc_*`, `slack_*`, `gitlab_*`, `db_abfrage`, `db_schema`,
-`statistik`, `freigabe_status`. Welche ein Bot sieht, hängt von seinen Zugriffen und Regeln ab.
+`statistik`, `freigabe_status`, ab home-mcp 0.10.0 auch `drive_ordner_anlegen`, `drive_hochladen` und `drive_ordner_paket`
+(ein Ordner mit allem darin, eine Sammelfreigabe). Welche ein Bot sieht, hängt von seinen Zugriffen und Regeln ab.
+
+Bei `drive_hochladen` und `drive_ordner_paket` ergänzt der Adapter die Beschreibung um `pfad`: Der Bot nennt eine Datei oder einen
+Ordner im Arbeitsordner (`/arbeit/…`) oder in seinem Arbeitsbereich (`anhaenge/…`), der Adapter liest sie und reicht sie Base64-kodiert
+an home-mcp weiter. Versteckte Pfade und alles außerhalb dieser beiden Orte lehnt er ab. Grenzen: 20 MB je Datei, 25 MB je Paket.

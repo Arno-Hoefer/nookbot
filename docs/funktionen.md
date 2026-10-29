@@ -16,6 +16,10 @@ Alle Bilder zeigen Demo-Daten. App links bzw. oben, Web-Oberfläche darunter.
 - **Anhänge** über „+“: Kamera, Galerie, jede Datei. Bilder werden auf dem Handy verkleinert und nach Text durchsucht.
   PDFs und Office-Dateien wandelt der Pi in Text um. Was als Text fehlt (Symbole in Dienstplänen, Scans), sieht sich der Bot
   mit `dokument_ansehen` als Bild an.
+- **Zip-Anhänge** (0.19.0) entpackt der Pi sofort in die Anhänge des Bots: Übersicht mit dem Text jeder Datei (PDF, Word, Excel,
+  PowerPoint, CSV, Text …) und die Originale. Geschützt gegen Zip-Slip, Verknüpfungen und Zip-Bomben; höchstens 200 Dateien und
+  100 MB entpackt, versteckte Dateien und `__MACOSX` fallen weg. Daraus macht der Bot auf Wunsch einen **Google-Drive-Ordner**:
+  erst Gliederung vorschlagen, nach deinem OK alles mit `drive_ordner_paket` als *eine* Freigabe anlegen.
 
 ![Web: Chat mit Diagramm-Karte, Auslöser-Zeile, Tabelle und Freigabe](screenshots/web/chat.png)
 
@@ -27,7 +31,8 @@ Alle Bilder zeigen Demo-Daten. App links bzw. oben, Web-Oberfläche darunter.
 </p>
 
 - Alles, was etwas verändert (Termine, Einladungen, Mail-Entwürfe, Tabellen, Dokumente), legt home-mcp erst als **Freigabe** an.
-- **Sammelfreigabe:** Mehrere Termine, etwa ein ganzer Dienstplan, kommen als *eine* Freigabe.
+- **Sammelfreigabe:** Mehrere Termine, etwa ein ganzer Dienstplan, kommen als *eine* Freigabe. Genauso ein ganzer Drive-Ordner
+  mit Docs, Sheets und hochgeladenen Dateien (`drive_ordner_paket`) – die Karte zeigt Ordnername und Dateiliste.
 - **Regeln je Bot und Aktion:** *frei* (sofort, höchstens 10 am Tag), *fragen* (Standard) oder *nie*. Sobald Gäste oder Einladungen
   dabei sind, wird immer gefragt.
 - **Rückgängig:** Ausgeführte Termine und Entwürfe lassen sich in der Aktivität wieder löschen. Termine werden dabei ohne Absage gelöscht.
@@ -100,7 +105,7 @@ Alle Bilder zeigen Demo-Daten. App links bzw. oben, Web-Oberfläche darunter.
 
 <p><img src="screenshots/app/arbeit.png" width="230" alt="Arbeitsordner"></p>
 
-- `python_ausfuehren`: Python im Sandkasten, ohne Netz. Für Auswertungen (pandas), Diagramme (matplotlib) und Excel.
+- `python_ausfuehren`: Python im Sandkasten, ohne Netz. Für Auswertungen (pandas), Diagramme (matplotlib), Excel, PDF (pypdf) und Word (python-docx).
   Das Modell rechnet nicht im Kopf.
 - Ergebnisse landen im **gemeinsamen Arbeitsordner** und als Karte im Chat (Bilder mit Vorschau). Dateien, die du dort ablegst,
   sehen alle Bots.

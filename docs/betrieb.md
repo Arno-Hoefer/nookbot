@@ -16,7 +16,7 @@ Die Skripte unter `pi/einrichtung/` der Reihe nach ausführen. Schlüssel werden
 | `7-claude.sh` | optional: Claude als zweiter Anbieter |
 | `8-stimmen.sh` | optional: Piper-Stimmen |
 | `9-whisper.sh` | optional: Spracherkennung auf dem Pi (Diktat im Web) |
-| `10-rechner.sh` | optional: Python-Sandkasten (bubblewrap, pandas, matplotlib, openpyxl) |
+| `10-rechner.sh` | optional: Python-Sandkasten (bubblewrap, pandas, matplotlib, openpyxl, pypdf, python-docx) |
 | `11-phonon.sh` | optional: Phonon-Stimmen auf dem Pi (Programm mit Prüfsumme, deutsches Modell, 13 Stimmen; ~150 MB) |
 | `nutzer-setzen.py <Name>` | wie die Bots dich nennen |
 

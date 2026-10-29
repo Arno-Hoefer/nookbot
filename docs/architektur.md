@@ -33,7 +33,7 @@
 | `claude` | Claude-Proxy (OpenAI-Format → Anthropic), Verbrauch, Preise, Guthaben mit Aufladung |
 | `gesundheit` | Health Connect: Tageswerte speichern, verdichten, abfragen |
 | `stimmen` | Phonon (`ph:`), Piper (`pi:`), Butler-Klang, `sprechbar()`, Aussprache, Diktat (whisper.cpp) |
-| `wissen` | Wissen je Bot und global, Anhänge, Dokumente in Text, `dokument_ansehen` (Claude oder Ollama-Bildmodelle) |
+| `wissen` | Wissen je Bot und global, Anhänge (Zips sicher entpackt), Dokumente in Text, `dokument_ansehen` (Claude oder Ollama-Bildmodelle) |
 | `home` | Rechte je Bot, Katalog von home-mcp, `home_aufruf` mit Grenzen, Regeln und „frei“ |
 | `bots` | Bots anlegen und ändern, AGENT.md und SOUL.md, PicoClaw-Konfiguration |
 | `sitzungen` | Verlauf (`SESS`), Verbindungen zu den Bots (`LINKS`), Ende einer Antwort erkennen, Wachhund |

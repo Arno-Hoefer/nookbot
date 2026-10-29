@@ -75,7 +75,7 @@ def freigaben_proxy(method: str, p: str, body: dict | None = None) -> dict:
     req = urllib.request.Request(basis.HOME_MCP.rsplit("/mcp", 1)[0] + p, method=method, data=json.dumps(body).encode() if body is not None else None,
                                  headers={"Content-Type": "application/json", "Authorization": "Bearer " + key})
     try:
-        with urllib.request.urlopen(req, timeout=90) as r:
+        with urllib.request.urlopen(req, timeout=300) as r:  # Ordner-Pakete nach Drive brauchen beim Ausführen länger
             return json.loads(r.read())
     except urllib.error.HTTPError as e:
         try:
@@ -206,7 +206,7 @@ def rechte_text(r: dict) -> str:
 ART = {**{t: "mail" for t in ("mails_suchen", "mail_lesen", "thread_lesen", "entwurf_anlegen")},
        **{t: "kalender" for t in ("kalender_liste", "termine", "termin_anlegen", "termine_anlegen", "termin_gaeste")},
        **{t: "drive" for t in ("drive_suche", "drive_lesen", "sheets_lesen", "sheets_schreiben", "sheets_anhaengen", "sheet_anlegen",
-                               "doc_anlegen", "doc_anhaengen")}}
+                               "doc_anlegen", "doc_anhaengen", "drive_ordner_anlegen", "drive_hochladen", "drive_ordner_paket")}}
 MEHRERE_KONTEN = {"mails_suchen", "kalender_liste", "termine", "drive_suche"}  # ohne konto: alle Konten
 
 
@@ -247,7 +247,14 @@ def home_aufruf(b: dict, tool: str, args: dict) -> tuple[str, bool]:
     """Ein home-mcp-Werkzeug für diesen Bot ausführen – mit seinen Grenzen und Regeln. Gibt (Text, Fehler) zurück."""
     if tool in rechner.REGEL_WERKZEUGE and rechner.regel(b, tool) == "nie":
         return f"{rechner.REGEL_WERKZEUGE[tool]} ist für dich gesperrt (App → Bot → Regeln).", True
+    roh = args
+    if tool in UPLOAD_WERKZEUGE and home_erlaubt(rechte(b), tool):
+        try:
+            args = uploads_aufloesen(b, tool, args or {})
+        except ValueError as e:
+            return str(e), True
     t, err = _home_aufruf_grenzen(b, tool, args)
+    args = roh
     if not err and tool in rechner.REGEL_WERKZEUGE:
         frei = rechner.frei_ausfuehren(b, tool, args or {}, t)
         if frei:
@@ -336,6 +343,111 @@ def _home_roh(tool: str, args: dict) -> tuple[str, bool]:
     return "\n".join(c.get("text", "") for c in res.get("content", [])), bool(res.get("isError"))
 
 
+# ── Uploads nach Drive: Dateien aus dem Arbeitsordner statt Base64 ──
+# Der Bot nennt nur einen Pfad (/arbeit/…, anhaenge/… oder /anhaenge/…); der Adapter liest die Datei und gibt sie
+# Base64-kodiert an home-mcp weiter. So muss das Modell keine riesigen Base64-Texte erzeugen.
+
+UPLOAD_WERKZEUGE = {"drive_hochladen", "drive_ordner_paket"}
+UPLOAD_MAX = 25_000_000       # wie home-mcp: Uploads je Freigabe
+UPLOAD_DATEI_MAX = 20_000_000
+UPLOAD_ORDNER_MAX = 200       # Dateien aus einem Ordner-pfad, bevor es abbricht
+
+
+def upload_pfad(b: dict, pfad: str) -> str:
+    """Pfad aus Sicht des Bots → echter Pfad. Nur gemeinsamer Arbeitsordner und eigener Arbeitsbereich, nichts Verstecktes."""
+    roh = str(pfad or "").strip()
+    if not roh:
+        raise ValueError("pfad ist leer.")
+    ws = os.path.realpath(bots.workspace(b))
+    arb = os.path.realpath(rechner.arbeit_dir())
+    if roh == "/arbeit" or roh.startswith("/arbeit/"):
+        wurzel, rest = arb, roh[len("/arbeit"):]
+    elif roh.startswith(ws + os.sep):
+        wurzel, rest = ws, roh[len(ws):]
+    else:
+        wurzel, rest = ws, roh  # „anhaenge/…“ und „/anhaenge/…“ (so heißt der Ordner im Python-Sandkasten)
+    teile = [t for t in rest.split("/") if t not in ("", ".")]
+    p = os.path.realpath(os.path.join(wurzel, *teile))
+    if any(t.startswith(".") for t in teile) or not (p == wurzel or p.startswith(wurzel + os.sep)) or not os.path.exists(p):
+        raise ValueError(f"„{roh}“ gibt es nicht. Erlaubt: gemeinsamer Arbeitsordner (/arbeit/…) und dein Arbeitsbereich (z. B. anhaenge/…).")
+    return p
+
+
+def _upload_eintrag(p: str, x: dict) -> dict:
+    import base64
+    if os.path.getsize(p) > UPLOAD_DATEI_MAX:
+        raise ValueError(f"„{os.path.basename(p)}“ ist zu groß (über 20 MB).")
+    with open(p, "rb") as f:
+        data = f.read()
+    y = {k: v for k, v in x.items() if k not in ("pfad", "inhalt")}
+    y.update(name=str(x.get("name") or os.path.basename(p)), base64=base64.b64encode(data).decode())
+    return y
+
+
+def uploads_aufloesen(b: dict, tool: str, args: dict) -> dict:
+    """pfad → base64. Bei drive_ordner_paket darf pfad auch ein Ordner sein: alle Dateien darin, Unterordner bleiben erhalten."""
+    args = dict(args)
+    if tool == "drive_hochladen":
+        if args.get("pfad"):
+            p = upload_pfad(b, args["pfad"])
+            if not os.path.isfile(p):
+                raise ValueError(f"„{args['pfad']}“ ist keine Datei.")
+            args = _upload_eintrag(p, args)
+        return args
+    dateien = args.get("dateien")
+    if not isinstance(dateien, list):
+        return args
+    neu = []
+    for x in dateien:
+        if not isinstance(x, dict) or not x.get("pfad"):
+            neu.append(x)
+            continue
+        p = upload_pfad(b, x["pfad"])
+        if os.path.isfile(p):
+            neu.append(_upload_eintrag(p, dict(x, art="datei")))
+            continue
+        oben = str(x.get("unterordner") or "").strip("/")
+        gefunden = 0
+        for wurzel, ordner, namen in os.walk(p):
+            ordner[:] = sorted(o for o in ordner if not o.startswith(".") and not o.endswith(".texte"))
+            for n in sorted(namen):
+                if n.startswith("."):
+                    continue
+                gefunden += 1
+                if gefunden > UPLOAD_ORDNER_MAX:
+                    raise ValueError(f"Mehr als {UPLOAD_ORDNER_MAX} Dateien in „{x['pfad']}“ – auf mehrere Pakete aufteilen.")
+                rel = os.path.relpath(wurzel, p)
+                uo = "/".join(t for t in [oben] + ([] if rel == "." else rel.split(os.sep)) if t)
+                neu.append(_upload_eintrag(os.path.join(wurzel, n), {"art": "datei", "unterordner": uo, "als_google": x.get("als_google")}))
+    gesamt = sum(len(x.get("base64") or "") * 3 // 4 for x in neu if isinstance(x, dict))
+    if gesamt > UPLOAD_MAX:
+        raise ValueError(f"Zusammen {gesamt / 1_000_000:.1f} MB – höchstens 25 MB je Paket. Auf mehrere drive_ordner_paket aufteilen "
+                         "(z. B. erst den Ordner mit Docs/Sheets, dann weitere Pakete mit eltern = id dieses Ordners).")
+    args["dateien"] = neu
+    return args
+
+
+def upload_schema(t: dict) -> dict:
+    """Werkzeugbeschreibung von home-mcp um pfad ergänzen (das kann nur der Adapter, nicht home-mcp selbst)."""
+    import copy
+    t = copy.deepcopy(t)
+    hinweis = ("pfad: Datei im gemeinsamen Arbeitsordner (/arbeit/…) oder in deinem Arbeitsbereich (z. B. anhaenge/…) – "
+               "der Adapter liest sie und lädt sie hoch. Nimm pfad statt base64.")
+    props = t.get("inputSchema", {}).get("properties", {})
+    if t["name"] == "drive_hochladen":
+        props["pfad"] = {"type": "string", "description": hinweis}
+        t["description"] += " Im NookBot: " + hinweis + " name leer = Dateiname aus pfad."
+        t["inputSchema"]["required"] = []
+    elif t["name"] == "drive_ordner_paket":
+        it = props.get("dateien", {}).get("items", {})
+        it.setdefault("properties", {})["pfad"] = {"type": "string", "description": "art datei: " + hinweis + " Auch ein ORDNER geht – dann alle "
+                                                   "Dateien darin, Unterordner bleiben erhalten (z. B. ein entpacktes Zip)."}
+        it["required"] = ["art"]
+        t["description"] += (" Im NookBot: Dateien mit pfad statt base64 angeben (Datei oder ganzer Ordner, z. B. ein entpacktes Zip); "
+                             "name leer = Dateiname.")
+    return t
+
+
 def homemcp_rpc(msg: dict, b: dict):
     """MCP-Endpunkt /homemcp/<bot>: wie home-mcp, aber nur mit den Werkzeugen und Grenzen dieses Bots."""
     mid, method = msg.get("id"), msg.get("method")
@@ -351,7 +463,8 @@ def homemcp_rpc(msg: dict, b: dict):
     if method == "tools/list":
         r = rechte(b)
         tools = json.loads(mcp_call("", method="tools/list")).get("tools", [])
-        return ok({"tools": [t for t in tools if home_erlaubt(r, t["name"]) and rechner.regel(b, t["name"]) != "nie"]})
+        return ok({"tools": [upload_schema(t) if t["name"] in UPLOAD_WERKZEUGE else t
+                             for t in tools if home_erlaubt(r, t["name"]) and rechner.regel(b, t["name"]) != "nie"]})
     if method == "tools/call":
         p = msg.get("params") or {}
         t, err = home_aufruf(b, str(p.get("name") or ""), p.get("arguments") or {})

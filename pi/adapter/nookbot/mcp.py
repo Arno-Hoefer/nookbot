@@ -127,7 +127,8 @@ MCP_TOOLS = {
                               "anruf": {"type": "boolean", "description": "NUR wenn %NUTZER% ausdrücklich angerufen werden will"}},
                            "required": ["name", "quelle", "auftrag"]}),
     "python_ausfuehren": ("Führt Python-Code auf dem Pi aus – abgeschottet, OHNE Internet, max. 2 Minuten. Für Rechnen, Auswerten (pandas), "
-                          "Diagramme (matplotlib → als PNG speichern), Excel/CSV lesen und schreiben (openpyxl), Dateien umwandeln. Arbeitsverzeichnis ist "
+                          "Diagramme (matplotlib → als PNG speichern), Excel/CSV lesen und schreiben (openpyxl), PDFs lesen/zerlegen (pypdf), Word lesen und "
+                          "schreiben (docx = python-docx), Dateien umwandeln. Arbeitsverzeichnis ist "
                           "der gemeinsame Arbeitsordner (/arbeit, schreibbar); deine Anhänge liegen lesbar unter /anhaenge. Neue Dateien sieht %NUTZER% "
                           "sofort im Chat. Gib Ergebnisse mit print() aus. Rechne nie im Kopf, wenn es hier geht.",
                           {"type": "object", "properties": {"code": {"type": "string", "description": "vollständiges Python-3-Skript"}}, "required": ["code"]}),
@@ -136,6 +137,10 @@ MCP_TOOLS = {
                       "damit %NUTZER% und andere Bots sie bekommen.",
                       {"type": "object", "properties": {"quelle": {"type": "string", "description": "Pfad in deinem Arbeitsbereich"},
                                                         "name": {"type": "string", "description": "Dateiname im Arbeitsordner (leer = wie Quelle)"}},
+                       "required": ["quelle"]}),
+    "zip_entpacken": ("Entpackt ein Zip aus dem gemeinsamen Arbeitsordner (/arbeit/…) oder deinem Arbeitsbereich in deine Anhänge und liefert "
+                      "die Übersicht (Dateien, Text je Datei). Zips, die %NUTZER% im Chat anhängt, sind schon entpackt – dafür nicht nötig.",
+                      {"type": "object", "properties": {"quelle": {"type": "string", "description": "Pfad des Zips, z. B. /arbeit/unterlagen.zip"}},
                        "required": ["quelle"]}),
     "seite_ansehen": ("Macht ein Bild (Screenshot) einer öffentlichen Webseite mit dem Pi-Browser, legt es in den Arbeitsordner und zeigt es %NUTZER%. "
                       "Mit frage wird das Bild auch angesehen und die Frage beantwortet (Layout, Preise in Grafiken, was man sieht). Ohne Anmeldung.",
@@ -326,6 +331,8 @@ def mcp_rpc(msg: dict, caller: dict):
             elif name == "arbeitsordner":
                 text = "\n".join(f"- {x['name']} · {x['groesse'] // 1024 + 1} KB · {time.strftime('%d.%m. %H:%M', time.localtime(x['ts']))}"
                                  + (f" · von {bots.bot(x['bot'])['name']}" if bots.bot(x["bot"]) else "") for x in rechner.arbeit_liste()) or "Der Arbeitsordner ist leer."
+            elif name == "zip_entpacken":
+                text = wissen.zip_aus_datei(caller, str(a.get("quelle") or ""))
             elif name == "datei_ablegen":
                 text = rechner.datei_ablegen(caller, str(a.get("quelle") or ""), str(a.get("name") or ""), caller_session(caller["id"]) or "")
             elif name == "seite_ansehen":
