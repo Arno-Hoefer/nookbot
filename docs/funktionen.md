@@ -45,6 +45,12 @@ Alle Bilder zeigen Demo-Daten. App links bzw. oben, Web-Oberfläche darunter.
 - **Zugriffe je Bot:** Konten für Mail, Kalender und Drive, „nur Hauptkalender“, Slack-Kanäle und Direktnachrichten, GitLab,
   einzelne Datenbanken, Statistik, Pakete, Gesundheit. Gesundheit gehört nie zu „Alles“.
 - Ein Bot kann einen anderen nur beauftragen, wenn der nicht mehr darf als er selbst.
+- **Im Web genauso wie in der App:** „Bots verwalten“ zeigt das Team mit Modell, Zugriffen, Gedächtnis und Automatik; je Bot lassen sich
+  Name, Rolle, Farbe, Figur, Modell, Stimme (mit Probe und Testanruf), Persönlichkeit, Fokus, Zugriffe, Regeln, Gedächtnis und Wissen ändern,
+  neue Bots anlegen (gleich mit Zugriffen und Regeln) und Bots löschen.
+- **Datenbanken:** Die Seite zeigt, welche Datenbanken home-mcp für „nookbot“ freigibt, und je Datenbank, welche Bots sie nutzen dürfen –
+  ein Tipp gibt oder entzieht den Zugriff. Darunter die Bibliothek (Beschreibung, Schema-Notizen, feste Abfragen) mit Import (NookBot-Export,
+  Echo-Vorlage als JSON oder Zip) und Export. Zugangsdaten bleiben in home-mcp.
 
 ![Web: Zugriffe und Regeln](screenshots/web/bot-zugriffe-regeln.png)
 
@@ -68,6 +74,13 @@ Alle Bilder zeigen Demo-Daten. App links bzw. oben, Web-Oberfläche darunter.
   - Tägliche Durchsicht (Standard 17:30, abschaltbar): Der Pi sucht **ohne KI** nach Mustern der letzten 14 Tage – derselbe Text
     mehrfach eingefügt, dieselbe Bitte an mehreren Tagen, ein Werkzeug scheitert immer wieder. Nur bei Neuem fragt er den Kapitän.
   - Höchstens 3 Vorschläge am Tag. Nach dem Ja bekommt der Bot den Auftrag, Schreibendes läuft weiter über Freigaben. Abgelehntes kommt nicht wieder.
+- **Gedächtnis aufräumen:** einmal in der Woche (Standard Sonntag 18:00, Tag/Zeit einstellbar, abschaltbar; auch „Jetzt aufräumen“ je Bot)
+  sieht der Pi das Gedächtnis und das eigene Wissen jedes Bots durch und legt eine Karte **„Aufräumen“** in dessen Chat:
+  - ohne KI: doppelte Einträge (auch gegenüber „für alle Bots“), abgelaufene Daten (ein Datum, das beim Merken in der Zukunft lag und jetzt vorbei ist),
+    „morgen“/„nächste Woche“ in Einträgen älter als 14 Tage, leere oder doppelte Wissensdateien;
+  - mit einem kleinen Modell (Ollama, `aufraeumen_modell` in config.json) nur „belanglos“ und „widersprüchlich“ – und nur ab 6 Einträgen und wenn sich seit der letzten Bewertung etwas geändert hat;
+  - Gesundheitsdaten werden nie vorgeschlagen und nie an ein Modell gegeben; Bots mit Gesundheits-Zugriff bekommen gar keine Modell-Bewertung.
+  - Gelöscht wird erst nach dem Ja. Im Web lassen sich einzelne Punkte abhaken; was bleibt, kommt nicht wieder. Der Bot selbst löscht dabei nichts.
 - **Wissen und Abläufe, die ein Bot selbst ändert**, übernimmt der Adapter in seine Ablage – sie überstehen jeden Neustart.
 
 ![Web: Auslöser](screenshots/web/ausloeser.png)

@@ -47,6 +47,20 @@ class Http(unittest.TestCase):
             self.assertIn(k, o)
         self.assertEqual(o["bots"][0]["modell"], "glm-5.3")
 
+    def test_aufraeumen_api(self):
+        code, o = self.api("GET", "/api/aufraeumen")
+        self.assertEqual((code, o["einstellungen"]["tag"], o["offen"]), (200, 7, []))
+        code, o = self.api("PUT", "/api/aufraeumen", {"aktiv": False, "zeit": "06:15"})
+        self.assertEqual(o["einstellungen"], {"aktiv": False, "tag": 7, "zeit": "06:15"})
+        self.assertEqual(self.api("POST", "/api/aufraeumen/jetzt", {"bot": "gibtsnicht"})[0], 404)
+        s.ged_set([{"id": "g1", "text": "Zweimal dasselbe gemerkt", "fuer": "scout"}, {"id": "g2", "text": "Zweimal dasselbe gemerkt!", "fuer": "scout"}])
+        from nookbot import aufraeumen
+        v = aufraeumen.durchsicht_scope("scout")
+        self.assertEqual(len(self.api("GET", "/api/aufraeumen")[1]["offen"]), 1)
+        code, o = self.api("POST", "/api/vorschlaege/" + v["id"], {"entscheidung": "ja", "nur": []})
+        self.assertEqual((code, o["entfernt"]), (200, 0))  # nichts angehakt → nichts weg
+        self.assertEqual(len(s.gedaechtnis()), 2)
+
     def test_ausloeser_api(self):
         code, o = self.api("PUT", "/api/ausloeser", {"ausloeser": [{"name": "P", "bot": "reacher", "quelle": "paket", "auftrag": "Sag es."}]})
         self.assertEqual(code, 200)

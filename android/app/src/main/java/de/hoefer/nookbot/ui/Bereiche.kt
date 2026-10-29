@@ -569,6 +569,30 @@ fun SettingsScreen(vm: NookViewModel) {
             }
             Row(Modifier.padding(top = 6.dp)) { SideButton("Jetzt durchsehen") { vm.durchsichtJetzt() } }
 
+            var aufAktiv by remember { mutableStateOf(true) }
+            var aufTag by remember { mutableStateOf(7) }
+            var aufZeit by remember { mutableStateOf("") }
+            LaunchedEffect(Unit) { vm.aufraeumenEinstellungen { a, t, z -> aufAktiv = a; aufTag = t; aufZeit = z } }
+            Section("Gedächtnis aufräumen", "Einmal in der Woche sucht der Pi je Bot nach Doppeltem, Abgelaufenem (Datum vorbei, „morgen“ in alten Einträgen) " +
+                "und leeren oder doppelten Wissensdateien – ohne KI. Ob etwas belanglos oder widersprüchlich ist, schätzt ein kleines Modell, nur wenn sich etwas " +
+                "geändert hat. Gesundheitsdaten bleiben unberührt. Gelöscht wird erst nach deinem Ja; was du behältst, kommt nicht wieder.")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Wöchentlich durchsehen", color = P.fg, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                Switch(aufAktiv, { aufAktiv = it; vm.aufraeumenSetzen(it, aufTag, aufZeit) }, colors = SwitchDefaults.colors(checkedTrackColor = A.accent))
+            }
+            if (aufAktiv && aufZeit.isNotBlank()) {
+                Row(Modifier.padding(top = 6.dp).horizontalScroll(rememberScrollState())) {
+                    listOf("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So").forEachIndexed { i, t ->
+                        Chip(t, aufTag == i + 1) { aufTag = i + 1; vm.aufraeumenSetzen(true, i + 1, aufZeit) }
+                    }
+                }
+                Field("Uhrzeit (HH:MM)", aufZeit) {
+                    aufZeit = it
+                    if (Regex("^([01]\\d|2[0-3]):[0-5]\\d$").matches(it)) vm.aufraeumenSetzen(true, aufTag, it)
+                }
+            }
+            Row(Modifier.padding(top = 6.dp)) { SideButton("Jetzt aufräumen") { vm.aufraeumenJetzt() } }
+
             Text("NookBot ${BuildConfig.VERSION_NAME}", color = P.mut, fontSize = 12.sp, modifier = Modifier.padding(top = 28.dp, bottom = 24.dp))
         }
     }

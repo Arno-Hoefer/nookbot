@@ -52,10 +52,12 @@ Antworten sind JSON, Fehler kommen als `{"error": "…"}`.
 |---|---|---|
 | GET/POST | `/api/arbeit` · GET/DELETE `/api/arbeit/<name>` | Arbeitsordner (Bilder inline, sonst als Download) |
 | GET/POST/DELETE | `/api/wissen…` | Wissen global und je Bot |
-| GET/PUT | `/api/datenbanken` · GET `/api/schema` | Datenbank-Bibliothek |
+| GET/PUT | `/api/datenbanken` · GET `/api/schema` | Datenbank-Bibliothek (welche Datenbanken home-mcp freigibt: `GET /api/rechte` → `db`; Zugriff je Bot über `PUT /api/bots/<id>` mit `rechte.db`) |
 | GET/POST/PUT/DELETE | `/api/gedaechtnis…`, `/api/ablaeufe…` | Gedächtnis, Abläufe |
 | GET/PUT | `/api/vorschlaege` | Vorschläge und Einstellungen (`aktiv`, `zeit`) |
-| POST | `/api/vorschlaege/<id>` (`entscheidung`: ja/nein) · `/api/vorschlaege/durchsicht` | Vorschlag entscheiden, Durchsicht sofort |
+| POST | `/api/vorschlaege/<id>` (`entscheidung`: ja/nein, bei Aufräum-Karten optional `nur`: [Schlüssel]) · `/api/vorschlaege/durchsicht` | Vorschlag entscheiden, Durchsicht sofort |
+| GET/PUT | `/api/aufraeumen` | Gedächtnis aufräumen: Einstellungen (`aktiv`, `tag` 1–7, `zeit`), letzte Durchsicht, offene Karten |
+| POST | `/api/aufraeumen/jetzt` (`bot`: leer = alle, `global`, Bot-id) | Aufräumen sofort (Ergebnis als SSE `aufraeumen`) |
 | POST/GET | `/api/gesundheit`, `/api/gesundheit/info` | Health Connect vom Handy |
 
 **Sprache und Verbrauch**

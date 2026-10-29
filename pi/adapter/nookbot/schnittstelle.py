@@ -10,7 +10,7 @@ import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler
 
-from . import basis, ereignisse, dienste, claude, gesundheit, stimmen, wissen, home, bots, sitzungen, gedaechtnis, rechner, automatik, team, vorschlaege, mcp
+from . import basis, ereignisse, dienste, claude, gesundheit, stimmen, wissen, home, bots, sitzungen, gedaechtnis, rechner, automatik, team, vorschlaege, aufraeumen, mcp
 
 
 # ── HTTP ───────────────────────────────────────────────────────────
@@ -111,6 +111,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, {"ablaeufe": gedaechtnis.ablaeufe()})
         if p == "/api/vorschlaege":
             return self._send(200, {"vorschlaege": vorschlaege.liste()[::-1], "einstellungen": vorschlaege.einstellungen()})
+        if p == "/api/aufraeumen":
+            return self._send(200, {"einstellungen": aufraeumen.einstellungen(), "letzte": aufraeumen.stand()["letzte"],
+                                    "offen": aufraeumen.offen()[::-1]})
         if p == "/api/freigaben":
             return self._send(200, home.freigaben_proxy("GET", "/app/freigaben" + ("?offen=1" if q.get("offen") else "")))
         if p == "/api/events":
@@ -423,7 +426,14 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, {"ok": True})
         m = re.match(r"^/api/vorschlaege/([a-z0-9]+)$", p)
         if m:
-            return self._send(200, vorschlaege.entscheiden(m.group(1), str(d.get("entscheidung") or "").lower() == "ja"))
+            nur = [str(x) for x in d["nur"]] if isinstance(d.get("nur"), list) else None
+            return self._send(200, vorschlaege.entscheiden(m.group(1), str(d.get("entscheidung") or "").lower() == "ja", nur))
+        if p == "/api/aufraeumen/jetzt":
+            nur = str(d.get("bot") or "")
+            if nur and nur != "global" and not bots.bot(nur):
+                raise KeyError("Bot gibt es nicht.")
+            threading.Thread(target=aufraeumen.durchsicht, args=(nur,), daemon=True).start()
+            return self._send(200, {"ok": True})
         m = re.match(r"^/api/freigaben/(F-[0-9a-f]{6})/rueckgaengig$", p)
         if m:
             try:
@@ -522,6 +532,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, {"aussprache": neu})
             if p == "/api/vorschlaege":
                 return self._send(200, {"einstellungen": vorschlaege.einstellungen_setzen(d)})
+            if p == "/api/aufraeumen":
+                return self._send(200, {"einstellungen": aufraeumen.einstellungen_setzen(d)})
             if p == "/api/gedaechtnis":
                 return self._send(200, {"eintraege": gedaechtnis.ged_set(list(d.get("eintraege") or []))})
             m = re.match(r"^/api/ablaeufe/([a-z0-9]+)$", p)

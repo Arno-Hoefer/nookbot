@@ -2,7 +2,8 @@
 
 Zwei Wege: im Gespräch (Werkzeug `vorschlag_machen`) und eine tägliche Durchsicht. Die Durchsicht sucht Muster ohne Modell
 (eingefügte Textblöcke, wiederholte Fragen, wiederkehrende Fehler) und fragt den Kapitän nur, wenn es etwas Neues gibt.
-vorschlaege.json: {"liste": [{id, bot, text, aktion, grund, status: offen|angenommen|abgelehnt|im_chat, sitzung, quelle, erstellt, entschieden}],
+vorschlaege.json: {"liste": [{id, bot, text, aktion, grund, status: offen|angenommen|abgelehnt|im_chat, sitzung, quelle, erstellt, entschieden,
+                              art: ""|"aufraeumen", entfernen: [Punkte aus aufraeumen.py]}],
                    "gesehen": {signal-schlüssel: ts}, "letzte": Datum der letzten Durchsicht}
 """
 import hashlib
@@ -57,21 +58,30 @@ def _aehnlich(a: str, b: str) -> bool:
 
 
 def _karte(v: dict) -> dict:
-    return {"id": "vor-" + v["id"], "role": "info", "art": "vorschlag", "ref": v["id"], "ts": v["erstellt"], "bot": v["bot"],
-            "status": v["status"], "titel": v["text"][:80], "text": "💡 " + v["text"]}
+    k = {"id": "vor-" + v["id"], "role": "info", "art": "vorschlag", "ref": v["id"], "ts": v["erstellt"], "bot": v["bot"],
+         "status": v["status"], "titel": v["text"][:80], "text": "💡 " + v["text"]}
+    if v.get("art") == "aufraeumen":  # die App zeigt den Text, das Web zusätzlich Häkchen je Punkt
+        k["text"] += "\n\n" + "\n".join(f"• {p['text'][:140]} – {p['grund']}" for p in v["entfernen"])
+        k["vorschlag_art"] = "aufraeumen"
+        k["punkte"] = [{"schluessel": p["schluessel"], "text": p["text"][:200], "grund": p["grund"]} for p in v["entfernen"]]
+    return k
 
 
-def vorschlag_neu(bid: str, text: str, aktion: str, grund: str = "", sitzung: str = "", quelle: str = "bot") -> dict:
+def vorschlag_neu(bid: str, text: str, aktion: str, grund: str = "", sitzung: str = "", quelle: str = "bot",
+                  art: str = "", entfernen: list | None = None) -> dict:
+    """art="aufraeumen": vom Adapter selbst (aufraeumen.py) – entfernen = Punkte, die ein Ja löscht. Zählt nicht zum Tageslimit
+    der Bots; Abgelehntes merkt sich aufraeumen.py je Eintrag statt über die Ähnlichkeit des Textes."""
     text, aktion = " ".join(str(text or "").split())[:300], str(aktion or "").strip()[:1500]
     if len(text) < 10 or len(aktion) < 10:
         raise ValueError("text (das Angebot an %NUTZER%) und aktion (was du nach dem Ja tust) angeben.")
     with basis._lock:
         d = daten()
         heute = time.strftime("%Y-%m-%d")
-        if sum(1 for v in d["liste"] if time.strftime("%Y-%m-%d", time.localtime(v["erstellt"])) == heute) >= VORSCHLAG_MAX_TAG:
+        if art != "aufraeumen" and sum(1 for v in d["liste"] if v.get("art") != "aufraeumen"
+                                       and time.strftime("%Y-%m-%d", time.localtime(v["erstellt"])) == heute) >= VORSCHLAG_MAX_TAG:
             raise ValueError(f"Heute gab es schon {VORSCHLAG_MAX_TAG} Vorschläge – frag %NUTZER% einfach im Gespräch.")
-        for v in d["liste"]:
-            if v["status"] in ("offen", "abgelehnt") and _aehnlich(v["text"] + " " + v["aktion"], text + " " + aktion):
+        for v in d["liste"] if art != "aufraeumen" else []:
+            if v.get("art") != "aufraeumen" and v["status"] in ("offen", "abgelehnt") and _aehnlich(v["text"] + " " + v["aktion"], text + " " + aktion):
                 raise ValueError("Das wurde schon vorgeschlagen" + (" und abgelehnt – nicht wiederholen." if v["status"] == "abgelehnt" else " und ist noch offen."))
         # Karte in die Hauptunterhaltung des Bots, wenn er gerade intern (Durchsicht, Auftrag) arbeitet
         s = sitzungen.SESS.get(sitzung) if sitzung else None
@@ -79,19 +89,22 @@ def vorschlag_neu(bid: str, text: str, aktion: str, grund: str = "", sitzung: st
             sitzung = bots.bot_session(bid)
         v = {"id": "v" + secrets.token_hex(3), "bot": bid, "text": text, "aktion": aktion, "grund": " ".join(str(grund or "").split())[:300],
              "status": "offen", "sitzung": sitzung, "quelle": quelle, "erstellt": time.time(), "entschieden": 0}
+        if art:
+            v.update(art=art, entfernen=list(entfernen or []))
         d["liste"] = (d["liste"] + [v])[-200:]
         basis.write_json(basis.path("vorschlaege.json"), d)
     sitzungen.SESS.upsert(sitzung, _karte(v))
     sitzungen.SESS.save(sitzung)
     automatik.aktivitaet(bid, "vorschlag", "Vorschlag gemacht", text, sitzung=sitzung)
     b = bots.bot(bid)
-    if quelle == "durchsicht":  # im Gespräch sieht man die Karte ohnehin
+    if quelle in ("durchsicht", "aufraeumen"):  # im Gespräch sieht man die Karte ohnehin
         dienste.push(b["name"] if b else bid, "💡 Vorschlag: " + text, sitzung, prio="low", tags="bulb", bot=b)
     ereignisse.EV.emit({"t": "vorschlaege"})
     return v
 
 
-def entscheiden(vid: str, ja: bool) -> dict:
+def entscheiden(vid: str, ja: bool, nur: list | None = None) -> dict:
+    """nur: bei Aufräum-Vorschlägen die Schlüssel der Punkte, die wirklich weg sollen (sonst alle)."""
     with basis._lock:
         d = daten()
         v = next((x for x in d["liste"] if x["id"] == vid), None)
@@ -105,7 +118,12 @@ def entscheiden(vid: str, ja: bool) -> dict:
     sitzungen.SESS.upsert(sid, {"id": "vor-" + vid, "status": v["status"]})
     sitzungen.SESS.save(sid)
     automatik.aktivitaet("app", "vorschlag", "Vorschlag angenommen" if ja else "Vorschlag abgelehnt", v["text"], sitzung=sid)
-    if ja:  # als Nachricht von %NUTZER% – der Bot setzt es mit seinen normalen Werkzeugen um, Schreibendes weiter mit Freigabe
+    if v.get("art") == "aufraeumen":  # entfernt der Adapter selbst – der Bot bekommt keinen Auftrag
+        from . import aufraeumen
+        v = dict(v, entfernt=aufraeumen.anwenden(v, ja, nur))
+        if ja:
+            automatik.aktivitaet("app", "vorschlag", "Aufgeräumt", f"{v['entfernt']} entfernt", sitzung=sid)
+    elif ja:  # als Nachricht von %NUTZER% – der Bot setzt es mit seinen normalen Werkzeugen um, Schreibendes weiter mit Freigabe
         sitzungen.send(sid, f"Ja, mach das: {v['text']}\n\n(Dein Plan dafür: {v['aktion']})")
     ereignisse.EV.emit({"t": "vorschlaege"})
     return v
@@ -117,7 +135,8 @@ def im_chat(sid: str) -> str:
     und als „im Chat beantwortet“ schließen (sonst führte ein späterer Klick auf „Ja“ alles ein zweites Mal aus)."""
     with basis._lock:
         d = daten()
-        offen = [v for v in d["liste"] if v["status"] == "offen" and v["sitzung"] == sid]
+        # Aufräum-Karten bleiben offen: dafür gibt es nur Ja/Nein, der Bot soll nicht selbst löschen
+        offen = [v for v in d["liste"] if v["status"] == "offen" and v["sitzung"] == sid and v.get("art") != "aufraeumen"]
         if not offen:
             return ""
         for v in offen:
@@ -195,7 +214,7 @@ def durchsicht() -> str:
             d["gesehen"].update({x["schluessel"]: time.time() for x in neu})
             basis.write_json(basis.path("vorschlaege.json"), d)
         kap = bots.kapitaen()
-        abgelehnt = [v["text"] for v in d["liste"] if v["status"] == "abgelehnt"][-10:]
+        abgelehnt = [v["text"] for v in d["liste"] if v["status"] == "abgelehnt" and v.get("art") != "aufraeumen"][-10:]
         vorhanden = [f"Ablauf „{a['name']}“ ({a['fuer']})" for a in gedaechtnis.ablaeufe() if a["status"] == "aktiv"] + \
                     [f"Routine „{r['name']}“ ({r['bot']}, {r['zeit']})" for r in automatik.routinen() if r.get("aktiv")]
         sid = "intern-vorschlag-" + time.strftime("%Y%m%d%H%M")

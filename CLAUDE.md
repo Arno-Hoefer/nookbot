@@ -20,7 +20,7 @@ pi/adapter/nookbot/            der Adapter in Modulen (Ladereihenfolge in __init
   wissen, home, bots               Wissen/Anhänge/Dokumente ansehen, Rechte + home-mcp-Proxy, Bots + AGENT.md/SOUL.md
   sitzungen, seiten, gedaechtnis   Verlauf + Bot-Verbindungen, Seiten lesen, Gedächtnis + Abläufe
   rechner, automatik, team         Arbeitsordner/Python/Seitenbild/Regeln, Routinen/Erinnerungen/Auslöser/Aktivität/Anrufe, Runden/Aufträge
-  vorschlaege                      Vorschläge der Bots, Muster ohne Modell, tägliche Durchsicht
+  vorschlaege, aufraeumen          Vorschläge der Bots, Muster ohne Modell, tägliche Durchsicht; Gedächtnis aufräumen (wöchentlich)
   mcp, schnittstelle, start        MCP-Werkzeuge der Bots, HTTP-Handler, main()
 pi/adapter/web/index.html      Web-Oberfläche (eine Datei, ohne Build)
 pi/adapter/tests/              unittest (ohne Pi): python3 -m unittest discover -s tests

@@ -33,6 +33,7 @@ Ausführliche Doku mit Screenshots: **[docs/](docs/README.md)** (Funktionen, Arc
 - **Gedächtnis**: Vorlieben und Absprachen (`merken`/`vergessen`) – nur aus den eigenen Nachrichten des Nutzers, sichtbar und rücknehmbar.
 - **Abläufe**: „Speicher das als Ablauf“ – nach dem OK wird daraus ein Skill, auf Wunsch als Routine geplant.
 - **Vorschläge**: Bots bieten an, Wiederkehrendes dauerhaft zu lösen (Karte mit Ja/Nein). Muster findet der Pi ohne KI, höchstens 3 am Tag.
+- **Gedächtnis aufräumen**: einmal in der Woche je Bot – Doppeltes, Abgelaufenes, leere oder doppelte Wissensdateien (ohne KI), Belangloses und Widersprüchliches (kleines Modell, nur bei Änderungen). Gelöscht wird erst nach dem Ja, Gesundheitsdaten bleiben unberührt.
 
 **Daten und Werkzeuge**
 - **Zugriffe je Bot**: ein MCP-Schlüssel für alle, die Feinsteuerung macht der Adapter – je Bot Konten für Mail/Kalender/Drive, „nur Hauptkalender“, Slack-Kanäle und Direktnachrichten, GitLab, einzelne Datenbanken, Pakete, Gesundheit. Ein Bot kann einen anderen nur beauftragen, wenn der nicht mehr darf als er selbst.
@@ -56,7 +57,7 @@ Ausführliche Doku mit Screenshots: **[docs/](docs/README.md)** (Funktionen, Arc
 - **Stimmen**: **Phonon** von Gradium auf dem Pi (13 natürliche deutsche Stimmen, ohne Cloud und Kontingent; Lizenz nur privat) oder Piper (Thorsten u. a.), je Stimme auch mit „Butler-Klang“. Uhrzeiten, Wochentage und Abkürzungen werden ausgeschrieben vorgelesen.
 
 **Oberflächen**
-- **App** (Android) und **Web-Oberfläche** (nur im Tailnet) mit denselben Bereichen; Statuszeile mit Ollama- und Claude-Verbrauch.
+- **App** (Android) und **Web-Oberfläche** (nur im Tailnet) mit denselben Bereichen – auch das komplette Bot-Management (anlegen, Figur, Modell, Stimme, Zugriffe, Regeln, Gedächtnis, Wissen, löschen) und Datenbank-Zugriff je Bot; Statuszeile mit Ollama- und Claude-Verbrauch.
 - Hell/Dunkel, Schriftgröße, Suche über alle Unterhaltungen, Benachrichtigungen ohne Dauerverbindung (oder „Für Anrufe erreichbar“).
 - **Gesundheit** (nur NookBot): Health Connect – Schritte, Schlaf, Puls, Trainings … als Tageswerte auf dem Pi.
 
@@ -81,7 +82,7 @@ App (Kotlin/Compose)  ──HTTPS im Tailnet──▶  nookbot-adapter (Python, 
   `basis` (Pfade, Konfiguration), `ereignisse` (SSE), `dienste` (Ollama, ntfy), `claude`, `gesundheit`, `stimmen` (Phonon, Piper,
   Vorlesetext, Diktat), `wissen` (Wissen, Anhänge, Dokumente ansehen), `home` (home-mcp, Zugriffe je Bot), `bots`, `sitzungen`
   (Verlauf, WebSocket zu den Bots), `seiten` (Seiten lesen, Pakete), `gedaechtnis` (Gedächtnis, Abläufe), `rechner` (Arbeitsordner,
-  Python, Regeln), `automatik` (Routinen, Erinnerungen, Aktivität, Auslöser, Anrufe), `team` (Runden, Aufträge verteilen), `vorschlaege` (Muster, Vorschläge), `mcp`,
+  Python, Regeln), `automatik` (Routinen, Erinnerungen, Aktivität, Auslöser, Anrufe), `team` (Runden, Aufträge verteilen), `vorschlaege` (Muster, Vorschläge), `aufraeumen` (Gedächtnis aufräumen), `mcp`,
   `schnittstelle` (HTTP), `start`. Module, die früher geladen werden, stehen oben im Import, spätere am Dateiende – so gibt es
   beim Laden keine Ringbezüge. `nookbot_server.py` stellt alle Namen wie früher bereit (`nookbot_server.bot(…)`).
 - **Tests** (`pi/adapter/tests/`, nur Standardbibliothek, ohne Pi): `cd pi/adapter && python3 -m unittest discover -s tests`

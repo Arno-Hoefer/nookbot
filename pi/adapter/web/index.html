@@ -246,6 +246,8 @@ function ereignis(e) {
   if (e.t === 'aktivitaet' && S.ansicht.art === 'aktivitaet') { clearTimeout(S.aktT); S.aktT = setTimeout(seiteAktivitaet, 800); }
   if (['bots', 'routinen', 'ablaeufe', 'gedaechtnis', 'erinnerungen', 'ausloeser'].includes(e.t)) laden().then(() => { nav(); if (S.ansicht.art !== 'chat' && !S.bearbeitet) zeigen(); });
   if (e.t === 'busy' && !e.v) fertigMelden(e.s);
+  if (e.t === 'aufraeumen') { toast('Aufräumen: ' + e.ergebnis); if (S.ansicht.art === 'gedaechtnis') seiteGedaechtnis(); }
+  if (e.t === 'vorschlaege' && S.ansicht.art === 'gedaechtnis') { clearTimeout(S.vorT); S.vorT = setTimeout(seiteGedaechtnis, 300); }
 }
 
 // ── Navigation ──
@@ -267,7 +269,7 @@ function nav() {
   const entw = S.ablaeufe.filter((x) => x.status === 'entwurf').length;
   h += '<div class="gruppe">Mehr</div>';
   const offenF = Object.values(S.freigaben).filter((f) => f && f.status === 'offen').length;
-  for (const [k, n, z] of [['suche', 'Suche', 0], ['freigaben', 'Freigaben', offenF], ['ablaeufe', 'Abläufe', entw], ['routinen', 'Routinen', 0],
+  for (const [k, n, z] of [['bots', 'Bots verwalten', 0], ['suche', 'Suche', 0], ['freigaben', 'Freigaben', offenF], ['ablaeufe', 'Abläufe', entw], ['routinen', 'Routinen', 0],
     ['ausloeser', 'Auslöser', (S.ausloeser || []).filter((x) => x.fehler).length], ['aktivitaet', 'Aktivität', 0], ['arbeit', 'Arbeitsordner', 0], ['erinnerungen', 'Erinnerungen', 0], ['gedaechtnis', 'Gedächtnis', 0], ['wissen', 'Wissen', 0], ['datenbanken', 'Datenbanken', 0],
     ['archiv', 'Ältere Unterhaltungen', 0], ['zugriffe', 'Zugriffe', 0], ['einstellungen', 'Einstellungen', 0]]) {
     h += `<div class="eintrag ${a.art === k ? 'aktiv' : ''}" data-seite="${k}"><div class="t"><div class="n">${n}</div></div>${z ? `<span class="badge">${z}</span>` : ''}</div>`;
@@ -297,7 +299,7 @@ async function zeigen() {
   if (a.art === 'chat') return chatOeffnen(a.id || S.bots[0]?.sitzung);
   S.offen = null;
   ({ablaeufe: seiteAblaeufe, gedaechtnis: seiteGedaechtnis, freigaben: seiteFreigaben, routinen: seiteRoutinen, runde: seiteRunde, ausloeser: seiteAusloeser, aktivitaet: seiteAktivitaet, arbeit: seiteArbeit,
-    bot: () => seiteBot(a.id), suche: seiteSuche, archiv: seiteArchiv, erinnerungen: seiteErinnerungen, wissen: seiteWissen,
+    bot: () => seiteBot(a.id), bots: seiteBots, suche: seiteSuche, archiv: seiteArchiv, erinnerungen: seiteErinnerungen, wissen: seiteWissen,
     datenbanken: seiteDatenbanken, zugriffe: seiteZugriffe, einstellungen: seiteEinstellungen}[a.art] || (() => {}))();
 }
 
@@ -431,18 +433,25 @@ function karte(m) {
       ${a ? `<pre class="schritte">${esc(a.schritte)}</pre>` : ''}
       ${st === 'entwurf' && a ? `<div class="knoepfe"><button class="pri klein" data-abl-ok="${esc(a.id)}">Speichern</button><button class="klein" data-abl-edit="${esc(a.id)}">Ändern</button><button class="klein text" data-abl-weg="${esc(a.id)}">Verwerfen</button></div>` : ''}</div>`;
   }
-  if (m.art === 'vorschlag') {
-    const st = m.status || 'offen';
-    return `<div class="karte vor"><div class="titel">💡 Vorschlag <span class="mut">${st === 'angenommen' ? '· angenommen ✓' : st === 'abgelehnt' ? '· abgelehnt' : st === 'im_chat' ? '· im Chat beantwortet' : ''}</span></div>
-      <div>${esc((m.text || '').replace(/^💡 /, ''))}</div>
-      ${st === 'offen' ? `<div class="knoepfe"><button class="pri klein" data-vor-ja="${esc(m.ref)}">Ja, mach das</button><button class="klein text" data-vor-nein="${esc(m.ref)}">Nein danke</button></div>` : ''}</div>`;
-  }
+  if (m.art === 'vorschlag') return vorschlagKarte(m);
   if (m.art === 'auftraege') {
     return `<div class="karte"><div class="titel">🧭 Aufträge verteilt</div>${m.ziel ? `<div class="mut">${esc(m.ziel)}</div>` : ''}
       ${(m.teile || []).map((t) => `<div class="teil">${ava(bot(t.bot), 22)}<div style="flex:1;min-width:0"><b>${esc(t.name)}</b> <span class="mut">${esc(t.auftrag.slice(0, 140))}</span></div>
         <span class="st ${esc(t.status)}">${{laeuft: 'läuft …', fertig: 'fertig', fehler: 'Fehler'}[t.status] || esc(t.status)}</span><button class="klein text" data-intern="${esc(t.sitzung)}">ansehen</button></div>`).join('')}</div>`;
   }
   return `<div class="karte">${esc(m.text)}</div>`;
+}
+// Vorschlag; beim Aufräumen (punkte) mit Häkchen je Eintrag – „Ja“ entfernt nur die angehakten, der Rest bleibt und kommt nicht wieder
+function vorschlagKarte(m) {
+  const st = m.status || 'offen'; const aufr = !!m.punkte;
+  const status = st === 'angenommen' ? (aufr ? '· aufgeräumt ✓' : '· angenommen ✓') : st === 'abgelehnt' ? (aufr ? '· alles behalten' : '· abgelehnt') : st === 'im_chat' ? '· im Chat beantwortet' : '';
+  const text = (m.text || '').replace(/^💡 /, '');
+  const kopfText = aufr ? text.split('\n\n')[0] : text;
+  return `<div class="karte vor"><div class="titel">${aufr ? '🧹 Aufräumen' : '💡 Vorschlag'} <span class="mut">${status}</span></div>
+    <div style="white-space:pre-wrap">${esc(kopfText)}</div>
+    ${aufr ? m.punkte.map((p) => `<label class="teil" style="cursor:pointer"><input type="checkbox" data-punkt="${esc(p.schluessel)}" ${st === 'offen' ? 'checked' : 'disabled'} style="width:auto">
+      <span style="flex:1">${esc(p.text)}<br><span class="mut">${esc(p.grund)}</span></span></label>`).join('') : ''}
+    ${st === 'offen' ? `<div class="knoepfe"><button class="pri klein" data-vor-ja="${esc(m.ref)}">${aufr ? 'Angehakte entfernen' : 'Ja, mach das'}</button><button class="klein text" data-vor-nein="${esc(m.ref)}">${aufr ? 'Alles behalten' : 'Nein danke'}</button></div>` : ''}</div>`;
 }
 function freigabeKarte(fid) {
   const f = S.freigaben[fid];
@@ -464,8 +473,17 @@ document.addEventListener('click', async (ev) => {
     if (t.dataset.vergessen) { await api('DELETE', '/api/gedaechtnis/' + t.dataset.vergessen); toast('Vergessen'); }
     if (t.dataset.ablOk) { await api('PUT', '/api/ablaeufe/' + t.dataset.ablOk, {status: 'aktiv'}); toast('Ablauf gespeichert – die Bots kennen ihn jetzt'); }
     if (t.dataset.ablWeg) { if (confirm('Entwurf verwerfen?')) await api('DELETE', '/api/ablaeufe/' + t.dataset.ablWeg); }
-    if (t.dataset.vorJa) { await api('POST', '/api/vorschlaege/' + t.dataset.vorJa, {entscheidung: 'ja'}); toast('Angenommen – der Bot legt los'); }
-    if (t.dataset.vorNein) { await api('POST', '/api/vorschlaege/' + t.dataset.vorNein, {entscheidung: 'nein'}); toast('Abgelehnt – kommt nicht wieder'); }
+    if (t.dataset.vorJa) {
+      const haken = [...(t.closest('.karte')?.querySelectorAll('[data-punkt]') || [])];
+      if (haken.length) {
+        const nur = haken.filter((x) => x.checked).map((x) => x.dataset.punkt);
+        if (!nur.length && !confirm('Nichts angehakt – alles behalten?')) return;
+        t.disabled = true;
+        const o = await api('POST', '/api/vorschlaege/' + t.dataset.vorJa, {entscheidung: nur.length ? 'ja' : 'nein', nur});
+        toast(nur.length ? `${o.entfernt ?? nur.length} entfernt – der Rest bleibt` : 'Alles bleibt'); if (S.ansicht.art === 'gedaechtnis') seiteGedaechtnis();
+      } else { await api('POST', '/api/vorschlaege/' + t.dataset.vorJa, {entscheidung: 'ja'}); toast('Angenommen – der Bot legt los'); }
+    }
+    if (t.dataset.vorNein) { t.disabled = true; await api('POST', '/api/vorschlaege/' + t.dataset.vorNein, {entscheidung: 'nein'}); toast('Abgelehnt – kommt nicht wieder'); if (S.ansicht.art === 'gedaechtnis') seiteGedaechtnis(); }
     if (t.dataset.ablEdit) ablaufDialog(S.ablaeufe.find((x) => x.id === t.dataset.ablEdit));
     if (t.dataset.intern) internZeigen(t.dataset.intern);
     if (t.dataset.freiAendern) {
@@ -539,16 +557,36 @@ function planDialog(a) {
 }
 
 // ── Gedächtnis ──
-function seiteGedaechtnis() {
+const WOCHENTAGE = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+function aufrEinstellungen(au) {
+  const e = au.einstellungen;
+  return `${schalter('auAktiv', 'Wöchentlich durchsehen', e.aktiv)}<div class="zeilen"><select id="auTag" style="width:auto">${WOCHENTAGE.map((t, i) => `<option value="${i + 1}" ${e.tag === i + 1 ? 'selected' : ''}>${t}</option>`).join('')}</select>
+    <input id="auZeit" type="time" value="${esc(e.zeit)}" style="width:auto"><button class="klein" id="auJetzt">🧹 Jetzt aufräumen</button>${au.letzte ? `<span class="mut">zuletzt ${esc(au.letzte.split('-').reverse().join('.'))}</span>` : ''}</div>`;
+}
+function aufrVerbinden() {
+  if (!$('#auAktiv')) return;
+  const setzen = async () => { try { await api('PUT', '/api/aufraeumen', {aktiv: $('#auAktiv').checked, tag: +$('#auTag').value, zeit: $('#auZeit').value}); toast('Gespeichert'); } catch (e) { toast(e.message); } };
+  $('#auAktiv').onchange = setzen; $('#auTag').onchange = setzen; $('#auZeit').onchange = setzen;
+  $('#auJetzt').onclick = async () => { try { await api('POST', '/api/aufraeumen/jetzt', {}); toast('Sehe alle Bots durch …'); } catch (e) { toast(e.message); } };
+}
+async function seiteGedaechtnis() {
   const gr = [['global', 'Über dich (alle Bots)'], ...S.bots.map((b) => [b.id, b.name])];
+  const au = await api('GET', '/api/aufraeumen').catch(() => null);
+  if (S.ansicht.art !== 'gedaechtnis') return;
+  const offenK = (au?.offen || []).map((v) => vorschlagKarte({ref: v.id, status: v.status, text: v.text, punkte: v.entfernen}));
   $('#haupt').innerHTML = kopf('Gedächtnis', 'was die Bots sich merken') + `<div class="seite"><div class="bl">
     <div class="box"><h3>Neu</h3><div class="zeilen"><input id="gT" placeholder="z. B. Zahlen immer mit Vorjahresvergleich" style="flex:1;min-width:200px">
       <select id="gF" style="width:auto">${gr.map(([id, n]) => `<option value="${id}">${esc(n)}</option>`).join('')}</select><button class="pri" id="gOk">Merken</button></div></div>
+    ${au ? `<div class="box"><h3>Aufräumen</h3><p class="mut" style="margin-top:0">Einmal in der Woche sucht der Pi je Bot nach Doppeltem, Abgelaufenem (Datum vorbei, „morgen“ in alten Einträgen),
+      leeren oder doppelten Wissensdateien – ohne KI. Nur ob etwas belanglos oder widersprüchlich ist, schätzt ein kleines Modell, und nur wenn sich etwas geändert hat.
+      Gesundheitsdaten fasst das Aufräumen nie an. Gelöscht wird erst nach deinem Ja; was du behältst, kommt nicht wieder.</p>${aufrEinstellungen(au)}</div>
+      ${offenK.join('')}` : ''}
     ${gr.map(([id, n]) => { const l = S.gedaechtnis.filter((e) => e.fuer === id); const b = bot(id);
       return `<div class="box"><h3>${esc(n)}${b && b.merken === false ? ' <span class="mut">· merkt sich nichts selbst</span>' : ''}</h3>${l.map((e) => `<div class="teil"><span style="flex:1">${esc(e.text)}</span>
-        <span class="mut">${e.von === 'app' ? 'du' : esc(botName(e.von))}${e.quelle === 'direkt' ? ' · direkt' : ''}</span><button class="klein text" data-ged-edit="${e.id}" title="ändern">✎</button><button class="klein text" data-vergessen="${e.id}">✕</button></div>`).join('') || '<div class="mut">Nichts gemerkt.</div>'}</div>`; }).join('')}
+        <span class="mut">${e.von === 'app' ? 'du' : esc(botName(e.von))}${e.quelle === 'direkt' ? ' · direkt' : ''} · ${new Date((e.ts || 0) * 1000).toLocaleDateString('de-DE')}</span><button class="klein text" data-ged-edit="${e.id}" title="ändern">✎</button><button class="klein text" data-vergessen="${e.id}">✕</button></div>`).join('') || '<div class="mut">Nichts gemerkt.</div>'}</div>`; }).join('')}
   </div></div>`;
   $('#gOk').onclick = async () => { const t = $('#gT').value.trim(); if (!t) return; try { await api('POST', '/api/gedaechtnis', {text: t, fuer: $('#gF').value}); $('#gT').value = ''; } catch (e) { toast(e.message); } };
+  aufrVerbinden();
 }
 
 // ── Freigaben ──
@@ -651,72 +689,135 @@ const feld = (label, inner) => `<label class="feld"><span>${label}</span>${inner
 const schalter = (id, label, an) => `<label class="schalter"><span>${label}</span><input type="checkbox" id="${id}" ${an ? 'checked' : ''}></label>`;
 function merkeBearbeitung() { S.bearbeitet = true; }
 
-// ── Bot-Einstellungen (anlegen/ändern) ──
+// ── Bots: Übersicht ──
+const FARBEN = ['#FF3B4E', '#3B8CFF', '#2FBF71', '#F5A524', '#9B6BFF', '#8F8E95', '#14B8A6', '#EC4899'];
+const FORMEN = ['kapsel', 'kreis', 'wolke', 'dreieck', 'quadrat'];
+function rechteKurz(b) {
+  const r = b.rechte || {};
+  if (r.alle) return 'alle Zugriffe' + (r.gesundheit ? ' · Gesundheit' : '');
+  const t = [];
+  for (const [k, n] of [['mail', 'Mail'], ['kalender', 'Kalender'], ['drive', 'Drive']]) if ((r[k] || []).length) t.push(n);
+  if (r.slack) t.push('Slack'); if (r.gitlab) t.push('GitLab'); if ((r.db || []).length) t.push('DB ' + r.db.join(', '));
+  if (r.statistik) t.push('Statistik'); if (r.pakete) t.push('Pakete'); if (r.gesundheit) t.push('Gesundheit');
+  return t.join(' · ') || 'keine Zugriffe';
+}
+function seiteBots() {
+  $('#haupt').innerHTML = kopf('Bots', 'dein Team', '<button class="pri klein" id="bsNeu">+ Neuer Bot</button>') + `<div class="seite"><div class="bl">
+    ${S.bots.map((b) => { const ged = S.gedaechtnis.filter((e) => e.fuer === b.id).length;
+      return `<div class="box"><div class="zeilen">${ava(b, 36)}<div style="flex:1;min-width:0"><h3 style="margin:0">${esc(b.name)} <span class="mut">${b.kapitaen ? '· Kapitän' : esc(b.rolle ? '· ' + b.rolle : '')}</span></h3>
+        <div class="mut">${b.laeuft === false ? '<span style="color:var(--accent)">gestoppt</span> · ' : ''}${esc(b.modell || '–')} · ${esc(rechteKurz(b))}</div>
+        <div class="mut">${ged} im Gedächtnis${b.merken === false ? ' (merkt sich nichts selbst)' : ''} · ${(b.wissen || []).length} Wissensdateien · ${S.routinen.filter((r) => r.bot === b.id).length} Routinen · ${(S.ausloeser || []).filter((a) => a.bot === b.id).length} Auslöser</div></div>
+        <button class="klein" data-bs-chat="${esc(b.sitzung)}">Chat</button><button class="klein pri" data-bs-edit="${esc(b.id)}">Einstellungen</button></div></div>`; }).join('')}
+    <p class="mut">Anlegen, ändern und löschen geht hier wie in der App. Der Kapitän sieht Rolle und Fokus aller Bots und verteilt Aufträge danach.</p></div></div>`;
+  $('#bsNeu').onclick = () => { S.ansicht = {art: 'bot', id: null}; nav(); zeigen(); };
+  $('#haupt').querySelectorAll('[data-bs-edit]').forEach((x) => x.onclick = () => { S.ansicht = {art: 'bot', id: x.dataset.bsEdit}; nav(); zeigen(); });
+  $('#haupt').querySelectorAll('[data-bs-chat]').forEach((x) => x.onclick = () => { S.ansicht = {art: 'chat', id: x.dataset.bsChat}; nav(); zeigen(); });
+}
+
+// ── Bot-Einstellungen (anlegen/ändern) – alles, was die App auch kann ──
 async function seiteBot(id) {
   const b = id ? bot(id) : null;
   const neu = !b;
   $('#haupt').innerHTML = kopf(neu ? 'Neuer Bot' : esc(b.name), neu ? '' : (b.kapitaen ? 'Kapitän' : esc(b.rolle || '')),
     neu ? '' : `<button class="klein" id="bChat">Chat öffnen</button>`) + `<div class="seite"><div class="bl" id="bForm"><div class="box mut">lädt …</div></div></div>`;
-  const [mod, stim, kat] = await Promise.all([api('GET', '/api/modelle').catch(() => ({modelle: [], claude: []})), api('GET', '/api/stimmen').catch(() => ({stimmen: []})),
-    api('GET', '/api/rechte').catch(() => null)]);
-  const rk = neu ? null : await api('GET', '/api/regeln').catch(() => null);
+  const [mod, stim, kat, rk] = await Promise.all([api('GET', '/api/modelle').catch(() => ({modelle: [], claude: []})), api('GET', '/api/stimmen').catch(() => ({stimmen: []})),
+    api('GET', '/api/rechte').catch(() => null), api('GET', '/api/regeln').catch(() => null)]);
+  if (S.ansicht.art !== 'bot' || S.ansicht.id !== id) return;  // inzwischen woanders hin
   const r = JSON.parse(JSON.stringify(b?.rechte || {}));
   const modelle = [...(mod.claude || []).map((m) => [m, 'Claude']), ...(mod.modelle || []).map((m) => [m, 'Ollama'])];
   if (b && !modelle.some(([m]) => m === b.modell)) modelle.unshift([b.modell, '']);
+  if (neu && !modelle.length) modelle.push(['glm-5.3', '']);
   const stimmen = stim.stimmen || [];
+  const farbe0 = b?.farbe || FARBEN[1];
+  const tage = ['', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+  const eigeneRoutinen = b ? S.routinen.filter((x) => x.bot === b.id) : [];
+  const eigeneAusl = b ? (S.ausloeser || []).filter((x) => x.bot === b.id) : [];
+  const eigeneAbl = b ? S.ablaeufe.filter((x) => x.fuer === b.id) : [];
   $('#bForm').innerHTML = `
-    <div class="box"><h3>Grundlagen</h3><div class="reihe">${feld('Name', `<input id="bName" value="${esc(b?.name || '')}">`)}${feld('Rolle (kurz)', `<input id="bRolle" value="${esc(b?.rolle || '')}" placeholder="Recherche, Skeptiker, Analyst">`)}</div>
-      <div class="reihe">${feld('Farbe', `<input type="color" id="bFarbe" value="${esc(b?.farbe || '#3B8CFF')}" style="height:38px;padding:2px">`)}
-      ${feld('Form', `<select id="bForm2">${['kapsel', 'kreis', 'wolke', 'dreieck', 'quadrat'].map((f) => `<option ${(b?.form || 'kreis') === f ? 'selected' : ''}>${f}</option>`).join('')}</select>`)}
-      ${feld('Modell', `<select id="bModell">${modelle.map(([m, a]) => `<option value="${esc(m)}" ${b?.modell === m ? 'selected' : ''}>${esc(m)}${a ? ' · ' + a : ''}</option>`).join('')}</select>`)}</div></div>
-    <div class="box"><h3>Persönlichkeit und Fokus</h3>${feld('Persönlichkeit – Ton und Art', `<textarea id="bPers" rows="4">${esc(b?.persoenlichkeit || '')}</textarea>`)}
-      ${feld('Fokus – wofür er zuständig ist (der Kapitän sieht das)', `<textarea id="bFokus" rows="5">${esc(b?.fokus || '')}</textarea>`)}</div>
+    <div class="box"><h3>Grundlagen</h3><div class="zeilen" style="margin-bottom:6px"><span id="bVorschau"></span>
+      ${b ? `<span class="mut">${b.laeuft === false ? '<span style="color:var(--accent)">gestoppt</span>' : 'läuft'} · ${esc(b.id)}</span>` : ''}</div>
+      <div class="reihe">${feld('Name', `<input id="bName" value="${esc(b?.name || '')}" maxlength="30">`)}${feld('Rolle (kurz)', `<input id="bRolle" value="${esc(b?.rolle || '')}" maxlength="40" placeholder="Recherche, Skeptiker, Analyst">`)}</div>
+      ${feld('Farbe', `<div class="zeilen">${FARBEN.map((f) => `<span data-farbe="${f}" title="${f}" style="width:26px;height:26px;border-radius:50%;background:${f};cursor:pointer;border:3px solid ${f === farbe0.toUpperCase() ? 'var(--text)' : 'transparent'}"></span>`).join('')}
+        <input type="color" id="bFarbe" value="${esc(farbe0)}" style="width:44px;height:30px;padding:2px" title="eigene Farbe"></div>`)}
+      ${feld('Figur', `<div class="zeilen" id="bFormen">${FORMEN.map((f) => `<span data-form="${f}" style="padding:4px;border-radius:10px;cursor:pointer;border:1px solid ${(b?.form || 'kreis') === f ? 'var(--text)' : 'var(--line)'}">${ava({form: f, farbe: farbe0, name: $('#bName')?.value || b?.name || '?'}, 26)}</span>`).join('')}</div><input type="hidden" id="bForm2" value="${esc(b?.form || 'kreis')}">`)}
+      ${feld('Modell – Ollama (Pauschale) oder Claude (nach Verbrauch)', `<select id="bModell">${modelle.map(([m, a]) => `<option value="${esc(m)}" ${b?.modell === m ? 'selected' : ''}>${esc(m)}${a ? ' · ' + a : ''}</option>`).join('')}</select>`)}</div>
+    <div class="box"><h3>Persönlichkeit und Fokus</h3>${feld('Persönlichkeit – Ton und Art', `<textarea id="bPers" rows="4" maxlength="3000">${esc(b?.persoenlichkeit || '')}</textarea>`)}
+      ${feld('Fokus – wofür er zuständig ist (der Kapitän sieht das)', `<textarea id="bFokus" rows="5" maxlength="3000">${esc(b?.fokus || '')}</textarea>`)}</div>
     <div class="box"><h3>Stimme</h3><div class="zeilen"><select id="bStimme" style="flex:1">${stimmen.map((s) => `<option value="${esc(s.id)}" ${(b?.stimme || 'pi:thorsten-high') === s.id ? 'selected' : ''}>${esc(s.name)} – ${esc(s.beschreibung)}</option>`).join('')}
       ${b?.stimme?.startsWith('handy:') ? `<option value="${esc(b.stimme)}" selected>Handy: ${esc(b.stimme.slice(6))}</option>` : ''}</select><button class="klein" id="bProbe">▶ Probe</button></div>
-      <p class="mut">Handy-Stimmen wählst du in der App. Namen spricht das Aussprache-Wörterbuch (Einstellungen) richtig aus.</p></div>
-    ${neu ? '' : `<div class="box"><h3>Zugriffe</h3><div id="bRechte"></div></div>`}
-    ${neu || !rk ? '' : `<div class="box"><h3>Regeln für Schreibendes</h3><p class="mut" style="margin-top:0">frei = sofort ausführen (höchstens ${rk.frei_max}× am Tag, steht in der Aktivität) ·
+      <p class="mut">Handy-Stimmen wählst du in der App. Namen spricht das Aussprache-Wörterbuch (Einstellungen) richtig aus.</p>
+      ${b ? '<button class="klein" id="bTestanruf">📞 Testanruf mit dieser Stimme</button>' : ''}</div>
+    <div class="box"><h3>Zugriffe</h3><div id="bRechte"></div></div>
+    ${!rk ? '' : `<div class="box"><h3>Regeln für Schreibendes</h3><p class="mut" style="margin-top:0">frei = sofort ausführen (höchstens ${rk.frei_max}× am Tag, steht in der Aktivität) ·
       fragen = Freigabe wie bisher · nie = gesperrt. Sobald Gäste oder Einladungen dabei sind, wird immer gefragt.</p>
       ${Object.entries(rk.werkzeuge).map(([t, n]) => `<div class="teil"><span style="flex:1">${esc(n)}</span><select data-regel="${t}" style="width:auto">
-        ${['frei', 'fragen', 'nie'].filter((v) => v !== 'frei' || !rk.nie_frei.includes(t)).map((v) => `<option ${((b.regeln || {})[t] || 'fragen') === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>`).join('')}</div>`}
-    ${neu ? '' : `<div class="box"><h3>Gedächtnis</h3>${schalter('bMerken', 'Darf sich selbst etwas merken', b.merken !== false)}
-      ${S.gedaechtnis.filter((e) => e.fuer === b.id).map((e) => `<div class="teil"><span style="flex:1">🧠 ${esc(e.text)}</span><button class="klein text" data-ged-edit="${e.id}">✎</button><button class="klein text" data-vergessen="${e.id}">✕</button></div>`).join('') || '<p class="mut">Noch nichts gemerkt.</p>'}</div>
-    <div class="box"><h3>Eigenes Wissen</h3>${(b.wissen || []).map((w) => `<div class="teil"><span style="flex:1">📄 ${esc(w.name)}</span><span class="mut">${Math.ceil(w.groesse / 1000)} KB</span>
+        ${['frei', 'fragen', 'nie'].filter((v) => v !== 'frei' || !rk.nie_frei.includes(t)).map((v) => `<option ${((b?.regeln || {})[t] || 'fragen') === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>`).join('')}</div>`}
+    <div class="box"><h3>Gedächtnis</h3>${schalter('bMerken', 'Darf sich selbst etwas merken', b?.merken !== false)}
+      ${b ? `${S.gedaechtnis.filter((e) => e.fuer === b.id).map((e) => `<div class="teil"><span style="flex:1">🧠 ${esc(e.text)}</span><span class="mut">${e.von === 'app' ? 'du' : esc(botName(e.von))}</span><button class="klein text" data-ged-edit="${e.id}">✎</button><button class="klein text" data-vergessen="${e.id}">✕</button></div>`).join('') || '<p class="mut">Noch nichts gemerkt.</p>'}
+      <div class="zeilen" style="margin-top:8px"><input id="bGedNeu" placeholder="Etwas nur für ${esc(b.name)} merken …" style="flex:1;min-width:180px"><button class="klein" id="bGedOk">Merken</button>
+        <button class="klein" id="bAufr" title="Doppeltes, Abgelaufenes und Belangloses suchen – als Vorschlag mit Ja/Nein">🧹 Jetzt aufräumen</button></div>
+      <p class="mut">Was alle Bots wissen sollen: Gedächtnis (links). Aufräumen schlägt nur vor – gelöscht wird erst nach deinem Ja.</p>` : ''}</div>
+    ${b ? `<div class="box"><h3>Eigenes Wissen</h3>${(b.wissen || []).map((w) => `<div class="teil"><span style="flex:1">📄 ${esc(w.name)}</span><span class="mut">${Math.ceil(w.groesse / 1000)} KB</span>
       <button class="klein text" data-w-zeigen="${esc(b.id)}|${esc(w.name)}">ansehen</button><button class="klein text" data-w-weg="${esc(b.id)}|${esc(w.name)}">✕</button></div>`).join('') || '<p class="mut">Noch keine Dateien.</p>'}
-      <div class="zeilen" style="margin-top:8px"><input type="file" id="bWissen" multiple style="width:auto"><span class="mut">Text, PDF, Word, Excel, PowerPoint …</span></div></div>`}
+      <div class="zeilen" style="margin-top:8px"><input type="file" id="bWissen" multiple style="width:auto"><span class="mut">Text, PDF, Word, Excel, PowerPoint …</span></div></div>
+    <div class="box"><h3>Automatik</h3>
+      ${eigeneRoutinen.map((x) => `<div class="teil"><span style="flex:1">⏰ ${esc(x.name)}</span><span class="mut">${x.datum ? esc(x.datum) : (x.tage || []).map((t) => tage[t]).join(' ')} ${esc(x.zeit)}${x.aktiv ? '' : ' · aus'}</span></div>`).join('')}
+      ${eigeneAusl.map((x) => `<div class="teil"><span style="flex:1">⚡ ${esc(x.name)}</span><span class="mut">${QUELLE[x.quelle] || esc(x.quelle)}${x.aktiv ? '' : ' · aus'}</span></div>`).join('')}
+      ${eigeneAbl.map((x) => `<div class="teil"><span style="flex:1">📋 ${esc(x.name)}</span><span class="mut">${x.status === 'aktiv' ? 'Ablauf' : 'Entwurf'}</span></div>`).join('')}
+      ${eigeneRoutinen.length + eigeneAusl.length + eigeneAbl.length ? '' : '<p class="mut">Keine Routinen, Auslöser oder eigenen Abläufe.</p>'}
+      <div class="zeilen" style="margin-top:8px"><button class="klein" data-gehe="routinen">Routinen</button><button class="klein" data-gehe="ausloeser">Auslöser</button><button class="klein" data-gehe="ablaeufe">Abläufe</button>
+        <button class="klein text" id="bNeuBeginnen" title="Neue Unterhaltung, die alte bleibt im Archiv">↺ Neue Unterhaltung</button></div></div>` : ''}
     <div class="zeilen"><button class="pri" id="bSpeichern">${neu ? 'Bot anlegen' : 'Speichern'}</button>${!neu && !b.kapitaen ? '<button class="text" id="bLoeschen" style="color:var(--accent)">Bot löschen</button>' : ''}</div>
-    <p class="mut">Nach dem Speichern startet der Bot kurz neu (ein paar Sekunden).</p>`;
+    <p class="mut">${neu ? 'Der neue Bot startet gleich nach dem Anlegen.' : 'Nach dem Speichern startet der Bot kurz neu (ein paar Sekunden) – eine laufende Antwort wird erst fertig.'}</p>`;
   S.bearbeitet = true;
-  if (!neu) rechteZeichnen(kat, r);
+  rechteZeichnen(kat, r);
+  const vorschau = () => { $('#bVorschau').innerHTML = ava({form: $('#bForm2').value, farbe: $('#bFarbe').value, name: $('#bName').value || '?'}, 44);
+    $('#bFormen').querySelectorAll('[data-form]').forEach((x) => { x.innerHTML = ava({form: x.dataset.form, farbe: $('#bFarbe').value, name: $('#bName').value || '?'}, 26);
+      x.style.borderColor = x.dataset.form === $('#bForm2').value ? 'var(--text)' : 'var(--line)'; });
+    $('#bForm').querySelectorAll('[data-farbe]').forEach((x) => x.style.borderColor = x.dataset.farbe === $('#bFarbe').value.toUpperCase() ? 'var(--text)' : 'transparent'); };
+  vorschau();
+  $('#bForm').querySelectorAll('[data-farbe]').forEach((x) => x.onclick = () => { $('#bFarbe').value = x.dataset.farbe; vorschau(); });
+  $('#bForm').querySelectorAll('[data-form]').forEach((x) => x.onclick = () => { $('#bForm2').value = x.dataset.form; vorschau(); });
+  $('#bFarbe').oninput = vorschau; $('#bName').oninput = vorschau;
+  $('#bForm').querySelectorAll('[data-gehe]').forEach((x) => x.onclick = () => { S.ansicht = {art: x.dataset.gehe, id: null}; nav(); zeigen(); });
   $('#bProbe').onclick = () => vorlesen(`Hallo, ich bin ${$('#bName').value || 'dein Bot'}. So klinge ich im Sprachmodus.`, $('#bStimme').value);
+  if ($('#bTestanruf')) $('#bTestanruf').onclick = async () => { try { await api('POST', '/api/anrufe/test', {bot: b.id}); toast('Gleich klingelt das Handy (App mit „erreichbar“)'); } catch (e) { toast(e.message); } };
   if ($('#bChat')) $('#bChat').onclick = () => { S.ansicht = {art: 'chat', id: b.sitzung}; nav(); zeigen(); };
   if ($('#bWissen')) $('#bWissen').onchange = async (e) => { for (const f of e.target.files) await wissenHoch(b.id, f); await laden(); seiteBot(b.id); };
+  if ($('#bGedOk')) $('#bGedOk').onclick = async () => { const t = $('#bGedNeu').value.trim(); if (!t) return;
+    try { await api('POST', '/api/gedaechtnis', {text: t, fuer: b.id}); toast('Gemerkt'); await laden(); seiteBot(b.id); } catch (e) { toast(e.message); } };
+  if ($('#bAufr')) $('#bAufr').onclick = async () => { try { await api('POST', '/api/aufraeumen/jetzt', {bot: b.id}); toast('Sehe nach … ein Vorschlag erscheint im Chat von ' + b.name); } catch (e) { toast(e.message); } };
+  if ($('#bNeuBeginnen')) $('#bNeuBeginnen').onclick = async () => {
+    if (!confirm('Neue Unterhaltung beginnen? Die bisherige bleibt im Archiv.')) return;
+    try { const o = await api('POST', `/api/bots/${b.id}/neu`); await laden(); S.ansicht = {art: 'chat', id: o.sitzung}; nav(); zeigen(); } catch (e) { toast(e.message); }
+  };
   if ($('#bLoeschen')) $('#bLoeschen').onclick = async () => {
-    if (!confirm(`${b.name} löschen? Seine Dateien landen im Papierkorb-Ordner auf dem Pi.`)) return;
-    try { await api('DELETE', '/api/bots/' + b.id); await laden(); S.ansicht = {art: 'chat', id: S.bots[0]?.sitzung}; nav(); zeigen(); } catch (e) { toast(e.message); }
+    if (!confirm(`${b.name} löschen? Seine Dateien landen im Papierkorb-Ordner auf dem Pi, seine Routinen werden gelöscht.`)) return;
+    try { await api('DELETE', '/api/bots/' + b.id); S.bearbeitet = false; await laden(); S.ansicht = {art: 'bots', id: null}; nav(); zeigen(); toast(b.name + ' gelöscht'); } catch (e) { toast(e.message); }
   };
   $('#bSpeichern').onclick = async () => {
     const d = {name: $('#bName').value.trim(), rolle: $('#bRolle').value.trim(), farbe: $('#bFarbe').value.toUpperCase(), form: $('#bForm2').value,
-      modell: $('#bModell').value, persoenlichkeit: $('#bPers').value, fokus: $('#bFokus').value, stimme: $('#bStimme').value};
+      modell: $('#bModell').value, persoenlichkeit: $('#bPers').value, fokus: $('#bFokus').value, stimme: $('#bStimme').value,
+      merken: $('#bMerken').checked, rechte: S.rechteEntwurf,
+      regeln: Object.fromEntries([...document.querySelectorAll('[data-regel]')].map((x) => [x.dataset.regel, x.value]).filter(([, v]) => v !== 'fragen'))};
     if (!d.name) return toast('Name fehlt');
-    if (!neu) {
-      d.merken = $('#bMerken').checked; d.rechte = S.rechteEntwurf;
-      d.regeln = Object.fromEntries([...document.querySelectorAll('[data-regel]')].map((x) => [x.dataset.regel, x.value]).filter(([, v]) => v !== 'fragen'));
-    }
+    const k = $('#bSpeichern'); k.disabled = true;
     try {
-      const o = neu ? await api('POST', '/api/bots', d) : await api('PUT', '/api/bots/' + b.id, d);
-      if (neu && d.stimme) await api('PUT', '/api/bots/' + o.id, {stimme: d.stimme});
+      let o;
+      if (neu) {  // Anlegen kennt nur die Grundlagen – Stimme, Zugriffe, Regeln und „merken“ danach setzen (wie die App)
+        o = await api('POST', '/api/bots', d);
+        o = await api('PUT', '/api/bots/' + o.id, {stimme: d.stimme, rechte: d.rechte, merken: d.merken, regeln: d.regeln});
+      } else o = await api('PUT', '/api/bots/' + b.id, d);
       toast(neu ? `${o.name} ist da` : 'Gespeichert – startet kurz neu'); S.bearbeitet = false; await laden(); S.ansicht = {art: 'bot', id: o.id}; nav(); zeigen();
-    } catch (e) { toast(e.message); }
+    } catch (e) { toast(e.message); k.disabled = false; }
   };
 }
 function rechteZeichnen(kat, r) {
   const el = $('#bRechte'); if (!el) return;
-  if (!kat) { el.innerHTML = '<p class="mut">home-mcp nicht erreichbar.</p>'; return; }
+  if (!kat) { S.rechteEntwurf = undefined; el.innerHTML = '<p class="mut">home-mcp nicht erreichbar – Zugriffe bleiben, wie sie sind.</p>'; return; }
   const alle = !!r.alle;
   const konten = (a) => kat.konten?.[a] || [];
-  const basis = () => alle ? {mail: konten('mail'), kalender: konten('kalender'), drive: konten('drive'), db: kat.db || [], slack: kat.slack, slack_dm: kat.slack,
-    slack_kanaele: [], gitlab: kat.gitlab, statistik: kat.statistik, pakete: true, gesundheit: !!r.gesundheit, nur_haupt: false} : {...r};
+  const basis = () => rechteAufgeloest(kat, r);
   const x = alle ? basis() : r;
   const hat = (k, v) => (x[k] || []).includes(v);
   S.rechteEntwurf = r;
@@ -733,7 +834,8 @@ function rechteZeichnen(kat, r) {
       + (kanaele.length ? `<div class="mut">Kanäle: ${(x.slack_kanaele || []).length ? 'nur die markierten' : 'alle freigegebenen – oder einzelne antippen'}</div><div class="zeilen">${kanaele.map((c) => `<span class="chip ${hat('slack_kanaele', c.id) ? 'an' : ''}" data-r="slack_kanaele|${esc(c.id)}">${esc(c.label)}</span>`).join('')}</div>`
         : '<p class="mut">Kanäle: in home-mcp ist für „nookbot“ noch keiner freigegeben.</p>') : '') : ''}
     ${kat.gitlab ? schalter('rGitlab', '🦊 GitLab', x.gitlab) : ''}
-    ${(kat.db || []).length ? `<div class="zeilen" style="margin:6px 0"><span>🗄️ Datenbank</span>${kat.db.map((d) => `<span class="chip ${hat('db', d) ? 'an' : ''}" data-r="db|${esc(d)}">${esc(d)}</span>`).join('')}</div>` : ''}
+    <div class="zeilen" style="margin:6px 0"><span>🗄️ Datenbank</span>${(kat.db || []).map((d) => `<span class="chip ${hat('db', d) ? 'an' : ''}" data-r="db|${esc(d)}">${esc(d)}</span>`).join('')
+      || '<span class="mut">in home-mcp ist für „nookbot“ keine freigegeben</span>'}</div>
     ${kat.statistik ? schalter('rStatistik', '📈 Besucherstatistik', x.statistik) : ''}
     ${schalter('rPakete', '📦 Pakete (aus Home)', x.pakete)}
     ${schalter('rGesundheit', '❤️ Gesundheit (Health Connect) – gehört nie zu „Alles“', x.gesundheit)}`;
@@ -1012,39 +1114,124 @@ async function seiteWissen() {
   });
 }
 
-// ── Datenbanken (Abfragen-Bibliothek) ──
+// ── Datenbanken: was home-mcp freigibt (Zugriff je Bot) + Bibliothek mit Beschreibung und festen Abfragen ──
+// „Alle Zugriffe“ in einzelne Häkchen auflösen, sobald man etwas ändert (wie in der App)
+function rechteAufgeloest(kat, r) {
+  if (!r?.alle) return JSON.parse(JSON.stringify(r || {}));
+  const k = (a) => [...(kat?.konten?.[a] || [])];
+  return {mail: k('mail'), kalender: k('kalender'), drive: k('drive'), db: [...(kat?.db || [])], slack: !!kat?.slack, slack_dm: !!kat?.slack, slack_kanaele: [],
+    gitlab: !!kat?.gitlab, statistik: !!kat?.statistik, pakete: true, gesundheit: !!r.gesundheit, nur_haupt: false};
+}
+// Eine Datei aus einem Zip lesen (Echo-Vorlagen: vorlage.json) – ohne Bibliothek, mit DecompressionStream
+async function zipEintrag(buf, endung) {
+  const dv = new DataView(buf), u8 = new Uint8Array(buf), td = new TextDecoder();
+  let e = buf.byteLength - 22; while (e >= 0 && dv.getUint32(e, true) !== 0x06054b50) e--;
+  if (e < 0) throw new Error('Kein gültiges Zip');
+  let p = dv.getUint32(e + 16, true);
+  for (let i = 0, n = dv.getUint16(e + 10, true); i < n; i++) {
+    const meth = dv.getUint16(p + 10, true), groesse = dv.getUint32(p + 20, true), nl = dv.getUint16(p + 28, true), off = dv.getUint32(p + 42, true);
+    const name = td.decode(u8.subarray(p + 46, p + 46 + nl));
+    if (name.endsWith(endung)) {
+      const start = off + 30 + dv.getUint16(off + 26, true) + dv.getUint16(off + 28, true), roh = u8.subarray(start, start + groesse);
+      if (meth === 0) return td.decode(roh);
+      if (meth !== 8 || !('DecompressionStream' in window)) throw new Error('Dieses Zip kann der Browser nicht entpacken');
+      return new Response(new Blob([roh]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text();
+    }
+    p += 46 + nl + dv.getUint16(p + 30, true) + dv.getUint16(p + 32, true);
+  }
+  throw new Error(`Keine ${endung} im Zip`);
+}
+// Eigener Export ({datenbanken: …}) oder Echo-Vorlage (quellen mit art=sql → Abfragen je Verbindung) – wie die App
+function dbImport(text, dbName) {
+  const o = JSON.parse(text);
+  if (Array.isArray(o.datenbanken)) return o.datenbanken;
+  if (!Array.isArray(o.quellen)) throw new Error('Weder NookBot-Export noch Echo-Vorlage');
+  const je = new Map();
+  for (const q of o.quellen) {
+    if (q.art !== 'sql') continue;
+    const b = q.beschreibung || ''; const [vor, ...nach] = b.split(' · ');
+    const rest = nach.join(' · ');
+    (je.get(q.verbindung || 'Datenbank') || je.set(q.verbindung || 'Datenbank', []).get(q.verbindung || 'Datenbank'))
+      .push({name: (vor || q.id || '') + (rest ? ' – ' + rest.split(',')[0].slice(0, 60) : ''), zweck: b, sql: q.sql || '', parameter: []});
+  }
+  if (!je.size) throw new Error('Keine SQL-Quellen in der Vorlage');
+  return [...je].map(([conn, abfragen]) => ({titel: conn, name: dbName, beschreibung: `Importiert aus der Echo-Vorlage „${o.name || ''}“.`, notizen: '', abfragen}));
+}
 async function seiteDatenbanken() {
-  $('#haupt').innerHTML = kopf('Datenbanken', 'Beschreibung, Schema-Notizen, feste Abfragen', '<button class="pri klein" id="dbSpeichern">Speichern</button>') + '<div class="seite"><div class="bl" id="dbL"><div class="box mut">lädt …</div></div></div>';
-  const o = await api('GET', '/api/datenbanken').catch((e) => { toast(e.message); return {datenbanken: []}; });
+  $('#haupt').innerHTML = kopf('Datenbanken', 'Zugriff je Bot, Beschreibung, feste Abfragen', '<button class="pri klein" id="dbSpeichern">Bibliothek speichern</button>') + '<div class="seite"><div class="bl" id="dbL"><div class="box mut">lädt …</div></div></div>';
+  const [o, kat] = await Promise.all([api('GET', '/api/datenbanken').catch((e) => { toast(e.message); return {datenbanken: []}; }), api('GET', '/api/rechte').catch(() => null)]);
+  if (S.ansicht.art !== 'datenbanken') return;
   const dbs = o.datenbanken || [];
+  const freigegeben = kat?.db || [];
+  let geaendert = false;
   const zeichnen = () => {
-    $('#dbL').innerHTML = `<p class="mut">Bots mit Datenbank-Zugriff bekommen das als Skill: feste Abfragen, die sie anpassen dürfen – gerechnet wird per SQL.</p>` + dbs.map((d, i) => `<div class="box">
-      <div class="reihe">${feld('Titel', `<input data-db="${i}|titel" value="${esc(d.titel || '')}">`)}${feld('Name in home-mcp', `<input data-db="${i}|name" value="${esc(d.name || '')}">`)}</div>
+    const zugriff = (b, d) => (b.rechte?.alle ? freigegeben : b.rechte?.db || []).includes(d);
+    $('#dbL').innerHTML = `<div class="box"><h3>In home-mcp freigegeben</h3>${!kat ? '<p class="mut">home-mcp nicht erreichbar.</p>' : freigegeben.length ? freigegeben.map((d) => {
+        const lib = dbs.filter((x) => x.name === d);
+        return `<div style="border-top:1px solid var(--line);padding:8px 0"><div class="zeilen"><b>🗄️ ${esc(d)}</b><span class="mut">${lib.length ? lib.reduce((n, x) => n + (x.abfragen || []).length, 0) + ' feste Abfragen' : 'noch nicht beschrieben'} · nur lesen</span>
+          <span style="flex:1"></span><button class="klein" data-db-schema="${esc(d)}">Schema ansehen</button>${lib.length ? '' : `<button class="klein" data-db-beschreiben="${esc(d)}">Beschreiben</button>`}</div>
+          <div class="zeilen" style="margin-top:6px"><span class="mut">Zugriff:</span>${S.bots.map((b) => `<span class="chip ${zugriff(b, d) ? 'an' : ''}" data-db-bot="${esc(b.id)}|${esc(d)}" title="${zugriff(b, d) ? 'Zugriff entziehen' : 'Zugriff geben'}">${esc(b.name)}</span>`).join('')}</div></div>`;
+      }).join('') : '<p class="mut">Für den Schlüssel „nookbot“ ist in home-mcp keine Datenbank freigegeben (home-mcp-Verwaltung → Datenbanken).</p>'}
+      <p class="mut">Antippen gibt oder entzieht einem Bot den Zugriff – er startet dann kurz neu. Dasselbe geht in den Einstellungen jedes Bots unter „Zugriffe“. Zugangsdaten bleiben in home-mcp.</p></div>
+      <div class="box"><h3>Bibliothek</h3><p class="mut" style="margin-top:0">Was die Bots über die Datenbanken wissen: wofür sie da sind, Hinweise zum Schema und feste Abfragen. Bots mit Zugriff bekommen das als Skill
+        und passen die Abfragen an – gerechnet wird per SQL.</p><div class="zeilen"><button class="klein" id="dbImport">Importieren …</button><input type="file" id="dbDatei" accept=".json,.zip,application/json,application/zip" hidden>
+        <button class="klein" id="dbExport">Exportieren</button><span class="mut">NookBot-Export oder Echo-Vorlage (JSON oder Zip)</span></div></div>
+      <datalist id="dbNamen">${freigegeben.map((d) => `<option value="${esc(d)}">`).join('')}</datalist>` + dbs.map((d, i) => `<div class="box" id="db-${i}">
+      <div class="reihe">${feld('Titel', `<input data-db="${i}|titel" value="${esc(d.titel || '')}">`)}${feld('Name in home-mcp', `<input data-db="${i}|name" list="dbNamen" value="${esc(d.name || '')}">`)}</div>
+      ${kat && d.name && !freigegeben.includes(d.name) ? `<p style="color:var(--accent);margin:0">„${esc(d.name)}“ ist in home-mcp nicht freigegeben – die Abfragen laufen so nicht.</p>` : ''}
       ${feld('Beschreibung', `<textarea rows="2" data-db="${i}|beschreibung">${esc(d.beschreibung || '')}</textarea>`)}
       ${feld('Schema-Notizen', `<textarea rows="4" data-db="${i}|notizen" style="font-family:ui-monospace,Menlo,monospace;font-size:13px">${esc(d.notizen || '')}</textarea>`)}
-      <div class="zeilen"><button class="klein" data-db-schema="${esc(d.name || '')}">Schema ansehen</button><button class="klein text" data-db-weg="${i}">Datenbank entfernen</button></div>
+      <div class="zeilen"><button class="klein" data-db-schema="${esc(d.name || '')}">Schema ansehen</button><button class="klein text" data-db-weg="${i}">Beschreibung entfernen</button></div>
       <h3 style="margin-top:14px">Abfragen</h3>${(d.abfragen || []).map((q, j) => `<div style="border-top:1px solid var(--line);padding-top:8px;margin-top:8px">
         <div class="reihe">${feld('Name', `<input data-q="${i}|${j}|name" value="${esc(q.name || '')}">`)}${feld('Parameter (name=standard, …)', `<input data-q="${i}|${j}|parameter" value="${esc((q.parameter || []).map((p) => p.name + (p.standard ? '=' + p.standard : '')).join(', '))}">`)}</div>
         ${feld('Zweck', `<input data-q="${i}|${j}|zweck" value="${esc(q.zweck || '')}">`)}
         ${feld('SQL', `<textarea rows="6" data-q="${i}|${j}|sql" style="font-family:ui-monospace,Menlo,monospace;font-size:13px">${esc(q.sql || '')}</textarea>`)}
         <button class="klein text" data-q-weg="${i}|${j}">Abfrage entfernen</button></div>`).join('')}
-      <button class="klein" data-q-neu="${i}" style="margin-top:8px">+ Abfrage</button></div>`).join('') + '<button class="klein" id="dbNeu">+ Datenbank</button>';
-    S.bearbeitet = true;
-    $('#dbL').querySelectorAll('[data-db]').forEach((x) => x.oninput = () => { const [i, k] = x.dataset.db.split('|'); dbs[i][k] = x.value; });
-    $('#dbL').querySelectorAll('[data-q]').forEach((x) => x.oninput = () => { const [i, j, k] = x.dataset.q.split('|'); const q = dbs[i].abfragen[j];
+      <button class="klein" data-q-neu="${i}" style="margin-top:8px">+ Abfrage</button></div>`).join('') + '<button class="klein" id="dbNeu">+ Datenbank beschreiben</button>';
+    S.bearbeitet = geaendert;
+    const aendern = () => { geaendert = true; S.bearbeitet = true; };
+    $('#dbL').querySelectorAll('[data-db]').forEach((x) => x.oninput = () => { const [i, k] = x.dataset.db.split('|'); dbs[i][k] = x.value; aendern(); });
+    $('#dbL').querySelectorAll('[data-q]').forEach((x) => x.oninput = () => { const [i, j, k] = x.dataset.q.split('|'); const q = dbs[i].abfragen[j]; aendern();
       q[k] = k === 'parameter' ? x.value.split(',').map((p) => p.trim()).filter(Boolean).map((p) => ({name: p.split('=')[0].trim().replace(/^:/, ''), standard: (p.split('=')[1] || '').trim()})) : x.value; });
-    $('#dbL').querySelectorAll('[data-q-neu]').forEach((x) => x.onclick = () => { (dbs[x.dataset.qNeu].abfragen ||= []).push({name: '', zweck: '', sql: '', parameter: []}); zeichnen(); });
-    $('#dbL').querySelectorAll('[data-q-weg]').forEach((x) => x.onclick = () => { const [i, j] = x.dataset.qWeg.split('|'); dbs[i].abfragen.splice(j, 1); zeichnen(); });
-    $('#dbL').querySelectorAll('[data-db-weg]').forEach((x) => x.onclick = () => { if (confirm('Datenbank aus der Bibliothek entfernen?')) { dbs.splice(x.dataset.dbWeg, 1); zeichnen(); } });
+    $('#dbL').querySelectorAll('[data-q-neu]').forEach((x) => x.onclick = () => { (dbs[x.dataset.qNeu].abfragen ||= []).push({name: '', zweck: '', sql: '', parameter: []}); aendern(); zeichnen(); });
+    $('#dbL').querySelectorAll('[data-q-weg]').forEach((x) => x.onclick = () => { const [i, j] = x.dataset.qWeg.split('|'); dbs[i].abfragen.splice(j, 1); aendern(); zeichnen(); });
+    $('#dbL').querySelectorAll('[data-db-weg]').forEach((x) => x.onclick = () => { if (confirm('Beschreibung und Abfragen entfernen? Die Datenbank selbst bleibt unberührt.')) { dbs.splice(x.dataset.dbWeg, 1); aendern(); zeichnen(); } });
+    $('#dbL').querySelectorAll('[data-db-beschreiben]').forEach((x) => x.onclick = () => { dbs.push({titel: x.dataset.dbBeschreiben, name: x.dataset.dbBeschreiben, beschreibung: '', notizen: '', abfragen: []}); aendern(); zeichnen();
+      $('#db-' + (dbs.length - 1))?.scrollIntoView({behavior: 'smooth'}); });
     $('#dbL').querySelectorAll('[data-db-schema]').forEach((x) => x.onclick = async () => {
+      if (!x.dataset.dbSchema) return toast('Erst den Namen in home-mcp eintragen');
       const d = $('#dlg'); d.innerHTML = '<p class="mut">lädt …</p>'; d.showModal();
       const s = await api('GET', '/api/schema?db=' + encodeURIComponent(x.dataset.dbSchema)).catch((e) => ({text: e.message}));
       d.innerHTML = `<h3 style="margin-top:0">Schema ${esc(x.dataset.dbSchema)}</h3><pre style="white-space:pre-wrap;max-height:60vh;overflow:auto;font-size:12px">${esc(s.text)}</pre><button onclick="this.closest('dialog').close()">Schließen</button>`;
     });
-    $('#dbNeu').onclick = () => { dbs.push({titel: '', name: '', beschreibung: '', notizen: '', abfragen: []}); zeichnen(); };
+    $('#dbL').querySelectorAll('[data-db-bot]').forEach((x) => x.onclick = async () => {
+      const [bid, d] = x.dataset.dbBot.split('|'); const b = bot(bid); if (!b) return;
+      const an = zugriff(b, d);
+      if (!confirm(`${b.name} ${an ? 'den Zugriff auf' : 'Zugriff auf'} „${d}“ ${an ? 'entziehen' : 'geben'}? ${b.name} startet dafür kurz neu.`)) return;
+      const r = rechteAufgeloest(kat, b.rechte); const l = new Set(r.db || []); an ? l.delete(d) : l.add(d); r.db = [...l]; delete r.alle;
+      try { await api('PUT', '/api/bots/' + bid, {rechte: r}); await laden(); toast(an ? 'Zugriff entzogen' : 'Zugriff gegeben'); zeichnen(); } catch (e) { toast(e.message); }
+    });
+    $('#dbNeu').onclick = () => { dbs.push({titel: '', name: freigegeben[0] || '', beschreibung: '', notizen: '', abfragen: []}); aendern(); zeichnen(); };
+    $('#dbExport').onclick = () => { const u = URL.createObjectURL(new Blob([JSON.stringify({datenbanken: dbs}, null, 2)], {type: 'application/json'}));
+      const a = document.createElement('a'); a.href = u; a.download = 'nookbot-datenbanken.json'; a.click(); setTimeout(() => URL.revokeObjectURL(u), 5000); };
+    $('#dbImport').onclick = () => $('#dbDatei').click();
+    $('#dbDatei').onchange = async (e) => {
+      const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+      try {
+        if (f.size > 2e6) throw new Error('Datei zu groß');
+        const buf = await f.arrayBuffer(); const u8 = new Uint8Array(buf);
+        const text = u8[0] === 0x50 && u8[1] === 0x4b ? await zipEintrag(buf, 'vorlage.json') : new TextDecoder().decode(u8);
+        const echo = !Array.isArray(JSON.parse(text).datenbanken);
+        const name = echo ? prompt('Echo-Vorlage: Bei welcher Datenbank in home-mcp laufen die Abfragen?', freigegeben[0] || 'heroku') : '';
+        if (name === null) return;
+        const neu = dbImport(text, (name || '').trim());
+        dbs.push(...neu); aendern(); zeichnen();
+        toast(`${neu.reduce((n, x) => n + (x.abfragen || []).length, 0)} Abfragen importiert – noch speichern`);
+      } catch (er) { toast(er.message); }
+    };
   };
   zeichnen();
-  $('#dbSpeichern').onclick = async () => { try { await api('PUT', '/api/datenbanken', {datenbanken: dbs}); S.bearbeitet = false; toast('Gespeichert – Bots mit Zugriff kennen jetzt die Abfragen'); } catch (e) { toast(e.message); } };
+  $('#dbSpeichern').onclick = async () => { try { await api('PUT', '/api/datenbanken', {datenbanken: dbs}); geaendert = false; S.bearbeitet = false; toast('Gespeichert – Bots mit Zugriff kennen jetzt die Abfragen'); } catch (e) { toast(e.message); } };
 }
 
 // ── Zugriffe ──
@@ -1061,8 +1248,9 @@ async function seiteZugriffe() {
 // ── Einstellungen ──
 async function seiteEinstellungen() {
   $('#haupt').innerHTML = kopf('Einstellungen') + '<div class="seite"><div class="bl" id="eL"><div class="box mut">lädt …</div></div></div>';
-  const [g, c, st, ge, vo] = await Promise.all([api('GET', '/api/guthaben').catch(() => null), api('GET', '/api/claude').catch(() => null),
-    api('GET', '/api/stimmen').catch(() => ({aussprache: {}})), api('GET', '/api/gesundheit/info').catch(() => null), api('GET', '/api/vorschlaege').catch(() => null)]);
+  const [g, c, st, ge, vo, au] = await Promise.all([api('GET', '/api/guthaben').catch(() => null), api('GET', '/api/claude').catch(() => null),
+    api('GET', '/api/stimmen').catch(() => ({aussprache: {}})), api('GET', '/api/gesundheit/info').catch(() => null), api('GET', '/api/vorschlaege').catch(() => null),
+    api('GET', '/api/aufraeumen').catch(() => null)]);
   const usd = (x) => (Math.round((x || 0) * 100) / 100).toFixed(2) + ' $';
   const inc = g?.included; const rest = inc ? (inc.balance_usd || 0) + (g.purchased?.balance_usd || 0) : null;
   const aus = Object.entries(st.aussprache || {}).sort((a, b) => a[0].localeCompare(b[0]));
@@ -1082,7 +1270,8 @@ async function seiteEinstellungen() {
       <div class="zeilen" style="margin-top:8px"><input id="aW" placeholder="Wort" style="flex:1"><input id="aL" placeholder="so sprechen" style="flex:1"><button class="klein" id="aOk">Hinzufügen</button></div></div>
     ${vo ? `<div class="box"><h3>Vorschläge</h3><p class="mut">Wiederholt sich etwas (derselbe Text mehrfach eingefügt, dieselbe Frage an mehreren Tagen, wiederkehrende Fehler), bietet der Kapitän an, es dauerhaft zu lösen. Gesucht wird ohne KI; gefragt wird er nur bei Neuem. Umgesetzt wird erst nach deinem Ja.</p>
       ${schalter('vAktiv', 'Tägliche Durchsicht', vo.einstellungen.aktiv)}<div class="zeilen" style="margin-top:8px"><input id="vZeit" type="time" value="${esc(vo.einstellungen.zeit)}"><button class="klein" id="vJetzt">Jetzt durchsehen</button></div>
-      ${vo.vorschlaege.slice(0, 8).map((v) => `<div class="teil"><span style="flex:1">${esc(v.text)}</span><span class="mut">${{offen: 'offen', angenommen: 'angenommen', abgelehnt: 'abgelehnt', im_chat: 'im Chat beantwortet'}[v.status]}</span></div>`).join('')}</div>` : ''}
+      ${vo.vorschlaege.filter((v) => v.art !== 'aufraeumen').slice(0, 8).map((v) => `<div class="teil"><span style="flex:1">${esc(v.text)}</span><span class="mut">${{offen: 'offen', angenommen: 'angenommen', abgelehnt: 'abgelehnt', im_chat: 'im Chat beantwortet'}[v.status]}</span></div>`).join('')}</div>` : ''}
+    ${au ? `<div class="box"><h3>Gedächtnis aufräumen</h3><p class="mut">Einmal in der Woche: Doppeltes, Abgelaufenes und Belangloses je Bot als Vorschlag (Karte im Chat des Bots). Gelöscht wird erst nach deinem Ja.</p>${aufrEinstellungen(au)}</div>` : ''}
     <div class="box"><h3>Im Browser</h3>${schalter('eVorlesen', 'Antworten vorlesen (Stimme des Bots)', vorlesenAn())}${schalter('eMelden', 'Benachrichtigen, wenn ein Bot fertig ist (solange dieser Tab offen ist)', melden)}</div>
     ${ge ? `<div class="box"><h3>Gesundheit</h3><p class="mut">${ge.tage ? `${ge.tage} Tage auf dem Pi (${esc(ge.von)} – ${esc(ge.bis)}) · Quellen: ${esc(Object.keys(ge.quellen || {}).map((q) => q.includes('fitbit') ? 'Fitbit' : q.includes('renpho') ? 'Renpho' : q.includes('egym') ? 'EGYM' : q.includes('healthconnect') ? 'Handy' : q).join(', '))}` : 'Noch keine Daten.'} Freigeben und abgleichen geht in der App.</p></div>` : ''}
     <div class="box"><h3>Sitzung</h3><button class="klein" onclick="abmelden()">Abmelden</button></div>`;
@@ -1102,6 +1291,7 @@ async function seiteEinstellungen() {
     $('#vAktiv').onchange = vSetzen; $('#vZeit').onchange = vSetzen;
     $('#vJetzt').onclick = async () => { try { await api('POST', '/api/vorschlaege/durchsicht'); toast('Durchsicht läuft – Vorschläge erscheinen im Chat des Kapitäns'); } catch (e) { toast(e.message); } };
   }
+  aufrVerbinden();
   $('#eVorlesen').onchange = (e) => store.set('nb_vorlesen', e.target.checked ? '1' : null);
   $('#eMelden').onchange = async (e) => {
     if (e.target.checked && 'Notification' in window && Notification.permission !== 'granted') {

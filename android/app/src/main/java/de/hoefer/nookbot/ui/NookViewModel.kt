@@ -540,8 +540,12 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
 
     // ── Vorschläge der Bots (Ja → der Bot bekommt den Auftrag, Nein → kommt nicht wieder) ──
     fun vorschlagEntscheiden(id: String, ja: Boolean) = io {
-        api.post("/api/vorschlaege/$id", JSONObject().put("entscheidung", if (ja) "ja" else "nein"))
-        toast.value = if (ja) "Angenommen – der Bot legt los" else "Abgelehnt – kommt nicht wieder"
+        val o = api.post("/api/vorschlaege/$id", JSONObject().put("entscheidung", if (ja) "ja" else "nein"))
+        toast.value = when {
+            o.has("entfernt") -> if (ja) "${o.optInt("entfernt")} entfernt" else "Alles bleibt – kommt nicht wieder"
+            ja -> "Angenommen – der Bot legt los"
+            else -> "Abgelehnt – kommt nicht wieder"
+        }
     }
 
     fun vorschlagEinstellungen(fertig: (Boolean, String) -> Unit) = io {
@@ -550,6 +554,21 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun vorschlagSetzen(aktiv: Boolean, zeit: String) = io { api.put("/api/vorschlaege", JSONObject().put("aktiv", aktiv).put("zeit", zeit)) }
+
+    // ── Gedächtnis aufräumen (wöchentlich, als Vorschlag – das Ja in der Karte entfernt) ──
+    fun aufraeumenEinstellungen(fertig: (Boolean, Int, String) -> Unit) = io {
+        val o = api.get("/api/aufraeumen").optJSONObject("einstellungen") ?: JSONObject()
+        withContext(Dispatchers.Main) { fertig(o.optBoolean("aktiv", true), o.optInt("tag", 7), o.optString("zeit", "18:00")) }
+    }
+
+    fun aufraeumenSetzen(aktiv: Boolean, tag: Int, zeit: String) = io {
+        api.put("/api/aufraeumen", JSONObject().put("aktiv", aktiv).put("tag", tag).put("zeit", zeit))
+    }
+
+    fun aufraeumenJetzt() = io {
+        api.post("/api/aufraeumen/jetzt")
+        toast.value = "Sehe alle Bots durch – Vorschläge erscheinen im Chat des jeweiligen Bots"
+    }
 
     fun durchsichtJetzt() = io {
         api.post("/api/vorschlaege/durchsicht")

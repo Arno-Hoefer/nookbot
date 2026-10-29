@@ -5,7 +5,7 @@ import threading
 import time
 from http.server import ThreadingHTTPServer
 
-from . import basis, claude, bots, sitzungen, automatik, schnittstelle, vorschlaege
+from . import basis, claude, bots, sitzungen, automatik, schnittstelle, vorschlaege, aufraeumen
 
 
 def start_bots():
@@ -38,7 +38,7 @@ def main():
         claude.claude_schluessel_verteilen()
     except Exception as e:  # noqa: BLE001
         basis.log("Claude-Schlüssel:", e)
-    for fn in (sitzungen.watchdog, automatik.scheduler, automatik.waechter, vorschlaege.planer):
+    for fn in (sitzungen.watchdog, automatik.scheduler, automatik.waechter, vorschlaege.planer, aufraeumen.aufraeumer):
         threading.Thread(target=fn, daemon=True, name=fn.__name__).start()
     basis.log(f"nookbot {basis.VERSION} auf 127.0.0.1:{basis.PORT} – Bots: {', '.join(b['name'] for b in bots.bots())}")
     while True:
