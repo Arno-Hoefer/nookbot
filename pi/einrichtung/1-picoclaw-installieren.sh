@@ -17,10 +17,20 @@ curl -fsSL "$B/picoclaw_Linux_arm64.tar.gz" -o "$TMP/picoclaw_Linux_arm64.tar.gz
 curl -fsSL "$B/picoclaw_${PICO_VER#v}_checksums.txt" -o "$TMP/sums.txt"
 (cd "$TMP" && grep " picoclaw_Linux_arm64.tar.gz\$" sums.txt | sha256sum -c -) || { echo "PRUEFSUMME FALSCH"; exit 1; }
 rm -rf /opt/picoclaw && install -d /opt/picoclaw
-tar xzf "$TMP/picoclaw_Linux_arm64.tar.gz" -C /opt/picoclaw
+tar xzf "$TMP/picoclaw_Linux_arm64.tar.gz" -C /opt/picoclaw --no-same-owner   # Dateien gehören root, nicht der UID aus dem Archiv
 rm -rf "$TMP"
 ls -la /opt/picoclaw
 sudo -u picoclaw env HOME=/srv/picoclaw /opt/picoclaw/picoclaw version 2>&1 | head -3
+
+echo "== Konfiguration und Arbeitsbereich (picoclaw onboard) – nur beim ersten Mal"
+# Legt /srv/picoclaw/.picoclaw/config.json und workspace/ an; 2-modell-und-websuche.sh baut darauf auf.
+# Steht die Konfiguration schon da (z. B. aus einer Sicherung), bleibt sie unangetastet.
+if [ -f /srv/picoclaw/.picoclaw/config.json ]; then
+  echo "config.json vorhanden – übersprungen"
+else
+  (cd /srv/picoclaw && sudo -u picoclaw env HOME=/srv/picoclaw /opt/picoclaw/picoclaw --no-color onboard </dev/null)
+  ls -la /srv/picoclaw/.picoclaw
+fi
 
 echo "== Aufrufhilfen"
 cat > /usr/local/bin/pico <<'EOS'

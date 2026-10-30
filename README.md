@@ -98,9 +98,10 @@ App (Kotlin/Compose)  ──HTTPS im Tailnet──▶  nookbot-adapter (Python, 
 ## Einrichten
 
 Voraussetzungen: Raspberry Pi (getestet: Pi 5, 4 GB, Raspberry Pi OS / Debian 12), Tailscale, ein Ollama-Konto.
-Die Skripte unter `pi/einrichtung/` in dieser Reihenfolge ausführen (Keys werden verdeckt abgefragt, nie im Repo):
+Die Skripte unter `pi/einrichtung/` in dieser Reihenfolge ausführen (Keys werden verdeckt abgefragt, nie im Repo).
+Vollständig mit Prüfbefehlen, Secrets, Ports und Wiederherstellung aus der Sicherung: **[docs/neu-aufsetzen.md](docs/neu-aufsetzen.md)**.
 
-1. `1-picoclaw-installieren.sh` – PicoClaw als eigener Benutzer, Prüfsumme wird geprüft
+1. `1-picoclaw-installieren.sh` – PicoClaw v0.3.1 als eigener Benutzer, Prüfsumme wird geprüft, Konfiguration per `onboard`
 2. `2-modell-und-websuche.sh` – Ollama-Modell und Brave-Websuche, Shell/Skill-Installation aus
 3. `3-picoclaw-dienst.sh` – systemd-Dienst, abgeschottet (`pi/kapitaen/USER.example.md` → `USER.md`)
 4. `4-home-mcp-anbinden.sh` – optional: eigener MCP-Server für Kalender/Mail/Daten

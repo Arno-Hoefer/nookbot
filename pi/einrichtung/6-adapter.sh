@@ -5,6 +5,9 @@
 # Aufruf: sudo bash 6-adapter.sh   (erwartet /tmp/nookbot-adapter/{nookbot_server.py,wsclient.py,nookbot/,web/})
 set -euo pipefail
 
+echo "== Pakete (pdftotext/pdftoppm für PDF-Wissen, seite_lesen und dokument_ansehen)"
+apt-get install -y -qq poppler-utils >/dev/null
+
 echo "== Programm"
 install -d -m 755 /opt/nookbot
 install -m 644 /tmp/nookbot-adapter/nookbot_server.py /tmp/nookbot-adapter/wsclient.py /opt/nookbot/

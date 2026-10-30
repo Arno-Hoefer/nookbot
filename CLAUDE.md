@@ -24,7 +24,7 @@ pi/adapter/nookbot/            der Adapter in Modulen (Ladereihenfolge in __init
   mcp, schnittstelle, start        MCP-Werkzeuge der Bots, HTTP-Handler, main()
 pi/adapter/web/index.html      Web-Oberfläche (eine Datei, ohne Build)
 pi/adapter/tests/              unittest (ohne Pi): python3 -m unittest discover -s tests
-pi/einrichtung/                Einrichtungsskripte 1–11 für einen frischen Pi
+pi/einrichtung/                Einrichtungsskripte 1–11 für einen frischen Pi (Anleitung: docs/neu-aufsetzen.md)
 pi/kapitaen/                   AGENT.md/SOUL.md-Vorlagen des Kapitäns (USER.md ist privat, gitignored)
 android/                       App (Kotlin, Jetpack Compose, whisper.cpp per NDK)
 docs/                          Doku + Screenshots (nur Demo-Daten)
@@ -60,6 +60,9 @@ sudo install -d -m 755 /opt/nookbot/nookbot && sudo install -m 644 nookbot/*.py 
 sudo install -m 644 web/index.html /opt/nookbot/web/
 sudo systemctl restart nookbot-adapter && journalctl -u nookbot-adapter -n 20
 ```
+
+Den Adapter nicht neu starten, solange Bots antworten oder eine Runde läuft. Einen Pi von Null aufsetzen oder aus der Sicherung
+wiederherstellen: [docs/neu-aufsetzen.md](docs/neu-aufsetzen.md).
 
 Vor größeren Änderungen `/opt/nookbot` sichern (`tar czf /root/nookbot-vor-….tgz -C /opt nookbot`).
 

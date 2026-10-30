@@ -4,20 +4,22 @@
 
 Voraussetzungen: Raspberry Pi 5 (getestet mit 4 GB, Raspberry Pi OS / Debian 12), Tailscale, ein Ollama-Konto.
 Die Skripte unter `pi/einrichtung/` der Reihe nach ausführen. Schlüssel werden verdeckt abgefragt.
+Die vollständige Anleitung mit Prüfbefehlen, Secrets, Ports, ntfy und Wiederherstellung steht in **[Neu aufsetzen](neu-aufsetzen.md)**.
 
 | Skript | Was |
 |---|---|
-| `1-picoclaw-installieren.sh` | PicoClaw als eigener Benutzer, Prüfsumme wird geprüft |
+| `1-picoclaw-installieren.sh` | PicoClaw v0.3.1 als eigener Benutzer, Prüfsumme wird geprüft, `picoclaw onboard` |
 | `2-modell-und-websuche.sh` | Ollama-Modell und Websuche, Shell und Skill-Installation aus |
 | `3-picoclaw-dienst.sh` | systemd-Dienst, abgeschottet |
 | `4-home-mcp-anbinden.sh` | optional: home-mcp für Kalender, Mail, Daten |
 | `5-chat-kanal.sh` | WebSocket-Kanal mit Token (zugleich der Schlüssel der App) |
-| `6-adapter.sh` | Adapter samt Paket, Vorlage für weitere Bots, Polkit-Regel, Tailnet-Freigabe |
+| `6-adapter.sh` | Adapter samt Paket, poppler-utils, Vorlage für weitere Bots, Polkit-Regel, Tailnet-Freigabe |
 | `7-claude.sh` | optional: Claude als zweiter Anbieter |
 | `8-stimmen.sh` | optional: Piper-Stimmen |
 | `9-whisper.sh` | optional: Spracherkennung auf dem Pi (Diktat im Web) |
 | `10-rechner.sh` | optional: Python-Sandkasten (bubblewrap, pandas, matplotlib, openpyxl, pypdf, python-docx) |
 | `11-phonon.sh` | optional: Phonon-Stimmen auf dem Pi (Programm mit Prüfsumme, deutsches Modell, 13 Stimmen; ~150 MB) |
+| (von Hand) | optional: ntfy und Freigaben im Web – siehe [Neu aufsetzen, Schritt 12](neu-aufsetzen.md#12-ntfy-und-freigaben-im-web-optional) |
 | `nutzer-setzen.py <Name>` | wie die Bots dich nennen |
 
 ## Aktualisieren
@@ -68,6 +70,7 @@ sonntags 4 Wochen, am Monatsersten 6 Monate. Seit 23.10.2026 gehören auch NookB
 - **Wiederherstellungstest:** `~/bin/pi-backup-pruefen.sh`. Er holt die neueste Sicherung, packt sie im Testordner aus und prüft
   unter anderem `bots.json`, `config.json`, die Unterhaltungen und `nutzer.json` von home-mcp.
 - **Wiederherstellen:** `nookbot.tar` bzw. `home-mcp.tar` nach `/srv` entpacken, Dienst-Dateien zurück, `systemctl daemon-reload`,
-  Dienste starten.
+  Dienste starten. Ausführlich: [Neu aufsetzen → Wiederherstellen](neu-aufsetzen.md#wiederherstellen-aus-der-sicherung).
+- Nicht in der Sicherung: ntfy (`/etc/ntfy/server.yml`, `/var/lib/ntfy/user.db`) – nach dem Wiederherstellen neu anlegen.
 - Bleibt die Sicherung aus, warnt die Home-App (`~/pi-backup/status.json`).
 - Die Skripte liegen im Home-Repo unter `deploy/backup/`.
