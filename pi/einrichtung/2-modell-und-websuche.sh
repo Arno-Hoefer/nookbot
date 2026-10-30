@@ -5,7 +5,7 @@
 set -euo pipefail
 
 read -rsp "Ollama-API-Key: " OLLAMA_KEY; echo
-read -rsp "Brave-Search-Key: " BRAVE_KEY; echo
+read -rsp "Brave-Search-Key (leer = ohne Websuche): " BRAVE_KEY; echo
 export OLLAMA_KEY BRAVE_KEY
 
 echo "== Modelle bei Ollama Cloud"
@@ -61,7 +61,7 @@ for r in t["skills"]["registries"].values():
 w = t["web"]
 w["provider"], w["prefer_native"] = "brave", False
 w["sogou"]["enabled"] = False
-w["brave"].update(enabled=True, api_keys=[bk], max_results=5)
+w["brave"].update(enabled=bool(bk), api_keys=[bk] if bk else [], max_results=5)
 c["heartbeat"]["enabled"] = False            # im Test keine selbstständigen Modellaufrufe
 c["gateway"].update(host="127.0.0.1", port=18790)
 save(p, c, "picoclaw")

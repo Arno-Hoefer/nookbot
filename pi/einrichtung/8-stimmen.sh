@@ -4,7 +4,7 @@
 set -euo pipefail
 install -d -m 755 /opt/piper/stimmen
 cd "$(mktemp -d)"
-curl -fsSL -o piper.tgz https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_linux_aarch64.tar.gz
+curl -fsSL -o piper.tgz https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_linux_$(uname -m).tar.gz
 tar xzf piper.tgz && cp -r piper/* /opt/piper/
 B=https://huggingface.co/rhasspy/piper-voices/resolve/main/de/de_DE
 for v in thorsten/high thorsten/medium thorsten_emotional/medium kerstin/low ramona/low eva_k/x_low karlsson/low pavoque/low; do

@@ -5,6 +5,7 @@
 | [Funktionen](funktionen.md) | Was NookBot kann – mit Screenshots aus App und Web |
 | [Architektur](architektur.md) | Komponenten, Datenfluss, Module des Adapters, Daten auf dem Pi |
 | [Sicherheit](sicherheit.md) | Rechte je Bot, Freigaben und Regeln, Sandkasten, Seiten-Sperre, Schlüssel |
+| [Neuer Server](neuer-server.md) | Eigener Server mit home-mcp + NookBot, kurz und in Reihenfolge (Teil 2, Teil 1 im Repo home-mcp) |
 | [Neu aufsetzen](neu-aufsetzen.md) | Frischer Pi Schritt für Schritt mit Prüfbefehlen, Secrets, Ports, Wiederherstellen aus der Sicherung |
 | [Betrieb](betrieb.md) | Einrichten, Aktualisieren, Protokolle, Kosten, Sicherung |
 | [Schnittstellen](schnittstellen.md) | HTTP-API für App und Web, MCP-Werkzeuge der Bots |

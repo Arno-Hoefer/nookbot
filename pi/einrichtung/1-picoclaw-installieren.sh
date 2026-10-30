@@ -3,6 +3,8 @@
 # Aufruf: sudo bash 1-picoclaw-installieren.sh
 set -uo pipefail
 PICO_VER=v0.3.1
+case "$(uname -m)" in aarch64) PAKET=picoclaw_Linux_arm64.tar.gz ;; x86_64) PAKET=picoclaw_Linux_x86_64.tar.gz ;;
+  *) echo "Nicht unterstützt: $(uname -m)"; exit 1 ;; esac
 
 echo "== Benutzer"
 for u in picoclaw; do
@@ -13,11 +15,11 @@ done
 echo "== PicoClaw $PICO_VER"
 TMP=$(mktemp -d)
 B=https://github.com/sipeed/picoclaw/releases/download/$PICO_VER
-curl -fsSL "$B/picoclaw_Linux_arm64.tar.gz" -o "$TMP/picoclaw_Linux_arm64.tar.gz"
+curl -fsSL "$B/$PAKET" -o "$TMP/$PAKET"
 curl -fsSL "$B/picoclaw_${PICO_VER#v}_checksums.txt" -o "$TMP/sums.txt"
-(cd "$TMP" && grep " picoclaw_Linux_arm64.tar.gz\$" sums.txt | sha256sum -c -) || { echo "PRUEFSUMME FALSCH"; exit 1; }
+(cd "$TMP" && grep " $PAKET\$" sums.txt | sha256sum -c -) || { echo "PRUEFSUMME FALSCH"; exit 1; }
 rm -rf /opt/picoclaw && install -d /opt/picoclaw
-tar xzf "$TMP/picoclaw_Linux_arm64.tar.gz" -C /opt/picoclaw --no-same-owner   # Dateien gehören root, nicht der UID aus dem Archiv
+tar xzf "$TMP/$PAKET" -C /opt/picoclaw --no-same-owner   # Dateien gehören root, nicht der UID aus dem Archiv
 rm -rf "$TMP"
 ls -la /opt/picoclaw
 sudo -u picoclaw env HOME=/srv/picoclaw /opt/picoclaw/picoclaw version 2>&1 | head -3
