@@ -79,6 +79,14 @@ Alle Bilder zeigen Demo-Daten. App links bzw. oben, Web-Oberfläche darunter.
   - Tägliche Durchsicht (Standard 17:30, abschaltbar): Der Pi sucht **ohne KI** nach Mustern der letzten 14 Tage – derselbe Text
     mehrfach eingefügt, dieselbe Bitte an mehreren Tagen, ein Werkzeug scheitert immer wieder. Nur bei Neuem fragt er den Kapitän.
   - Höchstens 3 Vorschläge am Tag. Nach dem Ja bekommt der Bot den Auftrag, Schreibendes läuft weiter über Freigaben. Abgelehntes kommt nicht wieder.
+- **Rundblick:** Der Kapitän sieht sich zu festen Zeiten (Standard 9:30, 13:30, 18:00, einstellbar, optional nur werktags) von sich aus um
+  und meldet sich nur, wenn es etwas gibt – Idee wie PicoClaws Heartbeat, gesteuert vom Adapter.
+  - Worauf er achtet, steht in `HEARTBEAT.md` in seinem Arbeitsbereich (in App und Web änderbar, „achte künftig auf …“ ergänzt er selbst).
+  - Er bekommt dazu, was die anderen Bots seit dem letzten Mal geliefert haben (ohne Bots mit Gesundheitsdaten), offene Freigaben,
+    Erinnerungen der nächsten 24 h und seine Meldungen der letzten 7 Tage samt 👍/👎. Jeder Lauf startet ohne Verlauf.
+  - `HEARTBEAT_OK` = still (keine Karte, keine Meldung). Sonst eine Karte **„Rundblick“** im Chat des Kapitäns mit Benachrichtigung;
+    Ideen als Vorschlagskarte. Höchstens 3 Meldungen am Tag, verpasste Zeiten werden höchstens eine Stunde nachgeholt.
+  - Nur lesen: nichts eintragen, entwerfen oder anlegen. PicoClaws eigener Heartbeat bleibt beim Kapitän aus.
 - **Gedächtnis aufräumen:** einmal in der Woche (Standard Sonntag 18:00, Tag/Zeit einstellbar, abschaltbar; auch „Jetzt aufräumen“ je Bot)
   sieht der Pi das Gedächtnis und das eigene Wissen jedes Bots durch und legt eine Karte **„Aufräumen“** in dessen Chat:
   - ohne KI: doppelte Einträge (auch gegenüber „für alle Bots“), abgelaufene Daten (ein Datum, das beim Merken in der Zukunft lag und jetzt vorbei ist),

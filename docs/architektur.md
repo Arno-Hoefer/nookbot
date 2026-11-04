@@ -43,6 +43,7 @@
 | `automatik` | Routinen, Erinnerungen, Auslöser, Aktivität, Anrufe |
 | `team` | Runden (mit Gespräch), Aufträge verteilen |
 | `vorschlaege` | Vorschläge der Bots, Muster ohne Modell, tägliche Durchsicht |
+| `rundblick` | Kapitän sieht sich zu festen Zeiten um (HEARTBEAT.md, still bei HEARTBEAT_OK), 👍/👎, Tageslimit |
 | `aufraeumen` | Gedächtnis aufräumen: Kandidaten ohne Modell, „belanglos/widersprüchlich“ sparsam per Modell, Vorschlag statt Löschen |
 | `mcp` | MCP-Werkzeuge der Bots (`MCP_TOOLS`, `mcp_rpc`) |
 | `schnittstelle` | HTTP-Handler (App, Web, MCP) |
@@ -72,6 +73,7 @@ in `__init__.py`). Darauf bauen Tests und Werkzeuge.
 | `aktivitaet.jsonl` | Aktivität, 30 Tage |
 | `anrufe.json`, `notify.json` | Warteschlangen für Anrufe und Meldungen |
 | `vorschlaege.json` | Vorschläge mit Entscheidung, gesehene Muster |
+| `rundblick.json` | gelaufene Zeiten je Tag, letzter Lauf, Meldungen mit Bewertung |
 | `aufraeumen.json` | letzte Durchsicht, behaltene Einträge (nicht wieder vorschlagen), Fingerabdruck der letzten Modell-Bewertung je Bot |
 | `gedaechtnis.json`, `ablaeufe.json`, `datenbanken.json`, `aussprache.json` | Gedächtnis, Abläufe, Datenbank-Bibliothek, Aussprache |
 | `wissen/` | globales Wissen (je Bot liegt es im Arbeitsbereich des Bots) |

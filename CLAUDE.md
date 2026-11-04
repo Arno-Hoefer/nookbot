@@ -21,6 +21,7 @@ pi/adapter/nookbot/            der Adapter in Modulen (Ladereihenfolge in __init
   sitzungen, seiten, gedaechtnis   Verlauf + Bot-Verbindungen, Seiten lesen, Gedächtnis + Abläufe
   rechner, automatik, team         Arbeitsordner/Python/Seitenbild/Regeln, Routinen/Erinnerungen/Auslöser/Aktivität/Anrufe, Runden/Aufträge
   vorschlaege, aufraeumen          Vorschläge der Bots, Muster ohne Modell, tägliche Durchsicht; Gedächtnis aufräumen (wöchentlich)
+  rundblick                        Kapitän sieht sich zu festen Zeiten um (HEARTBEAT.md, HEARTBEAT_OK = still), 👍/👎, Tageslimit
   mcp, schnittstelle, start        MCP-Werkzeuge der Bots, HTTP-Handler, main()
 pi/adapter/web/index.html      Web-Oberfläche (eine Datei, ohne Build)
 pi/adapter/tests/              unittest (ohne Pi): python3 -m unittest discover -s tests

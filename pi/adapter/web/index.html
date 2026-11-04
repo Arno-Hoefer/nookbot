@@ -67,6 +67,8 @@ header.kopf .sub{font-size:13px;color:var(--mut);font-weight:400}
 .karte.ged{border-left-color:var(--violet);padding:8px 12px;display:flex;gap:10px;align-items:center;font-size:14px}
 .karte.ged.zurueck{opacity:.5;text-decoration:line-through}
 .karte.abl,.karte.vor{border-left-color:var(--amber)}
+.karte.rb{border-left-color:var(--green)}
+.karte .bew.an{background:var(--soft);font-weight:700}
 .karte.frei{border-left-color:var(--accent)}
 .karte .titel{font-weight:700;margin-bottom:6px}
 .karte .knoepfe{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
@@ -434,6 +436,11 @@ function karte(m) {
       ${st === 'entwurf' && a ? `<div class="knoepfe"><button class="pri klein" data-abl-ok="${esc(a.id)}">Speichern</button><button class="klein" data-abl-edit="${esc(a.id)}">Ändern</button><button class="klein text" data-abl-weg="${esc(a.id)}">Verwerfen</button></div>` : ''}</div>`;
   }
   if (m.art === 'vorschlag') return vorschlagKarte(m);
+  if (m.art === 'rundblick') {
+    return `<div class="karte rb"><div class="titel">🧭 Rundblick <span class="mut">· von sich aus</span></div><div class="md">${md(m.text || '')}</div>
+      <div class="knoepfe"><button class="klein text bew ${m.status === 'gut' ? 'an' : ''}" data-rb="${esc(m.ref)}" data-bew="gut" title="hilfreich">👍</button>
+      <button class="klein text bew ${m.status === 'schlecht' ? 'an' : ''}" data-rb="${esc(m.ref)}" data-bew="schlecht" title="nicht hilfreich">👎</button></div></div>`;
+  }
   if (m.art === 'auftraege') {
     return `<div class="karte"><div class="titel">🧭 Aufträge verteilt</div>${m.ziel ? `<div class="mut">${esc(m.ziel)}</div>` : ''}
       ${(m.teile || []).map((t) => `<div class="teil">${ava(bot(t.bot), 22)}<div style="flex:1;min-width:0"><b>${esc(t.name)}</b> <span class="mut">${esc(t.auftrag.slice(0, 140))}</span></div>
@@ -482,6 +489,10 @@ document.addEventListener('click', async (ev) => {
         const o = await api('POST', '/api/vorschlaege/' + t.dataset.vorJa, {entscheidung: nur.length ? 'ja' : 'nein', nur});
         toast(nur.length ? `${o.entfernt ?? nur.length} entfernt – der Rest bleibt` : 'Alles bleibt'); if (S.ansicht.art === 'gedaechtnis') seiteGedaechtnis();
       } else { await api('POST', '/api/vorschlaege/' + t.dataset.vorJa, {entscheidung: 'ja'}); toast('Angenommen – der Bot legt los'); }
+    }
+    if (t.dataset.rb) {
+      const neu = t.classList.contains('an') ? '' : t.dataset.bew;
+      await api('POST', '/api/rundblick/' + t.dataset.rb, {bewertung: neu}); toast(neu === 'gut' ? 'Danke – mehr davon' : neu ? 'Verstanden – weniger davon' : 'Zurückgenommen');
     }
     if (t.dataset.vorNein) { t.disabled = true; await api('POST', '/api/vorschlaege/' + t.dataset.vorNein, {entscheidung: 'nein'}); toast('Abgelehnt – kommt nicht wieder'); if (S.ansicht.art === 'gedaechtnis') seiteGedaechtnis(); }
     if (t.dataset.ablEdit) ablaufDialog(S.ablaeufe.find((x) => x.id === t.dataset.ablEdit));
@@ -1041,7 +1052,7 @@ async function seiteArbeit() {
 }
 
 // ── Aktivität ──
-const AKT_ART = {anruf: '📞', werkzeug: '🔧', frei: '⚙️', routine: '⏰', ausloeser: '⚡', freigabe: '✅', runde: '👥'};
+const AKT_ART = {anruf: '📞', werkzeug: '🔧', frei: '⚙️', routine: '⏰', ausloeser: '⚡', freigabe: '✅', runde: '👥', rundblick: '🧭', vorschlag: '💡'};
 async function seiteAktivitaet() {
   const f = S.aktFilter || (S.aktFilter = {tage: 1, bot: '', hintergrund: false});
   const o = await api('GET', `/api/aktivitaet?tage=${f.tage}&bot=${encodeURIComponent(f.bot)}${f.hintergrund ? '&hintergrund=1' : ''}`).catch(() => ({eintraege: []}));
@@ -1252,6 +1263,7 @@ async function seiteEinstellungen() {
   const [g, c, st, ge, vo, au] = await Promise.all([api('GET', '/api/guthaben').catch(() => null), api('GET', '/api/claude').catch(() => null),
     api('GET', '/api/stimmen').catch(() => ({aussprache: {}})), api('GET', '/api/gesundheit/info').catch(() => null), api('GET', '/api/vorschlaege').catch(() => null),
     api('GET', '/api/aufraeumen').catch(() => null)]);
+  const rb = await api('GET', '/api/rundblick').catch(() => null);
   const usd = (x) => (Math.round((x || 0) * 100) / 100).toFixed(2) + ' $';
   const inc = g?.included; const rest = inc ? (inc.balance_usd || 0) + (g.purchased?.balance_usd || 0) : null;
   const aus = Object.entries(st.aussprache || {}).sort((a, b) => a[0].localeCompare(b[0]));
@@ -1272,6 +1284,14 @@ async function seiteEinstellungen() {
     ${vo ? `<div class="box"><h3>Vorschläge</h3><p class="mut">Wiederholt sich etwas (derselbe Text mehrfach eingefügt, dieselbe Frage an mehreren Tagen, wiederkehrende Fehler), bietet der Kapitän an, es dauerhaft zu lösen. Gesucht wird ohne KI; gefragt wird er nur bei Neuem. Umgesetzt wird erst nach deinem Ja.</p>
       ${schalter('vAktiv', 'Tägliche Durchsicht', vo.einstellungen.aktiv)}<div class="zeilen" style="margin-top:8px"><input id="vZeit" type="time" value="${esc(vo.einstellungen.zeit)}"><button class="klein" id="vJetzt">Jetzt durchsehen</button></div>
       ${vo.vorschlaege.filter((v) => v.art !== 'aufraeumen').slice(0, 8).map((v) => `<div class="teil"><span style="flex:1">${esc(v.text)}</span><span class="mut">${{offen: 'offen', angenommen: 'angenommen', abgelehnt: 'abgelehnt', im_chat: 'im Chat beantwortet'}[v.status]}</span></div>`).join('')}</div>` : ''}
+    ${rb ? `<div class="box"><h3>Rundblick</h3><p class="mut">Der Kapitän sieht sich zu festen Zeiten von sich aus um – Termine, Mail, Slack, was die anderen Bots geliefert haben – und meldet sich nur, wenn es etwas gibt.
+      Ideen kommen als Vorschlag. Er setzt nichts selbst um. Mit 👍/👎 unter einer Meldung lernt er, was dich interessiert.</p>
+      ${schalter('rbAktiv', 'Rundblick', rb.einstellungen.aktiv)}${schalter('rbWerktags', 'Nur werktags', rb.einstellungen.werktags)}
+      <div class="zeilen" style="margin-top:8px"><input id="rbZeiten" value="${esc(rb.einstellungen.zeiten.join(', '))}" placeholder="09:30, 13:30, 18:00" style="flex:1">
+        ${feld('höchstens am Tag', `<input id="rbMax" type="number" min="1" max="10" value="${rb.einstellungen.max_tag}" style="width:70px">`)}<button class="klein" id="rbJetzt">Jetzt umsehen</button></div>
+      <p class="mut" style="margin-bottom:4px">Worauf er achtet (HEARTBEAT.md – er ergänzt sie auch selbst, wenn du sagst „achte künftig auf …“):</p>
+      <textarea id="rbAufg" rows="8" style="width:100%">${esc(rb.aufgaben)}</textarea><button class="klein" id="rbAufgOk">Liste speichern</button>
+      ${rb.meldungen.slice(0, 6).map((m) => `<div class="teil"><span style="flex:1">${esc(m.text.slice(0, 160))}</span><span class="mut">${{gut: '👍', schlecht: '👎'}[m.bewertung] || ''} ${new Date(m.ts * 1000).toLocaleString('de-DE', {dateStyle: 'short', timeStyle: 'short'})}</span></div>`).join('')}</div>` : ''}
     ${au ? `<div class="box"><h3>Gedächtnis aufräumen</h3><p class="mut">Einmal in der Woche: Doppeltes, Abgelaufenes und Belangloses je Bot als Vorschlag (Karte im Chat des Bots). Gelöscht wird erst nach deinem Ja.</p>${aufrEinstellungen(au)}</div>` : ''}
     <div class="box"><h3>Im Browser</h3>${schalter('eVorlesen', 'Antworten vorlesen (Stimme des Bots)', vorlesenAn())}${schalter('eMelden', 'Benachrichtigen, wenn ein Bot fertig ist (solange dieser Tab offen ist)', melden)}</div>
     ${ge ? `<div class="box"><h3>Gesundheit</h3><p class="mut">${ge.tage ? `${ge.tage} Tage auf dem Pi (${esc(ge.von)} – ${esc(ge.bis)}) · Quellen: ${esc(Object.keys(ge.quellen || {}).map((q) => q.includes('fitbit') ? 'Fitbit' : q.includes('renpho') ? 'Renpho' : q.includes('egym') ? 'EGYM' : q.includes('healthconnect') ? 'Handy' : q).join(', '))}` : 'Noch keine Daten.'} Freigeben und abgleichen geht in der App.</p></div>` : ''}
@@ -1291,6 +1311,15 @@ async function seiteEinstellungen() {
     const vSetzen = async () => { try { await api('PUT', '/api/vorschlaege', {aktiv: $('#vAktiv').checked, zeit: $('#vZeit').value}); toast('Gespeichert'); } catch (e) { toast(e.message); } };
     $('#vAktiv').onchange = vSetzen; $('#vZeit').onchange = vSetzen;
     $('#vJetzt').onclick = async () => { try { await api('POST', '/api/vorschlaege/durchsicht'); toast('Durchsicht läuft – Vorschläge erscheinen im Chat des Kapitäns'); } catch (e) { toast(e.message); } };
+  }
+  if ($('#rbAktiv')) {
+    const rbSetzen = async (extra = {}) => {
+      try { await api('PUT', '/api/rundblick', {aktiv: $('#rbAktiv').checked, werktags: $('#rbWerktags').checked, max_tag: +$('#rbMax').value || 3,
+        zeiten: $('#rbZeiten').value.split(/[ ,;]+/).filter(Boolean), ...extra}); toast('Gespeichert'); } catch (e) { toast(e.message); }
+    };
+    $('#rbAktiv').onchange = () => rbSetzen(); $('#rbWerktags').onchange = () => rbSetzen(); $('#rbZeiten').onchange = () => rbSetzen(); $('#rbMax').onchange = () => rbSetzen();
+    $('#rbAufgOk').onclick = () => rbSetzen({aufgaben: $('#rbAufg').value});
+    $('#rbJetzt').onclick = async () => { try { await api('POST', '/api/rundblick/jetzt'); toast('Der Kapitän sieht sich um – meldet er sich, steht es in seinem Chat'); } catch (e) { toast(e.message); } };
   }
   aufrVerbinden();
   $('#eVorlesen').onchange = (e) => store.set('nb_vorlesen', e.target.checked ? '1' : null);

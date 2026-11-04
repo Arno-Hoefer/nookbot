@@ -435,7 +435,7 @@ fun ChatScreen(vm: NookViewModel, sid: String) {
     }
 }
 
-/** Karten vom Adapter im Chat: Gedächtnis-Hinweis, Ablauf-Entwurf, Vorschlag, verteilte Aufträge. */
+/** Karten vom Adapter im Chat: Gedächtnis-Hinweis, Ablauf-Entwurf, Vorschlag, Rundblick, verteilte Aufträge. */
 @Composable
 private fun InfoKarte(vm: NookViewModel, m: Msg) {
     val ablaeufe by vm.ablaeufe.collectAsState()
@@ -488,6 +488,20 @@ private fun InfoKarte(vm: NookViewModel, m: Msg) {
                 Spacer(Modifier.width(10.dp))
                 TextButton({ vm.vorschlagEntscheiden(m.ref, false) }) { Text("Nein danke", color = P.mut) }
             }
+        }
+        "rundblick" -> Card(Modifier.padding(vertical = 8.dp), border = A.green.copy(alpha = 0.5f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Badge("RUNDBLICK", A.green)
+                Text("von sich aus", color = P.mut, fontSize = 12.sp, modifier = Modifier.padding(start = 8.dp).weight(1f))
+                // 👍/👎: der Kapitän sieht beim nächsten Rundblick, was ankam – nochmal tippen nimmt es zurück
+                TextButton({ vm.rundblickBewerten(m.ref, if (m.status == "gut") "" else "gut") }) {
+                    Text("👍", fontSize = 16.sp, color = if (m.status == "gut") P.fg else P.mut.copy(alpha = if (m.status == "schlecht") 0.4f else 1f))
+                }
+                TextButton({ vm.rundblickBewerten(m.ref, if (m.status == "schlecht") "" else "schlecht") }) {
+                    Text("👎", fontSize = 16.sp, color = if (m.status == "schlecht") P.fg else P.mut.copy(alpha = if (m.status == "gut") 0.4f else 1f))
+                }
+            }
+            SelectionContainer { Text(markdown(m.text, P.fg2), color = P.fg, fontSize = 14.sp, lineHeight = 20.sp, modifier = Modifier.padding(top = 4.dp)) }
         }
         "auftraege" -> {
             var zeigen by remember { mutableStateOf<String?>(null) }

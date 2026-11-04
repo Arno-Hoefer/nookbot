@@ -10,7 +10,7 @@ import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler
 
-from . import basis, ereignisse, dienste, claude, gesundheit, stimmen, wissen, home, bots, sitzungen, gedaechtnis, rechner, automatik, team, vorschlaege, aufraeumen, mcp
+from . import basis, ereignisse, dienste, claude, gesundheit, stimmen, wissen, home, bots, sitzungen, gedaechtnis, rechner, automatik, team, vorschlaege, aufraeumen, rundblick, mcp
 
 
 # ── HTTP ───────────────────────────────────────────────────────────
@@ -111,6 +111,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, {"ablaeufe": gedaechtnis.ablaeufe()})
         if p == "/api/vorschlaege":
             return self._send(200, {"vorschlaege": vorschlaege.liste()[::-1], "einstellungen": vorschlaege.einstellungen()})
+        if p == "/api/rundblick":
+            d_ = rundblick.daten()
+            return self._send(200, {"einstellungen": rundblick.einstellungen(), "aufgaben": rundblick.aufgaben(), "letzter": d_["letzter"],
+                                    "meldungen": d_["meldungen"][-20:][::-1]})
         if p == "/api/aufraeumen":
             return self._send(200, {"einstellungen": aufraeumen.einstellungen(), "letzte": aufraeumen.stand()["letzte"],
                                     "offen": aufraeumen.offen()[::-1]})
@@ -367,7 +371,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, sitzungen.SESS.meta(sitzungen.SESS.create(b["id"])))
         m = re.match(r"^/api/sessions/([a-z0-9-]+)/senden$", p)
         if m:
-            sitzungen.send(m.group(1), str(d.get("text") or ""), zusatz=vorschlaege.im_chat(m.group(1)))
+            sitzungen.send(m.group(1), str(d.get("text") or ""), zusatz=vorschlaege.im_chat(m.group(1)) + rundblick.im_chat(m.group(1)))
             return self._send(200, {"ok": True})
         if p == "/api/runden":
             return self._send(200, team.runde(str(d.get("frage") or "").strip(), list(d.get("bots") or []), d.get("kapitaen"), int(d.get("gespraech") or 0)))
@@ -421,6 +425,12 @@ class Handler(BaseHTTPRequestHandler):
             r = automatik.add_routine({"name": a["name"], "bot": bid, "auftrag": gedaechtnis.ablauf_text(a), "zeit": d.get("zeit"), "datum": d.get("datum"),
                              "tage": d.get("tage")})
             return self._send(200, r)
+        if p == "/api/rundblick/jetzt":
+            threading.Thread(target=lambda: basis.log("Rundblick (von Hand):", rundblick.rundblick(von_hand=True)), daemon=True).start()
+            return self._send(200, {"ok": True})
+        m = re.match(r"^/api/rundblick/(r[0-9a-f]+)$", p)
+        if m:
+            return self._send(200, rundblick.bewerten(m.group(1), str(d.get("bewertung") or "")))
         if p == "/api/vorschlaege/durchsicht":
             threading.Thread(target=vorschlaege.durchsicht, daemon=True).start()
             return self._send(200, {"ok": True})
@@ -534,6 +544,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, {"einstellungen": vorschlaege.einstellungen_setzen(d)})
             if p == "/api/aufraeumen":
                 return self._send(200, {"einstellungen": aufraeumen.einstellungen_setzen(d)})
+            if p == "/api/rundblick":
+                if "aufgaben" in d:
+                    rundblick.aufgaben_setzen(str(d["aufgaben"]))
+                return self._send(200, {"einstellungen": rundblick.einstellungen_setzen(d), "aufgaben": rundblick.aufgaben()})
             if p == "/api/gedaechtnis":
                 return self._send(200, {"eintraege": gedaechtnis.ged_set(list(d.get("eintraege") or []))})
             m = re.match(r"^/api/ablaeufe/([a-z0-9]+)$", p)

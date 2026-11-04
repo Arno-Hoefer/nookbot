@@ -293,7 +293,7 @@ def mcp_rpc(msg: dict, caller: dict):
                 if cs.startswith("auftrag-"):
                     raise ValueError("Während eines Auftrags aus dem Team keine Vorschläge.")
                 v = vorschlaege.vorschlag_neu(caller["id"], str(a.get("text") or ""), str(a.get("aktion") or ""), str(a.get("grund") or ""), cs,
-                                              "durchsicht" if cs.startswith("intern-vorschlag-") else "bot")
+                                              "durchsicht" if cs.startswith(("intern-vorschlag-", "intern-rundblick-")) else "bot")
                 text = f"Vorschlag {v['id']} liegt %NUTZER% als Karte vor. Nicht selbst umsetzen – nach seinem Ja bekommst du den Auftrag."
             elif name == "bot_fragen":
                 b = bots.bot(str(a.get("bot", "")))

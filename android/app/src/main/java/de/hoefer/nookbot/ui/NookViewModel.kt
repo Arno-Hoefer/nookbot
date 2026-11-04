@@ -570,6 +570,27 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
         toast.value = "Sehe alle Bots durch – Vorschläge erscheinen im Chat des jeweiligen Bots"
     }
 
+    // ── Rundblick: der Kapitän meldet sich von sich aus (Einstellungen, 👍/👎) ──
+    fun rundblickBewerten(id: String, bewertung: String) = io {
+        api.post("/api/rundblick/$id", JSONObject().put("bewertung", bewertung))
+        toast.value = when (bewertung) { "gut" -> "Danke – mehr davon"; "schlecht" -> "Verstanden – weniger davon"; else -> "Zurückgenommen" }
+    }
+
+    fun rundblickLaden(fertig: (JSONObject) -> Unit) = io {
+        val o = api.get("/api/rundblick")
+        withContext(Dispatchers.Main) { fertig(o) }
+    }
+
+    fun rundblickSetzen(werte: JSONObject, meldung: String? = null) = io {
+        api.put("/api/rundblick", werte)
+        meldung?.let { toast.value = it }
+    }
+
+    fun rundblickJetzt() = io {
+        api.post("/api/rundblick/jetzt")
+        toast.value = "Der Kapitän sieht sich um – meldet er sich, steht es in seinem Chat"
+    }
+
     fun durchsichtJetzt() = io {
         api.post("/api/vorschlaege/durchsicht")
         toast.value = "Durchsicht läuft – Vorschläge erscheinen im Chat des Kapitäns"

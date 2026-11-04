@@ -154,6 +154,9 @@ def agent_md(b: dict) -> str:
         parts.append("## Neue Bots\n\nBeschreibt %NUTZER% einen Bot, legst du ihn mit `bot_anlegen` an (Name, Rolle, Fokus, Persönlichkeit; "
                      "Fokus ausführlich und konkret). Mit `bot_aendern` passt du bestehende an. Zugriffe auf Kalender/Mail/Daten schaltet "
                      "nur %NUTZER% frei – sag ihm, wo (App → Bot → Zugriffe).\n")
+        parts.append("## Rundblick\n\nZu festen Zeiten siehst du dich von dir aus um und meldest dich nur, wenn es etwas gibt. Worauf du dabei "
+                     "achtest, steht in `HEARTBEAT.md`. Sagt %NUTZER% „achte künftig auf …“ oder „das will ich nicht mehr hören“, passt du "
+                     "diese Liste mit `edit_file` an und sagst ihm kurz, was du geändert hast.\n")
     others = [o for o in others if home.rechte_teilmenge(home.rechte(o), home.rechte(b))]  # nur Bots, die nicht mehr dürfen als er
     if others:
         parts.append("## Dein Team\n\nMit `bot_fragen` gibst du anderen Bots einen Auftrag und bekommst ihre Antwort:\n"
@@ -267,6 +270,8 @@ def sync_bot(b: dict, restart: bool = True):
                           "headers": {"Authorization": "Bearer " + basis.conf()["mcp_token"]}}
     cfg["tools"].setdefault("cron", {})["enabled"] = False  # Zeitpläne nur über NookBot-Routinen (sichtbar in der App)
     cfg["tools"].setdefault("web_fetch", {})["enabled"] = False  # Seiten nur über seite_lesen (Heimnetz-Sperre, PDF, Pi-Browser)
+    if b.get("kapitaen"):
+        cfg.setdefault("heartbeat", {})["enabled"] = False  # das übernimmt der Rundblick (rundblick.py) – sonst liefe er doppelt
     if not b.get("zugriffe") or not basis.homemcp_key():
         servers.pop("home", None)
     else:  # über den Adapter: er hält den Schlüssel und lässt nur durch, was für diesen Bot freigegeben ist

@@ -569,6 +569,47 @@ fun SettingsScreen(vm: NookViewModel) {
             }
             Row(Modifier.padding(top = 6.dp)) { SideButton("Jetzt durchsehen") { vm.durchsichtJetzt() } }
 
+            var rbGeladen by remember { mutableStateOf(false) }
+            var rbAktiv by remember { mutableStateOf(true) }
+            var rbWerktags by remember { mutableStateOf(false) }
+            var rbZeiten by remember { mutableStateOf("") }
+            var rbMax by remember { mutableStateOf("3") }
+            var rbAufgaben by remember { mutableStateOf("") }
+            LaunchedEffect(Unit) {
+                vm.rundblickLaden { o ->
+                    val e = o.optJSONObject("einstellungen") ?: org.json.JSONObject()
+                    rbAktiv = e.optBoolean("aktiv", true); rbWerktags = e.optBoolean("werktags")
+                    rbZeiten = e.optJSONArray("zeiten")?.let { a -> (0 until a.length()).joinToString(", ") { a.getString(it) } } ?: ""
+                    rbMax = e.optInt("max_tag", 3).toString(); rbAufgaben = o.optString("aufgaben"); rbGeladen = true
+                }
+            }
+            fun rbWerte() = org.json.JSONObject().put("aktiv", rbAktiv).put("werktags", rbWerktags).put("max_tag", rbMax.toIntOrNull() ?: 3)
+                .put("zeiten", org.json.JSONArray(rbZeiten.split(Regex("[ ,;]+")).filter { it.isNotBlank() }))
+            Section("Rundblick", "Der Kapitän sieht sich zu festen Zeiten von sich aus um – Termine, Mail, Slack, was die anderen Bots geliefert haben – " +
+                "und meldet sich nur, wenn es etwas gibt. Ideen kommen als Vorschlag, er setzt nichts selbst um. Mit 👍/👎 unter einer Meldung lernt er, " +
+                "was dich interessiert.")
+            if (rbGeladen) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Rundblick", color = P.fg, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                    Switch(rbAktiv, { rbAktiv = it; vm.rundblickSetzen(rbWerte()) }, colors = SwitchDefaults.colors(checkedTrackColor = A.accent))
+                }
+                if (rbAktiv) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Nur werktags", color = P.fg, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                        Switch(rbWerktags, { rbWerktags = it; vm.rundblickSetzen(rbWerte()) }, colors = SwitchDefaults.colors(checkedTrackColor = A.accent))
+                    }
+                    Field("Uhrzeiten (z. B. 09:30, 13:30, 18:00)", rbZeiten) { rbZeiten = it }
+                    Field("Höchstens Meldungen am Tag", rbMax, number = true) { rbMax = it.filter(Char::isDigit).take(2) }
+                    Field("Worauf er achtet (HEARTBEAT.md)", rbAufgaben, lines = 12) { rbAufgaben = it }
+                    Hint("Er ergänzt die Liste auch selbst, wenn du ihm sagst „achte künftig auf …“.")
+                    Row(Modifier.padding(top = 6.dp)) {
+                        SideButton("Speichern") { vm.rundblickSetzen(rbWerte().put("aufgaben", rbAufgaben), "Gespeichert") }
+                        Spacer(Modifier.width(8.dp))
+                        SideButton("Jetzt umsehen") { vm.rundblickJetzt() }
+                    }
+                }
+            }
+
             var aufAktiv by remember { mutableStateOf(true) }
             var aufTag by remember { mutableStateOf(7) }
             var aufZeit by remember { mutableStateOf("") }
