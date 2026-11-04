@@ -72,6 +72,11 @@ class Sessions:
     def running(self, sid: str) -> bool:
         return bool(self.rt.get(sid, {}).get("laeuft"))
 
+    def ansicht(self, s: dict, letzte: int = 0) -> dict:
+        """Für App und Web: Gedanken gekürzt, auf Wunsch nur die letzten Nachrichten (der Rest bleibt auf dem Pi)."""
+        ms = s["msgs"][-letzte:] if letzte else s["msgs"]
+        return dict(s, msgs=[kurz(m) for m in ms], aelter=len(s["msgs"]) - len(ms))
+
     def upsert(self, sid: str, m: dict):
         with basis._lock:
             s = self.get(sid)
@@ -85,7 +90,7 @@ class Sessions:
             else:
                 s["msgs"].append(m)
             s["aktualisiert"] = time.time()
-        ereignisse.EV.emit({"t": "msg", "s": sid, "m": m})
+        ereignisse.EV.emit({"t": "msg", "s": sid, "m": kurz(m)})
 
     def remove_msg(self, sid: str, mid: str):
         with basis._lock:
@@ -218,6 +223,16 @@ def tool_names(p: dict) -> str:
         if n:
             names.append(n)
     return ",".join(dict.fromkeys(names)) or "werkzeug"
+
+
+GEDANKEN_MAX = 1500  # Gedanken sind oft 50–100 KB groß; die App zeigt sie nur aufgeklappt
+
+
+def kurz(m: dict) -> dict:
+    t = m.get("text") or ""
+    if m.get("role") != "thought" or len(t) <= GEDANKEN_MAX:
+        return m
+    return dict(m, text=t[:GEDANKEN_MAX] + " …", gekuerzt=True)
 
 
 def on_bot_event(bid: str, sid: str, raw: str):

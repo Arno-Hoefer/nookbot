@@ -75,6 +75,10 @@ class Benachrichtigung : BroadcastReceiver() {
             if (seit >= 0 && last >= seit) {
                 val items = r.optJSONArray("items")
                 for (i in 0 until (items?.length() ?: 0)) show(ctx, items!!.getJSONObject(i))
+                // Den Chat gleich mitholen – Tipp auf die Meldung zeigt ihn dann sofort
+                val zs = de.hoefer.nookbot.data.Zwischenspeicher(ctx)
+                (0 until (items?.length() ?: 0)).map { items!!.getJSONObject(it).optString("s") }.filter { it.isNotBlank() && it != "null" }.distinct().take(5)
+                    .forEach { sid -> runCatching { zs.schreiben("chat-$sid", api.get("/api/sessions/$sid?vorladen=1")) } }
             }
             prefs.edit().putLong("notifyLast", last).apply()
         }

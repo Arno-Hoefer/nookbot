@@ -1,4 +1,5 @@
 """HTTP-Schnittstelle für App und Web-Oberfläche."""
+import gzip
 import hmac
 import json
 import os
@@ -24,6 +25,9 @@ class Handler(BaseHTTPRequestHandler):
         data = b"" if obj is None else json.dumps(obj, ensure_ascii=False).encode()
         self.send_response(code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
+        if len(data) > 2048 and "gzip" in self.headers.get("Accept-Encoding", ""):
+            data = gzip.compress(data, 5)
+            self.send_header("Content-Encoding", "gzip")
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
@@ -127,10 +131,11 @@ class Handler(BaseHTTPRequestHandler):
             s = sitzungen.SESS.get(m.group(1))
             if not s:
                 raise KeyError("Unterhaltung gibt es nicht.")
-            if s.get("ungelesen"):
+            if s.get("ungelesen") and not q.get("vorladen"):  # Vorladen in den Handy-Speicher ist kein Lesen
                 s["ungelesen"] = 0
                 sitzungen.SESS.save(s["id"])
-            return self._send(200, dict(s, laeuft=sitzungen.SESS.running(s["id"])))
+            letzte = 0 if q.get("alle") else int(q.get("letzte") or 80)
+            return self._send(200, dict(sitzungen.SESS.ansicht(s, letzte), laeuft=sitzungen.SESS.running(s["id"])))
         if p == "/api/suche":
             q_ = str(q.get("q") or "").strip().lower()
             if len(q_) < 2:

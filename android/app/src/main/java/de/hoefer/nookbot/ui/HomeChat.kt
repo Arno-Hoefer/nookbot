@@ -278,8 +278,16 @@ fun ChatScreen(vm: NookViewModel, sid: String) {
     val busy = sid in busySet
     val runde = s?.art == "runde"
 
+    val aelter by vm.aelter.collectAsState()
+    var vorher by remember { mutableStateOf(0) }
     LaunchedEffect(msgs.size, msgs.lastOrNull()?.text?.length, busy) {
-        if (msgs.isNotEmpty()) list.animateScrollToItem(msgs.size)
+        when {
+            msgs.isEmpty() -> {}
+            vm.obenBleiben -> { vm.obenBleiben = false; list.scrollToItem(0) }
+            vorher == 0 -> list.scrollToItem(msgs.size)  // frisch geöffnet: ohne Animation ans Ende
+            else -> list.animateScrollToItem(msgs.size)
+        }
+        vorher = msgs.size
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -317,6 +325,9 @@ fun ChatScreen(vm: NookViewModel, sid: String) {
                 Hint(if (b?.zugriffe == true) "Worum geht’s? ${b.name} kann in Kalender, Mail, Slack, GitLab und die Datenbank schauen und im Web suchen. " +
                     "Eintragen und Entwürfe gehen nur mit deiner Freigabe." else "Worum geht’s? ${b?.name ?: "Der Bot"} kann im Web suchen und sein Wissen nutzen.",
                     Modifier.padding(vertical = 20.dp))
+            }
+            if (aelter > 0) item {
+                TextButton({ vm.aelterLaden() }, Modifier.fillMaxWidth()) { Text("$aelter ältere Nachrichten laden", color = P.fg2, fontSize = 13.sp) }
             }
             // Name über einer Bot-Nachricht, wenn ein anderer Bot spricht als vorher (Runden, Aufträge)
             val names = HashSet<String>()

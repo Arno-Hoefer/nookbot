@@ -401,7 +401,7 @@ const FREI = /\bF-[0-9a-f]{6}\b/g;
 function chatZeichnen(unten) {
   const s = S.offen; if (!s) return;
   const vl = $('#verlauf'); const amEnde = unten || (vl.scrollHeight - vl.scrollTop - vl.clientHeight < 80);
-  let h = ''; let tools = [];
+  let h = s.aelter ? `<button class="klein text" id="aelter" style="margin:0 auto 8px;display:block">${s.aelter} ältere Nachrichten laden</button>` : ''; let tools = [];
   const toolsRaus = () => { if (tools.length) { h += `<div class="werkzeug">✓ ${esc([...new Set(tools.join(',').split(',').map(werkzeugText))].join(' · '))}</div>`; tools = []; } };
   for (const m of s.msgs) {
     if (m.role === 'thought') continue;
@@ -419,6 +419,9 @@ function chatZeichnen(unten) {
   toolsRaus();
   if (s.laeuft) h += '<div class="denkt">… arbeitet</div>';
   $('#bl').innerHTML = h;
+  $('#aelter')?.addEventListener('click', async () => {
+    try { const a = await api('GET', `/api/sessions/${encodeURIComponent(s.id)}?alle=1`); if (S.offen?.id === a.id) { S.offen = a; chatZeichnen(); vl.scrollTop = 0; } } catch (e) { toast(e.message); }
+  });
   if (amEnde) vl.scrollTop = vl.scrollHeight;
 }
 function karte(m) {
@@ -520,7 +523,7 @@ document.addEventListener('click', async (ev) => {
 async function internZeigen(sid) {
   const d = $('#dlg');
   try {
-    const s = await api('GET', '/api/sessions/' + encodeURIComponent(sid));
+    const s = await api('GET', '/api/sessions/' + encodeURIComponent(sid) + '?alle=1');
     const txt = s.msgs.filter((m) => m.role === 'bot' && m.text.trim()).map((m) => md(m.text)).join('<hr>') || '<p class="mut">Noch keine Antwort.</p>';
     d.innerHTML = `<h3 style="margin-top:0">${esc(s.titel)}</h3><div class="md" style="max-height:60vh;overflow:auto">${txt}</div><div class="knoepfe" style="margin-top:12px"><button onclick="this.closest('dialog').close()">Schließen</button></div>`;
   } catch (e) { d.innerHTML = `<p>${esc(e.message)}</p><button onclick="this.closest('dialog').close()">Schließen</button>`; }

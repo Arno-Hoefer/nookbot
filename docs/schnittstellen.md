@@ -18,7 +18,7 @@ Antworten sind JSON, Fehler kommen als `{"error": "…"}`.
 
 | Methode | Pfad | |
 |---|---|---|
-| POST | `/api/sessions` · GET/DELETE `/api/sessions/<id>` | Unterhaltung anlegen, lesen, löschen |
+| POST | `/api/sessions` · GET/DELETE `/api/sessions/<id>` | Unterhaltung anlegen, lesen, löschen. Lesen liefert die letzten 80 Nachrichten (`aelter` = Rest, `?alle=1` = alle, `?letzte=N`), Gedanken auf 1500 Zeichen gekürzt (`gekuerzt`); `?vorladen=1` setzt „ungelesen“ nicht zurück. JSON-Antworten über 2 KB kommen mit gzip, wenn der Client es anbietet. |
 | POST | `/api/sessions/<id>/senden` | Nachricht an den Bot |
 | POST | `/api/sessions/<id>/anhang` | Datei anhängen (Base64), der Pi wandelt in Text |
 | POST | `/api/sessions/<id>/ablauf` | Weg aus dem Gespräch als Ablauf-Entwurf |

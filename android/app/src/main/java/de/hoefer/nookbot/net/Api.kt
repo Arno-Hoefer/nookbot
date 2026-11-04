@@ -12,7 +12,7 @@ import java.util.concurrent.TimeUnit
 class Api(private val base: () -> String, private val token: () -> String) {
     private val json = "application/json; charset=utf-8".toMediaType()
 
-    fun get(path: String): JSONObject = call(Request.Builder().url(base() + path).get())
+    fun get(path: String): JSONObject = call(Request.Builder().url(base() + path).get(), kurzClient)
     fun post(path: String, body: JSONObject = JSONObject()): JSONObject = call(Request.Builder().url(base() + path).post(body.toString().toRequestBody(json)))
     fun put(path: String, body: JSONObject): JSONObject = call(Request.Builder().url(base() + path).put(body.toString().toRequestBody(json)))
     fun delete(path: String): JSONObject = call(Request.Builder().url(base() + path).delete())
@@ -37,9 +37,9 @@ class Api(private val base: () -> String, private val token: () -> String) {
         }
     }
 
-    private fun call(b: Request.Builder): JSONObject {
+    private fun call(b: Request.Builder, c: OkHttpClient = client): JSONObject {
         if (token().isBlank()) throw IOException("Chat-Token fehlt (Einstellungen)")
-        client.newCall(b.header("Authorization", "Bearer ${token()}").build()).execute().use { r ->
+        c.newCall(b.header("Authorization", "Bearer ${token()}").build()).execute().use { r ->
             val text = r.body?.string() ?: ""
             if (r.code == 401) throw IOException("Chat-Token abgelehnt")
             if (!r.isSuccessful) throw IOException(runCatching { JSONObject(text).optString("error") }.getOrNull()?.takeIf { it.isNotBlank() } ?: "HTTP ${r.code}")
@@ -60,8 +60,10 @@ class Api(private val base: () -> String, private val token: () -> String) {
             onOpen()
             val src = r.body?.source() ?: return
             val data = StringBuilder()
+            lebenszeichen = System.currentTimeMillis()
             while (!src.exhausted()) {
                 val line = src.readUtf8Line() ?: break
+                lebenszeichen = System.currentTimeMillis()
                 when {
                     line.startsWith("data:") -> data.append(line.removePrefix("data:").trim())
                     line.isEmpty() && data.isNotEmpty() -> {
@@ -73,9 +75,14 @@ class Api(private val base: () -> String, private val token: () -> String) {
         }
     }
 
+    /** Wann zuletzt etwas über den Ereignisstrom kam (auch das Lebenszeichen alle 45 s). */
+    @Volatile var lebenszeichen = 0L
+
     companion object {
         val client: OkHttpClient = OkHttpClient.Builder().connectTimeout(15, TimeUnit.SECONDS).readTimeout(120, TimeUnit.SECONDS).build()
         // Der Adapter schickt alle 45 s ein Lebenszeichen – 100 s ohne Daten heißt: Verbindung tot
+        // Lesen ist schnell; hängt eine Anfrage 20 s, ist die Verbindung nach dem Schlafen tot → Fehler statt 2 Minuten warten
+        private val kurzClient: OkHttpClient = client.newBuilder().readTimeout(20, TimeUnit.SECONDS).build()
         private val streamClient: OkHttpClient = client.newBuilder().readTimeout(100, TimeUnit.SECONDS).build()
     }
 }

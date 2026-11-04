@@ -148,3 +148,10 @@ Alle Bilder zeigen Demo-Daten. App links bzw. oben, Web-Oberfläche darunter.
 - **Ollama:** Guthaben laut ollama.com.
 - **Claude:** Verbrauch wird je Anfrage mitgezählt; mit Startbetrag und monatlicher Aufladung ergibt sich der Rest.
 - **Aussprache-Wörterbuch** für Namen, Design, Schriftgröße, Benachrichtigungen, „Für Anrufe erreichbar“, Testanruf.
+
+## Schnelles Laden (ab 0.21.0)
+
+- Die App speichert die Startseite und die letzten 40 Chats auf dem Handy (app-eigener Speicher, kein Backup). Beim Öffnen erscheinen sie sofort, danach kommt der aktuelle Stand vom Pi.
+- Vorgeladen wird im Hintergrund: nach dem Verbinden die Bot-Chats, die sich geändert haben; wenn ein Bot fertig ist; und bei jeder Benachrichtigung der zugehörige Chat (alle 5 Minuten, auch bei geschlossener App).
+- Der Pi schickt nur die letzten 80 Nachrichten, Gedanken gekürzt und komprimiert. „Ältere Nachrichten laden“ holt den Rest.
+- Nach dem Aufwachen verbindet die App den Ereignisstrom sofort neu, wenn eine Minute nichts kam; Lese-Anfragen geben nach 20 s auf statt nach 2 Minuten.

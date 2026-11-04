@@ -59,6 +59,7 @@ sealed class Route {
 class NookViewModel(app: Application) : AndroidViewModel(app) {
     val settings = Settings(app)
     private val api = Api({ settings.serverUrl }, { settings.chatToken })
+    private val zs = de.hoefer.nookbot.data.Zwischenspeicher(app)
 
     val stack = MutableStateFlow<List<Route>>(listOf(if (settings.configured) Route.Home else Route.Settings))
     val theme = MutableStateFlow(settings.theme)
@@ -68,6 +69,10 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
     val bots = MutableStateFlow<List<Bot>>(emptyList())
     val sitzungen = MutableStateFlow<List<Sitzung>>(emptyList())
     val msgs = MutableStateFlow<List<Msg>>(emptyList())
+    /** So viele ältere Nachrichten liegen noch auf dem Pi (die App lädt nur die letzten 80). */
+    val aelter = MutableStateFlow(0)
+    /** Nach „ältere laden“ nicht ans Ende springen */
+    var obenBleiben = false
     val busy = MutableStateFlow<Set<String>>(emptySet())
     val routinen = MutableStateFlow<List<Routine>>(emptyList())
     val ausloeser = MutableStateFlow<List<de.hoefer.nookbot.data.Ausloeser>>(emptyList())
@@ -121,7 +126,10 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
     val current: String? get() = (stack.value.lastOrNull() as? Route.Chat)?.sid
 
     init {
-        if (settings.configured) connect()
+        if (settings.configured) {
+            zs.lesen("state")?.let { st -> runCatching { applyState(st, ausSpeicher = true) } }
+            connect()
+        }
         viewModelScope.launch(Dispatchers.IO) { runCatching { de.hoefer.nookbot.Absturz.melden(getApplication()) } }
         refreshFreigaben()
     }
@@ -147,7 +155,7 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
         if (stack.value.size <= 1) return false
         val leaving = stack.value.last()
         stack.value = stack.value.dropLast(1)
-        if (leaving is Route.Chat) msgs.value = emptyList()
+        if (leaving is Route.Chat) { msgs.value = emptyList(); aelter.value = 0 }
         if (stack.value.last() is Route.Chat) loadSession((stack.value.last() as Route.Chat).sid)
         return true
     }
@@ -165,6 +173,7 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
                 if (!foreground) { delay(1000); continue }
                 try {
                     loadStateNow()
+                    vorladenAlle()
                     api.events(seq, onOpen = { online.value = true; fehler.value = null }) { ev -> viewModelScope.launch { apply(ev) } }
                 } catch (e: Exception) {
                     online.value = false
@@ -177,8 +186,16 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
 
     private suspend fun loadStateNow() {
         val st = api.get("/api/state")
-        withContext(Dispatchers.Main) {
-            seq = st.optLong("seq")
+        withContext(Dispatchers.Main) { applyState(st) }
+        zs.schreiben("state", st)
+        current?.let { loadSessionNow(it) }
+        runCatching { guthaben.value = Guthaben.from(api.get("/api/guthaben")) }
+        runCatching { claude.value = api.get("/api/claude") }
+    }
+
+    private fun applyState(st: JSONObject, ausSpeicher: Boolean = false) {
+        run {
+            if (!ausSpeicher) seq = st.optLong("seq")
             bots.value = arr(st.optJSONArray("bots")).map { Bot.from(it) }
             sitzungen.value = arr(st.optJSONArray("sessions")).map { Sitzung.from(it) }.sortedByDescending { it.aktualisiert }
             busy.value = sitzungen.value.filter { it.laeuft }.map { it.id }.toSet()
@@ -187,12 +204,9 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
             erinnerungen.value = Erinnerung.list(st.optJSONArray("erinnerungen"))
             ablaeufe.value = Ablauf.list(st.optJSONArray("ablaeufe"))
             gedaechtnis.value = Merk.list(st.optJSONArray("gedaechtnis"))
-            ErinnerungAlarm.planen(getApplication(), erinnerungen.value)
+            if (!ausSpeicher) ErinnerungAlarm.planen(getApplication(), erinnerungen.value)
             ntfy.value = st.optBoolean("ntfy")
         }
-        current?.let { loadSessionNow(it) }
-        runCatching { guthaben.value = Guthaben.from(api.get("/api/guthaben")) }
-        runCatching { claude.value = api.get("/api/claude") }
     }
 
     private fun arr(a: JSONArray?): List<JSONObject> = if (a == null) emptyList() else (0 until a.length()).map { a.getJSONObject(it) }
@@ -210,7 +224,7 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
             "del" -> if (sid == current) msgs.value = msgs.value.filterNot { it.id == ev.optString("id") }
             "busy" -> {
                 busy.value = if (ev.optBoolean("v")) busy.value + sid else busy.value - sid
-                if (!ev.optBoolean("v")) refreshFreigaben()
+                if (!ev.optBoolean("v")) { refreshFreigaben(); if (sid != current) viewModelScope.launch(Dispatchers.IO) { vorladen(sid) } }
             }
             "session" -> {
                 val s = Sitzung.from(ev.getJSONObject("s"))
@@ -228,7 +242,8 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
         foreground = fg
         AppState.foreground = fg
         if (fg) {
-            if (stream?.isActive != true && settings.configured) connect()
+            // Nach dem Schlafen ist der Ereignisstrom oft schon tot, ohne dass es jemand merkt → sofort neu verbinden
+            if (settings.configured && (stream?.isActive != true || System.currentTimeMillis() - api.lebenszeichen > 60_000)) connect()
             refreshFreigaben()
             // Gesundheitsdaten nebenbei auffrischen, wenn der letzte Abgleich über 6 Stunden her ist
             if (settings.configured && settings.gesundheitStand > 0 && System.currentTimeMillis() - settings.gesundheitStand > 6 * 3_600_000L) {
@@ -245,20 +260,53 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
 
     fun openChat(sid: String) {
         msgs.value = emptyList()
+        aelter.value = 0
         if (sid != current) anhaenge.value = emptyList()
         stack.value = stack.value.filterNot { it is Route.Chat } + Route.Chat(sid)
-        loadSession(sid)
+        io {
+            zs.lesen("chat-$sid")?.let { s -> withContext(Dispatchers.Main) { if (current == sid && msgs.value.isEmpty()) zeigen(sid, s) } }
+            loadSessionNow(sid)
+        }
     }
 
     private fun loadSession(sid: String) = io { loadSessionNow(sid) }
 
-    private suspend fun loadSessionNow(sid: String) {
-        val s = api.get("/api/sessions/$sid")
-        val list = arr(s.optJSONArray("msgs")).map { Msg.from(it) }
+    private suspend fun loadSessionNow(sid: String, alle: Boolean = false) {
+        val s = api.get("/api/sessions/$sid" + if (alle) "?alle=1" else "")
         withContext(Dispatchers.Main) {
-            if (current == sid) msgs.value = list
+            if (current == sid) zeigen(sid, s)
             if (s.optBoolean("laeuft")) busy.value = busy.value + sid
         }
+        if (!alle) zs.schreiben("chat-$sid", s)
+    }
+
+    private fun zeigen(sid: String, s: JSONObject) {
+        // Ältere schon geladen? Dann nicht wieder auf die letzten 80 kürzen.
+        val neu = arr(s.optJSONArray("msgs")).map { Msg.from(it) }
+        val alt = msgs.value
+        val erster = neu.firstOrNull()?.id
+        val i = alt.indexOfFirst { it.id == erster }
+        if (i > 0 && aelter.value == 0 && s.optInt("aelter") > 0) { msgs.value = alt.take(i) + neu; return }
+        msgs.value = neu
+        aelter.value = s.optInt("aelter")
+    }
+
+    /** Im Hintergrund in den Handy-Speicher holen, ohne „ungelesen“ zurückzusetzen. */
+    private fun vorladen(sid: String) {
+        runCatching { zs.schreiben("chat-$sid", api.get("/api/sessions/$sid?vorladen=1")) }
+    }
+
+    /** Nach dem Verbinden: die Chats der Bots, die sich seit dem letzten Speichern geändert haben. */
+    private fun vorladenAlle() {
+        val neu = bots.value.mapNotNull { b -> sitzungen.value.firstOrNull { it.id == b.sitzung } }
+            .filter { it.id != current && (zs.lesen("chat-${it.id}")?.optDouble("aktualisiert", 0.0) ?: 0.0) * 1000 < it.aktualisiert - 1 }
+        neu.forEach { vorladen(it.id) }
+    }
+
+    fun aelterLaden() {
+        val sid = current ?: return
+        obenBleiben = true
+        io { loadSessionNow(sid, alle = true) }
     }
 
     fun newChat(botId: String) = io {
@@ -332,7 +380,7 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Ergebnis eines Teilauftrags (interne Unterhaltung) als Text. */
     fun internText(sid: String, onText: (String) -> Unit) = io {
-        val s = api.get("/api/sessions/$sid")
+        val s = api.get("/api/sessions/$sid?alle=1")
         val t = arr(s.optJSONArray("msgs")).filter { it.optString("role") == "bot" && it.optString("text").isNotBlank() }
             .joinToString("\n\n---\n\n") { it.optString("text") }
         withContext(Dispatchers.Main) { onText(t.ifBlank { "Noch keine Antwort." }) }
@@ -440,6 +488,7 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
 
     fun deleteSession(sid: String) = io {
         api.delete("/api/sessions/$sid")
+        zs.loeschen("chat-$sid")
         withContext(Dispatchers.Main) { sitzungen.value = sitzungen.value.filterNot { it.id == sid } }
     }
 
