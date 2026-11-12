@@ -89,9 +89,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, {"dateien": rechner.arbeit_liste()})
         m = re.match(r"^/api/arbeit/(.+)$", p)
         if m:
-            fp = os.path.join(rechner.arbeit_dir(), rechner.arbeit_name(urllib.parse.unquote(m.group(1))))
-            if not os.path.isfile(fp):
-                raise KeyError("Datei gibt es nicht.")
+            fp = rechner.arbeit_pfad(urllib.parse.unquote(m.group(1)))
             import mimetypes
             data = open(fp, "rb").read()
             ct = mimetypes.guess_type(fp)[0] or "application/octet-stream"

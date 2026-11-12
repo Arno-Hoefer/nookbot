@@ -72,6 +72,10 @@ class Sessions:
     def running(self, sid: str) -> bool:
         return bool(self.rt.get(sid, {}).get("laeuft"))
 
+    def von_dir(self, sid: str) -> bool:
+        r = self.rt.get(sid or "", {})
+        return bool(r.get("laeuft") and r.get("von_dir"))
+
     def ansicht(self, s: dict, letzte: int = 0) -> dict:
         """Für App und Web: Gedanken gekürzt, auf Wunsch nur die letzten Nachrichten (der Rest bleibt auf dem Pi)."""
         ms = s["msgs"][-letzte:] if letzte else s["msgs"]
@@ -100,10 +104,12 @@ class Sessions:
         ereignisse.EV.emit({"t": "del", "s": sid, "id": mid})
 
     # ── Ablauf einer Antwort ──
-    def start_turn(self, sid: str, bid: str):
+    def start_turn(self, sid: str, bid: str, von_dir: bool = False):
+        """von_dir: %NUTZER% hat diesen Lauf selbst angestoßen (Chat, Knopf). Routinen, Auslöser, Rundblick, Aufträge und Runden
+        nicht – dort bringt der Lauf oft fremden Text mit (Mails, Webseiten), deshalb gilt die Regel „frei“ dann nicht."""
         r = self.rt.setdefault(sid, {})
         r.update(laeuft=True, bot=bid, start=time.time(), last=time.time(), n0=len(self.get(sid)["msgs"]),
-                 typing=False, saw_typing=False, stop_at=0)
+                 typing=False, saw_typing=False, stop_at=0, von_dir=von_dir, gesundheit=False)
         r.setdefault("done", threading.Event()).clear()
         ereignisse.EV.emit({"t": "busy", "s": sid, "v": True})
 
@@ -289,7 +295,7 @@ def send(sid: str, text: str, as_user: bool = True, zusatz: str = "") -> None:
             s["titel"] = text.splitlines()[0][:60]
         SESS.upsert(sid, {"id": "u" + secrets.token_hex(5), "role": "user", "text": text, "ts": time.time()})
     s["ungelesen"] = 0
-    SESS.start_turn(sid, s["bot"])
+    SESS.start_turn(sid, s["bot"], von_dir=as_user and not sid.startswith(("auftrag-", "intern-")))
     SESS.save(sid)
     ws.send_json({"type": "message.send", "id": "m" + secrets.token_hex(4), "session_id": sid, "payload": {"content": text + zusatz}})
 

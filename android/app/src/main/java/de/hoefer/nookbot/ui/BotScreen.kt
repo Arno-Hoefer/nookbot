@@ -133,7 +133,7 @@ fun BotScreen(vm: NookViewModel, id: String?) {
             regelKatalog?.takeIf { b != null }?.let { k ->
                 val wz = k.optJSONObject("werkzeuge") ?: org.json.JSONObject()
                 val nieFrei = k.optJSONArray("nie_frei")?.let { a -> (0 until a.length()).map { a.getString(it) }.toSet() } ?: emptySet()
-                Section("Regeln für Schreibendes", "frei = sofort ausführen (höchstens ${k.optInt("frei_max", 10)}× am Tag, steht in der Aktivität) · " +
+                Section("Regeln für Schreibendes", "frei = sofort ausführen, nur wenn du selbst im Gespräch bist (höchstens ${k.optInt("frei_max", 10)}× am Tag, steht in der Aktivität; Routinen und Auslöser fragen immer) · " +
                     "fragen = Freigabe wie bisher · nie = gesperrt. Sind Gäste oder Einladungen dabei, wird immer gefragt.")
                 wz.keys().forEach { t ->
                     Text(wz.optString(t), color = P.fg, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))

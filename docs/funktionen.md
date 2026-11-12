@@ -35,6 +35,15 @@ Alle Bilder zeigen Demo-Daten. App links bzw. oben, Web-Oberfläche darunter.
   mit Docs, Sheets und hochgeladenen Dateien (`drive_ordner_paket`) – die Karte zeigt Ordnername und Dateiliste.
 - **Regeln je Bot und Aktion:** *frei* (sofort, höchstens 10 am Tag), *fragen* (Standard) oder *nie*. Sobald Gäste oder Einladungen
   dabei sind, wird immer gefragt.
+- *frei* gilt **nur, wenn du selbst im Gespräch bist** (Chat, Knopf wie „Ja, mach das“). Läuft der Bot aus einer Routine, einem Auslöser,
+  dem Rundblick, einer Runde oder einem Auftrag eines anderen Bots, wird aus *frei* ein *fragen* – solche Läufe bringen oft fremden
+  Text mit (Mails, Webseiten), der sonst Aktionen auslösen könnte. Die Aktivität zeigt das als Hintergrund.
+- **Gesundheitsdaten bleiben beim Bot** (seit 0.22.0):
+  - Ein Gesundheits-Bot (wie Vital) bekommt keine Team-Werkzeuge (`bot_fragen`, `bots_liste`) und schreibt Dateien in einen eigenen
+    Arbeitsordner (`arbeit-privat/<bot>`); den gemeinsamen liest er nur (`/gemeinsam` im Python-Sandkasten). App und Web zeigen
+    diese Dateien mit 🔒, andere Bots sehen sie nicht.
+  - Der Kapitän mit Gesundheitszugriff ebenso, aber nur in einem Lauf, in dem er `gesundheit` abgefragt hat: dann keine Aufträge an
+    andere Bots und eigener Ordner. Im nächsten Lauf ist er wieder normal.
 - **Rückgängig:** Ausgeführte Termine und Entwürfe lassen sich in der Aktivität wieder löschen. Termine werden dabei ohne Absage gelöscht.
 
 ![Web: Freigaben](screenshots/web/freigaben.png)

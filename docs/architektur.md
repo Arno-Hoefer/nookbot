@@ -78,6 +78,7 @@ in `__init__.py`). Darauf bauen Tests und Werkzeuge.
 | `gedaechtnis.json`, `ablaeufe.json`, `datenbanken.json`, `aussprache.json` | Gedächtnis, Abläufe, Datenbank-Bibliothek, Aussprache |
 | `wissen/` | globales Wissen (je Bot liegt es im Arbeitsbereich des Bots) |
 | `arbeit/` | gemeinsamer Arbeitsordner |
+| `arbeit-privat/<bot>/` | eigener Arbeitsordner für Gesundheits-Bots (andere Bots sehen ihn nicht) |
 | `claude.json`, `claude_verbrauch.json` | Schlüssel und Verbrauch (privat) |
 | `gesundheit/` | Tageswerte aus Health Connect |
 | `diagnose.json`, `abstuerze.json` | Protokolle der App (ohne Inhalte) |

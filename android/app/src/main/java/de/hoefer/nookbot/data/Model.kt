@@ -170,12 +170,12 @@ data class Ausloeser(
 }
 
 /** Eine Datei im gemeinsamen Arbeitsordner auf dem Pi. */
-data class ArbeitDatei(val name: String, val groesse: Long, val ts: Long, val bot: String) {
+data class ArbeitDatei(val name: String, val groesse: Long, val ts: Long, val bot: String, val privat: Boolean = false) {
     val bild: Boolean get() = Regex("(?i)\\.(png|jpe?g|gif|webp)$").containsMatchIn(name)
 
     companion object {
         fun list(a: JSONArray?): List<ArbeitDatei> = if (a == null) emptyList() else (0 until a.length()).map { a.getJSONObject(it) }.map {
-            ArbeitDatei(it.optString("name"), it.optLong("groesse"), (it.optDouble("ts", 0.0) * 1000).toLong(), it.optString("bot"))
+            ArbeitDatei(it.optString("name"), it.optLong("groesse"), (it.optDouble("ts", 0.0) * 1000).toLong(), it.optString("bot"), it.optBoolean("privat"))
         }
     }
 }

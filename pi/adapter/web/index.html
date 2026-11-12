@@ -763,7 +763,7 @@ async function seiteBot(id) {
       <p class="mut">Handy-Stimmen wählst du in der App. Namen spricht das Aussprache-Wörterbuch (Einstellungen) richtig aus.</p>
       ${b ? '<button class="klein" id="bTestanruf">📞 Testanruf mit dieser Stimme</button>' : ''}</div>
     <div class="box"><h3>Zugriffe</h3><div id="bRechte"></div></div>
-    ${!rk ? '' : `<div class="box"><h3>Regeln für Schreibendes</h3><p class="mut" style="margin-top:0">frei = sofort ausführen (höchstens ${rk.frei_max}× am Tag, steht in der Aktivität) ·
+    ${!rk ? '' : `<div class="box"><h3>Regeln für Schreibendes</h3><p class="mut" style="margin-top:0">frei = sofort ausführen, nur wenn du selbst im Gespräch bist (höchstens ${rk.frei_max}× am Tag, steht in der Aktivität; Routinen und Auslöser fragen immer) ·
       fragen = Freigabe wie bisher · nie = gesperrt. Sobald Gäste oder Einladungen dabei sind, wird immer gefragt.</p>
       ${Object.entries(rk.werkzeuge).map(([t, n]) => `<div class="teil"><span style="flex:1">${esc(n)}</span><select data-regel="${t}" style="width:auto">
         ${['frei', 'fragen', 'nie'].filter((v) => v !== 'frei' || !rk.nie_frei.includes(t)).map((v) => `<option ${((b?.regeln || {})[t] || 'fragen') === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>`).join('')}</div>`}
@@ -1039,7 +1039,7 @@ async function seiteArbeit() {
   const kb = (n) => n > 1e6 ? (n / 1e6).toFixed(1) + ' MB' : Math.ceil(n / 1024) + ' KB';
   $('#haupt').innerHTML = kopf('Arbeitsordner', 'gemeinsam für alle Bots', '<button class="pri klein" id="arHoch">+ Datei</button><input type="file" id="arDatei" multiple hidden>') +
     `<div class="seite"><div class="bl">${o.dateien.map((f) => `<div class="eintrag" style="cursor:default">
-      <div class="t"><div class="n">${/\.(png|jpe?g|gif|webp)$/i.test(f.name) ? '🖼' : '📄'} ${esc(f.name)}</div><div class="s">${kb(f.groesse)} · ${zeitText(f.ts)}${f.bot && f.bot !== 'app' ? ' · von ' + esc(botName(f.bot)) : f.bot === 'app' ? ' · von dir' : ''}</div></div>
+      <div class="t"><div class="n">${/\.(png|jpe?g|gif|webp)$/i.test(f.name) ? '🖼' : '📄'} ${esc(f.name)}</div><div class="s">${kb(f.groesse)} · ${zeitText(f.ts)}${f.bot && f.bot !== 'app' ? ' · von ' + esc(botName(f.bot)) : f.bot === 'app' ? ' · von dir' : ''}${f.privat ? ' · 🔒 nur dieser Bot (Gesundheit)' : ''}</div></div>
       <button class="klein" data-arbeit-laden="${esc(f.name)}">Laden</button><button class="klein text" data-ar-weg="${esc(f.name)}">✕</button></div>`).join('')
       || '<div class="box mut">Leer. Hier landen Diagramme, Tabellen und Seitenbilder der Bots – und Dateien, die du für sie ablegst.</div>'}
     <p class="mut">Die Bots lesen und schreiben hier mit <code>python_ausfuehren</code>; legst du eine Datei ab, sag dem Bot einfach den Namen.</p></div></div>`;

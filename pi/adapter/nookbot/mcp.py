@@ -162,6 +162,13 @@ def caller_session(bid: str) -> str | None:
     return max(run)[1] if run else None
 
 
+def gesundheit_sperre(caller: dict):
+    """Gesundheitsdaten gehen nie an andere Bots: kein Auftrag aus einem Gesundheits-Bot oder aus einem Lauf, der sie abgefragt hat."""
+    if rechner.abgeschottet(caller, caller_session(caller["id"]) or ""):
+        raise ValueError("In diesem Lauf sind Gesundheitsdaten im Spiel – die gebe ich nicht an andere Bots weiter. "
+                         "Beantworte es selbst oder bitte %NUTZER%, die Frage in einem neuen Gespräch ohne Gesundheitsdaten zu stellen.")
+
+
 def mcp_rpc(msg: dict, caller: dict):
     mid, method = msg.get("id"), msg.get("method")
     if mid is None:
@@ -176,9 +183,10 @@ def mcp_rpc(msg: dict, caller: dict):
         team = len(bots.bots()) > 1
         kap = bool(caller.get("kapitaen"))
         zug = bool(home.rechte(caller)["pakete"])
+        allein = home.gesundheit_bot(caller) and not kap  # Gesundheits-Bot: gibt nichts an andere Bots weiter
         merk = caller.get("merken", True)
         return ok({"tools": [{"name": t, "description": basis.n(d), "inputSchema": sc} for t, (d, sc) in MCP_TOOLS.items()
-                             if (team or t not in ("bots_liste", "bot_fragen", "auftraege_verteilen"))
+                             if (team and not allein or t not in ("bots_liste", "bot_fragen", "auftraege_verteilen"))
                              and (kap or t not in ("bot_anlegen", "bot_aendern", "auftraege_verteilen"))
                              and (zug or t not in ("pakete", "paket_hinzufuegen"))
                              and (home.rechte(caller).get("gesundheit") or t != "gesundheit")
@@ -241,11 +249,15 @@ def mcp_rpc(msg: dict, caller: dict):
             elif name == "auftraege_verteilen":
                 if not caller.get("kapitaen"):
                     raise ValueError("Nur der Kapitän verteilt Aufträge – nimm bot_fragen.")
+                gesundheit_sperre(caller)
                 text = team.verteilen(caller, a.get("auftraege") or [], str(a.get("ziel") or ""))
             elif name == "gesundheit":
                 if not home.rechte(caller).get("gesundheit"):
                     raise ValueError("Gesundheitsdaten sind für dich nicht freigegeben.")
                 text = gesundheit.gesundheit_abfrage(a)
+                cs = caller_session(caller["id"])
+                if cs in sitzungen.SESS.rt:  # ab jetzt in diesem Lauf: nichts an andere Bots, eigener Arbeitsordner
+                    sitzungen.SESS.rt[cs]["gesundheit"] = True
             elif name == "dokument_ansehen":
                 text = wissen.dokument_ansehen(caller, str(a.get("datei") or ""), str(a.get("frage") or ""), str(a.get("seiten") or ""))
             elif name == "seite_lesen":
@@ -299,6 +311,7 @@ def mcp_rpc(msg: dict, caller: dict):
                 b = bots.bot(str(a.get("bot", "")))
                 if not b or b["id"] == caller["id"]:
                     raise ValueError("Unbekannter Bot – siehe bots_liste.")
+                gesundheit_sperre(caller)
                 if not home.rechte_teilmenge(home.rechte(b), home.rechte(caller)):
                     # Sonst holt sich ein Bot Mails/Slack/Daten, die er selbst nicht sehen darf, über einen anderen Bot
                     raise ValueError(f"{b['name']} hat Zugriffe, die du nicht hast – solche Bots kannst du nicht beauftragen. "
@@ -330,7 +343,8 @@ def mcp_rpc(msg: dict, caller: dict):
                 text = rechner.python_ausfuehren(caller, str(a.get("code") or ""), caller_session(caller["id"]) or "")
             elif name == "arbeitsordner":
                 text = "\n".join(f"- {x['name']} · {x['groesse'] // 1024 + 1} KB · {time.strftime('%d.%m. %H:%M', time.localtime(x['ts']))}"
-                                 + (f" · von {bots.bot(x['bot'])['name']}" if bots.bot(x["bot"]) else "") for x in rechner.arbeit_liste()) or "Der Arbeitsordner ist leer."
+                                 + (f" · von {bots.bot(x['bot'])['name']}" if bots.bot(x["bot"]) else "") + (" · nur für dich" if x.get("privat") else "")
+                                 for x in rechner.arbeit_liste(caller, caller_session(caller["id"]) or "")) or "Der Arbeitsordner ist leer."
             elif name == "zip_entpacken":
                 text = wissen.zip_aus_datei(caller, str(a.get("quelle") or ""))
             elif name == "datei_ablegen":

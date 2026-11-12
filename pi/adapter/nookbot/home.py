@@ -147,6 +147,10 @@ def rechte_norm(r: dict) -> dict:
     return out
 
 
+def gesundheit_bot(b: dict) -> bool:
+    return bool(b.get("gesundheit") or rechte(b).get("gesundheit"))
+
+
 def rechte(b: dict) -> dict:
     if not b.get("zugriffe"):
         return dict(RECHTE_LEER)
@@ -359,7 +363,7 @@ def upload_pfad(b: dict, pfad: str) -> str:
     if not roh:
         raise ValueError("pfad ist leer.")
     ws = os.path.realpath(bots.workspace(b))
-    arb = os.path.realpath(rechner.arbeit_dir())
+    arb = os.path.realpath(rechner.arbeit_dir(b, mcp.caller_session(b["id"]) or ""))
     if roh == "/arbeit" or roh.startswith("/arbeit/"):
         wurzel, rest = arb, roh[len("/arbeit"):]
     elif roh.startswith(ws + os.sep):

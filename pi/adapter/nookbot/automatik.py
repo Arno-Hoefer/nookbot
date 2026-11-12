@@ -194,6 +194,8 @@ def aktivitaet(bid: str, art: str, was: str, detail="", sitzung: str = "", ok: b
     """art: werkzeug, routine, ausloeser, freigabe, runde, auftrag."""
     s = sitzungen.SESS.get(sitzung) if sitzung else None
     hinter = art in ("routine", "ausloeser") or bool(s and (s.get("art") in ("routine", "intern", "auftrag") or sitzung.startswith("auftrag-")))
+    if s and sitzungen.SESS.running(sitzung) and not sitzungen.SESS.von_dir(sitzung):
+        hinter = True  # Routine oder Auslöser im Hauptchat des Bots: was dabei passiert, ist Hintergrund
     e = {"ts": round(time.time(), 1), "bot": bid, "art": art, "was": str(was)[:80], "detail": _kurz(detail), "sitzung": sitzung or "",
          "ok": bool(ok), "hintergrund": hinter}
     if ref:

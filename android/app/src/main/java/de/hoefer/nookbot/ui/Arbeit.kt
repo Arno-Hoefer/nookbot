@@ -50,7 +50,7 @@ fun ArbeitScreen(vm: NookViewModel) {
                         Column(Modifier.weight(1f).padding(start = 10.dp)) {
                             Text(f.name, color = P.fg, fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                             Text(groesse(f.groesse) + " · " + fmt.format(Date(f.ts)) +
-                                when (f.bot) { "" -> ""; "app" -> " · von dir"; else -> " · von ${vm.bot(f.bot)?.name ?: f.bot}" },
+                                when (f.bot) { "" -> ""; "app" -> " · von dir"; else -> " · von ${vm.bot(f.bot)?.name ?: f.bot}" } + if (f.privat) " · 🔒 nur dieser Bot" else "",
                                 color = P.mut, fontSize = 12.sp)
                         }
                         TextButton({ loeschen = f.name }) { Text("✕", color = P.mut) }

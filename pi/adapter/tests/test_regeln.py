@@ -14,6 +14,8 @@ class Regeln(unittest.TestCase):
             return {"status": "ausgefuehrt", "ergebnis": "Termin eingetragen", "text": "Termin X"}
         s.freigaben_proxy = proxy
         self.b = {"id": "reacher", "regeln": {"termin_anlegen": "frei", "termin_gaeste": "frei", "doc_anlegen": "nie", "quatsch": "frei"}}
+        self.sid = s.bot_session("reacher")
+        s.SESS.start_turn(self.sid, "reacher", von_dir=True)  # %NUTZER% schreibt gerade selbst
 
     def tearDown(self):
         s.freigaben_proxy = self.alt
@@ -47,6 +49,31 @@ class Regeln(unittest.TestCase):
         self.assertIsNone(s.frei_ausfuehren(self.b, "termin_anlegen", {}, "F-bbbbbb"))
         self.assertEqual(len(self.aufrufe), 1)
         self.assertIn("Tageslimit", s.aktivitaet_liste(1, art="freigabe")[0]["was"])
+
+    def test_frei_nicht_im_hintergrund(self):
+        s.SESS.start_turn(self.sid, "reacher", von_dir=False)  # Routine oder Auslöser im selben Chat
+        self.assertIsNone(s.frei_ausfuehren(self.b, "termin_anlegen", {}, "F-abc123"))
+        self.assertEqual(self.aufrufe, [])
+        e = s.aktivitaet_liste(1, art="freigabe")[0]
+        self.assertIn("nur im Gespräch", e["was"])
+        self.assertTrue(e["hintergrund"])
+
+    def test_send_merkt_wer_startet(self):
+        from nookbot import sitzungen
+        alt = sitzungen.LINKS.get
+        sitzungen.LINKS.get = lambda *a: type("W", (), {"send_json": lambda self, o: None})()
+        try:
+            sitzungen.send(self.sid, "Trag mir morgen 9 Uhr Zahnarzt ein")
+            self.assertTrue(s.SESS.von_dir(self.sid))
+            sitzungen.send(self.sid, "[Routine „Morgens“] …", as_user=False)
+            self.assertFalse(s.SESS.von_dir(self.sid))
+            a = s.bot_session("scout")
+            sitzungen.SESS.create("scout", art="auftrag", sid="auftrag-scout")
+            sitzungen.send("auftrag-scout", "[Auftrag von Reacher] …")  # bot_fragen schickt als Nutzer, ist aber kein Gespräch
+            self.assertFalse(s.SESS.von_dir("auftrag-scout"))
+            self.assertTrue(a)
+        finally:
+            sitzungen.LINKS.get = alt
 
     def test_nie_sperrt_home_aufruf(self):
         b = {"id": "reacher", "zugriffe": True, "regeln": {"doc_anlegen": "nie"}}
