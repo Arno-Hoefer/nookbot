@@ -164,3 +164,20 @@ Alle Bilder zeigen Demo-Daten. App links bzw. oben, Web-Oberfläche darunter.
 - Vorgeladen wird im Hintergrund: nach dem Verbinden die Bot-Chats, die sich geändert haben; wenn ein Bot fertig ist; und bei jeder Benachrichtigung der zugehörige Chat (alle 5 Minuten, auch bei geschlossener App).
 - Der Pi schickt nur die letzten 80 Nachrichten, Gedanken gekürzt und komprimiert. „Ältere Nachrichten laden“ holt den Rest.
 - Nach dem Aufwachen verbindet die App den Ereignisstrom sofort neu, wenn eine Minute nichts kam; Lese-Anfragen geben nach 20 s auf statt nach 2 Minuten.
+
+## Neuer Stil, Projekte, Pläne, Live-Karten (ab 0.23.0)
+
+Angelehnt an Claude Duet und Meta Muse.
+
+- **Stil:** ruhig und warm – Off-White (dunkel: warmes Anthrazit), Bot-Blasen grau, eigene Nachrichten lachsfarben, Hauptknöpfe schwarz,
+  Überschriften in Serifenschrift. Oben Menü · Bot in der Mitte · Mehr; unten die Leiste **Chat · Aufgaben · Bots**. Die App startet im Chat mit dem Kapitän.
+- **Aufgaben:** „Aktiv“ zeigt, was auf dich wartet (Freigaben), was gerade läuft und die Routinen von heute; „Geplant“ die einmaligen und wöchentlichen Routinen.
+- **Projekte:** ein Thema über Wochen als eigene Unterhaltung mit dem Kapitän, Statuszeile im Menü („wartet auf den Vermieter“) und Plan.
+  Anlegen in der App (Bots → Neues Projekt) oder durch den Kapitän (`projekt_anlegen`); Status setzt der Bot mit `projekt_status`.
+- **Pläne:** Checkliste oben im Chat (`plan_setzen`, `plan_punkt`): offen, erledigt, „behalte ich im Blick“, „braucht dich“, optional mit Fälligkeit.
+  Du hakst in der App ab. Der Rundblick sieht Punkte, die dich brauchen oder fällig sind.
+- **Live-Karten:** bis zu 4 angepinnte Karten oben in einer Unterhaltung (`karte_anpinnen`, gleicher Titel = dieselbe Karte) mit kurzem Stand,
+  bis zu 4 Werten und „aktualisiert 9:41“. Regelmäßig aktualisieren: eine Routine. In der App „abnehmen“.
+- **Rechte auf Zeit:** Beim Stellen einer Regel auf *frei* fragt die App „1 Tag · 1 Woche · Immer“. Danach wird automatisch wieder gefragt.
+- **Meldungen:** Einstellungen → Benachrichtigungen: je Thema an/aus (Antworten, Rundblick, Vorschläge, Runden) und eine Ruhezeit.
+  Freigaben kommen immer.

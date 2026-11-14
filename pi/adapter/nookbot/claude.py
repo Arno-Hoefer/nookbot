@@ -315,6 +315,7 @@ def update_bot(bid: str, d: dict) -> dict:
             b["merken"] = bool(d["merken"])
         if "regeln" in d and isinstance(d["regeln"], dict):
             b["regeln"] = rechner.regeln_norm(d["regeln"])
+            b["regeln_bis"] = rechner.regeln_bis_norm(b["regeln"], d.get("regeln_bis") if isinstance(d.get("regeln_bis"), dict) else b.get("regeln_bis") or {})
         if "stimme" in d and (not d["stimme"] or str(d["stimme"]).startswith(("pi:", "handy:", "ph:"))):
             b["stimme"] = str(d["stimme"] or "")[:120]
         bots.save_bots(all_b)

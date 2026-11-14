@@ -27,7 +27,10 @@ class Sessions:
         last = next((m for m in reversed(s["msgs"]) if m["role"] in ("bot", "user")), None)
         return {"id": s["id"], "bot": s["bot"], "art": s.get("art", "chat"), "titel": s.get("titel", ""), "aktualisiert": s.get("aktualisiert", 0),
                 "teilnehmer": s.get("teilnehmer", []),
-                "letzte": (last["text"][:140].replace("\n", " ") if last else ""), "laeuft": self.running(s["id"]), "ungelesen": s.get("ungelesen", 0)}
+                "letzte": (last["text"][:140].replace("\n", " ") if last else ""), "laeuft": self.running(s["id"]), "ungelesen": s.get("ungelesen", 0),
+                # Projekte: Statuszeile und Stand des Plans fürs Menü
+                "status": s.get("status", ""), "plan": projekte.zusammenfassung(s) if s.get("plan") else "",
+                "braucht_dich": sum(1 for p in s.get("plan") or [] if p.get("status") == "braucht_dich"), "karten": len(s.get("karten") or [])}
 
     def get(self, sid: str) -> dict | None:
         with basis._lock:
@@ -356,3 +359,6 @@ def watchdog():
 
 
 from . import gedaechtnis, automatik  # noqa: E402
+
+
+from . import projekte  # noqa: E402

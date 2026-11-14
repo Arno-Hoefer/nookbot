@@ -67,6 +67,9 @@ fun BotScreen(vm: NookViewModel, id: String?) {
     var rechte by remember(b?.id) { mutableStateOf(org.json.JSONObject((b?.rechte ?: org.json.JSONObject()).toString())) }
     var merken by remember(b?.id) { mutableStateOf(b?.merken ?: true) }
     var regeln by remember(b?.id) { mutableStateOf(b?.regeln ?: emptyMap()) }
+    // „frei“ auf Zeit: Werkzeug → Ablauf (Unix-Sekunden); beim Wählen von „frei“ fragt die App, wie lange
+    var regelnBis by remember(b?.id) { mutableStateOf(b?.regelnBis ?: emptyMap()) }
+    var freiFrage by remember { mutableStateOf<String?>(null) }
     val regelKatalog by vm.regelKatalog.collectAsState()
     var stimme by remember(b?.id) { mutableStateOf(b?.stimme ?: "pi:thorsten-high") }
     val gedaechtnis by vm.gedaechtnis.collectAsState()
@@ -139,10 +142,36 @@ fun BotScreen(vm: NookViewModel, id: String?) {
                     Text(wz.optString(t), color = P.fg, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
                     Row {
                         listOf("frei", "fragen", "nie").filter { it != "frei" || t !in nieFrei }.forEach { v ->
-                            Chip(v, (regeln[t] ?: "fragen") == v) { regeln = if (v == "fragen") regeln - t else regeln + (t to v) }
+                            Chip(v, (regeln[t] ?: "fragen") == v) {
+                                if (v == "frei") freiFrage = t
+                                else { regeln = if (v == "fragen") regeln - t else regeln + (t to v); regelnBis = regelnBis - t }
+                            }
                         }
                     }
+                    regelnBis[t]?.takeIf { regeln[t] == "frei" }?.let { bis ->
+                        Text("frei bis " + java.text.SimpleDateFormat("dd.MM. HH:mm", java.util.Locale.GERMANY).format(java.util.Date((bis * 1000).toLong())) + ", danach wieder fragen",
+                            color = P.mut, fontSize = 12.sp)
+                    }
                 }
+            }
+
+            freiFrage?.let { t ->
+                AlertDialog(onDismissRequest = { freiFrage = null }, containerColor = P.card,
+                    title = { Text("Wie lange „frei“?", color = P.fg) },
+                    text = { Text("Danach fragt der Bot automatisch wieder.", color = P.fg2, fontSize = 14.sp) },
+                    confirmButton = {
+                        Row {
+                            fun setze(sek: Long?) {
+                                regeln = regeln + (t to "frei")
+                                regelnBis = if (sek == null) regelnBis - t else regelnBis + (t to (System.currentTimeMillis() / 1000 + sek).toDouble())
+                                freiFrage = null
+                            }
+                            TextButton({ setze(24 * 3600L) }) { Text("1 Tag", color = P.fg) }
+                            TextButton({ setze(7 * 24 * 3600L) }) { Text("1 Woche", color = P.fg) }
+                            TextButton({ setze(null) }) { Text("Immer", color = P.fg) }
+                        }
+                    },
+                    dismissButton = { TextButton({ freiFrage = null }) { Text("Abbrechen", color = P.fg2) } })
             }
 
             Section("Gedächtnis", "Was sich der Bot dauerhaft merkt – Vorlieben, Arbeitsweisen, Fakten über dich. Nur aus deinen eigenen Nachrichten.")
@@ -174,7 +203,7 @@ fun BotScreen(vm: NookViewModel, id: String?) {
                     saving = true
                     val d = JSONObject().put("name", name).put("rolle", rolle).put("farbe", colorHex(farbe)).put("form", form).put("modell", modell)
                         .put("persoenlichkeit", persoenlichkeit).put("fokus", fokus).put("rechte", rechte).put("merken", merken).put("stimme", stimme)
-                        .apply { if (b != null) put("regeln", org.json.JSONObject(regeln)) }
+                        .apply { if (b != null) { put("regeln", org.json.JSONObject(regeln)); put("regeln_bis", org.json.JSONObject(regelnBis)) } }
                     vm.saveBot(id, d) { saving = false; vm.back() }
                 }
                 Spacer(Modifier.width(10.dp))

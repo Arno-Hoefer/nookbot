@@ -24,9 +24,49 @@ def modelle() -> list[str]:
 
 # ── Benachrichtigungen (ntfy) ──────────────────────────────────────
 
+# Welche Meldungen aufs Handy kommen (App → Einstellungen → Meldungen) und wann Ruhe ist. Freigaben kommen immer (sie warten auf dich).
+THEMEN = {"antworten": "Antworten der Bots", "rundblick": "Rundblick", "vorschlaege": "Vorschläge", "runden": "Runden fertig"}
+_THEMA = {"compass": "rundblick", "bulb": "vorschlaege", "runde": "runden"}
+
+
+def meldungen() -> dict:
+    m = basis.conf().get("meldungen") or {}
+    return {"themen": {k: bool(m.get("themen", {}).get(k, True)) for k in THEMEN}, "namen": THEMEN,
+            "ruhe_an": bool(m.get("ruhe_an")), "ruhe_von": m.get("ruhe_von") or "21:30", "ruhe_bis": m.get("ruhe_bis") or "07:00"}
+
+
+def meldungen_setzen(d: dict) -> dict:
+    alt = meldungen()
+    neu = {"themen": {k: bool((d.get("themen") or {}).get(k, alt["themen"][k])) for k in THEMEN},
+           "ruhe_an": bool(d.get("ruhe_an", alt["ruhe_an"]))}
+    for k in ("ruhe_von", "ruhe_bis"):
+        v = str(d.get(k) or alt[k])
+        neu[k] = v if len(v) == 5 and v[2] == ":" and v[:2].isdigit() and v[3:].isdigit() else alt[k]
+    with basis._lock:
+        c = basis.conf()
+        c["meldungen"] = neu
+        basis.write_json(basis.path("config.json"), c)
+    return meldungen()
+
+
+def _stumm(prio: str, tags: str) -> bool:
+    if prio == "high":
+        return False  # Freigaben und Tests kommen immer
+    m = meldungen()
+    if not m["themen"].get(_THEMA.get(tags, "antworten"), True):
+        return True
+    if m["ruhe_an"]:
+        jetzt, von, bis = time.strftime("%H:%M"), m["ruhe_von"], m["ruhe_bis"]
+        return (von <= jetzt or jetzt < bis) if von > bis else (von <= jetzt < bis)
+    return False
+
+
 def push(title: str, msg: str, sid: str | None = None, prio: str = "default", tags: str = "robot", ntfy: bool = True, bot: dict | None = None):
     """Benachrichtigung: in den Meldungs-Speicher (die App holt ihn alle paar Minuten ab) und – falls eingerichtet – über ntfy.
-    bot: von wem – die App zeigt dann je Bot eine eigene Unterhaltung (Name, Farbe) statt einer gemeinsamen NookBot-Meldung."""
+    bot: von wem – die App zeigt dann je Bot eine eigene Unterhaltung (Name, Farbe) statt einer gemeinsamen NookBot-Meldung.
+    Abgeschaltete Themen und die Ruhezeit (App → Einstellungen → Meldungen) verschlucken die Meldung – der Chat bleibt, wie er ist."""
+    if _stumm(prio, tags):
+        return
     with basis._lock:
         d = basis.read_json(basis.path("notify.json"), {"last": 0, "items": []})
         d["last"] += 1

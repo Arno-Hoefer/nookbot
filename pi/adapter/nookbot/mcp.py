@@ -5,7 +5,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from . import basis, claude, gesundheit, wissen, home, bots, sitzungen, seiten, gedaechtnis, rechner, automatik, team, vorschlaege
+from . import basis, claude, gesundheit, wissen, home, bots, sitzungen, seiten, gedaechtnis, rechner, automatik, team, vorschlaege, projekte
 
 
 # ── MCP für die Bots: Routinen, Erinnerungen (alle), Team (Aufträge an andere Bots), Bots anlegen (Kapitän) ──
@@ -113,6 +113,30 @@ MCP_TOOLS = {
                              "aktion": {"type": "string", "description": "was du nach dem Ja konkret tust – mit welchen Werkzeugen"},
                              "grund": {"type": "string", "description": "woran du es gemerkt hast (kurz)"}},
                           "required": ["text", "aktion"]}),
+    "projekt_anlegen": ("Legt ein Projekt an: eine eigene Unterhaltung zu einem Thema über Wochen (Umzug, Reise, Renovierung …), mit Statuszeile "
+                        "und Plan. Nur wenn %NUTZER% es will oder ein Thema eindeutig länger dauert. Danach im Projekt mit plan_setzen den Plan anlegen.",
+                        {"type": "object", "properties": {"titel": {"type": "string", "description": "kurz, z. B. „Umzug März“"},
+                                                          "ziel": {"type": "string", "description": "worum es geht, ein Satz"}}, "required": ["titel"]}),
+    "projekt_status": ("Setzt die Statuszeile des Projekts, in dem du gerade bist (erscheint im Menü), z. B. „wartet auf den Vermieter“.",
+                       {"type": "object", "properties": {"text": {"type": "string", "description": "höchstens ein halber Satz"}}, "required": ["text"]}),
+    "plan_setzen": ("Legt den Plan (Checkliste) dieser Unterhaltung an oder ergänzt ihn. Punkte mit gleichem Text behalten ihren Stand. "
+                    "%NUTZER% sieht ihn oben im Chat und hakt dort ab.",
+                    {"type": "object", "properties": {
+                        "ziel": {"type": "string", "description": "das Ziel in einem Satz"},
+                        "punkte": {"type": "array", "items": {"type": "object", "properties": {"text": {"type": "string"},
+                                                                                               "faellig": {"type": "string", "description": "YYYY-MM-DD, optional"}},
+                                                              "required": ["text"]}}}, "required": ["punkte"]}),
+    "plan_punkt": ("Ändert einen Punkt des Plans: status offen | erledigt | beobachten (du behältst es im Blick) | braucht_dich (%NUTZER% muss etwas tun).",
+                   {"type": "object", "properties": {"punkt": {"type": "string", "description": "id oder genauer Text des Punkts"},
+                                                     "status": {"type": "string", "enum": ["offen", "erledigt", "beobachten", "braucht_dich"]},
+                                                     "notiz": {"type": "string"}}, "required": ["punkt"]}),
+    "karte_anpinnen": ("Pinnt eine Live-Karte oben in diese Unterhaltung oder aktualisiert sie (gleicher Titel = dieselbe Karte): kurzer Stand "
+                       "und bis zu 4 Werte (z. B. Pakete unterwegs, Kontostand, Termine heute). Für Dinge, die %NUTZER% immer wieder sehen will; "
+                       "regelmäßig aktualisieren geht mit einer Routine.",
+                       {"type": "object", "properties": {"titel": {"type": "string"}, "inhalt": {"type": "string", "description": "ein, zwei Sätze"},
+                                                         "werte": {"type": "array", "items": {"type": "object", "properties": {
+                                                             "label": {"type": "string"}, "wert": {"type": "string"}}}}}, "required": ["titel"]}),
+    "karte_entfernen": ("Nimmt eine angepinnte Karte dieser Unterhaltung ab.", {"type": "object", "properties": {"titel": {"type": "string"}}, "required": ["titel"]}),
     "ausloeser_anlegen": ("Legt einen Auslöser an: Bei einem Ereignis bekommst du automatisch einen Auftrag – neue Mail zu einer Gmail-Suche, "
                           "neue Slack-Nachricht zu einer Slack-Suche, Änderung einer Webseite oder neuer Paketstatus. Geprüft wird ohne KI im Takt; "
                           "nur wenn etwas Neues da ist, arbeitest du. Nur anlegen, wenn %NUTZER% das will.",
@@ -187,7 +211,7 @@ def mcp_rpc(msg: dict, caller: dict):
         merk = caller.get("merken", True)
         return ok({"tools": [{"name": t, "description": basis.n(d), "inputSchema": sc} for t, (d, sc) in MCP_TOOLS.items()
                              if (team and not allein or t not in ("bots_liste", "bot_fragen", "auftraege_verteilen"))
-                             and (kap or t not in ("bot_anlegen", "bot_aendern", "auftraege_verteilen"))
+                             and (kap or t not in ("bot_anlegen", "bot_aendern", "auftraege_verteilen", "projekt_anlegen"))
                              and (zug or t not in ("pakete", "paket_hinzufuegen"))
                              and (home.rechte(caller).get("gesundheit") or t != "gesundheit")
                              and (merk or t != "merken")]})
@@ -300,6 +324,22 @@ def mcp_rpc(msg: dict, caller: dict):
                                      "text": f"📋 Ablauf-Entwurf: {ab['name']}\n\n{ab['schritte']}"})
                 text = (f"Entwurf „{ab['name']}“ (id {ab['id']}) liegt %NUTZER% als Karte im Chat vor. Erst nach seinem OK ist er als Skill "
                         "verfügbar – sag ihm das kurz, ohne die Schritte zu wiederholen.")
+            elif name == "projekt_anlegen":
+                if not caller.get("kapitaen"):
+                    raise ValueError("Projekte legt der Kapitän an.")
+                s = projekte.anlegen(caller["id"], str(a.get("titel") or ""), str(a.get("ziel") or ""))
+                text = f"Projekt „{s['titel']}“ angelegt (id {s['id']}). Es erscheint im Menü unter Projekte; dort geht es weiter."
+            elif name == "projekt_status":
+                text = projekte.status_setzen(caller_session(caller["id"]) or "", str(a.get("text") or ""))
+            elif name == "plan_setzen":
+                text = projekte.plan_setzen(caller_session(caller["id"]) or "", a.get("punkte") or [], str(a.get("ziel") or ""))
+            elif name == "plan_punkt":
+                text = projekte.plan_punkt(caller_session(caller["id"]) or "", str(a.get("punkt") or ""), str(a.get("status") or ""),
+                                           a.get("notiz") if "notiz" in a else None)
+            elif name == "karte_anpinnen":
+                text = projekte.karte(caller_session(caller["id"]) or "", str(a.get("titel") or ""), str(a.get("inhalt") or ""), a.get("werte") or [])
+            elif name == "karte_entfernen":
+                text = projekte.karte_weg(caller_session(caller["id"]) or "", str(a.get("titel") or ""))
             elif name == "vorschlag_machen":
                 cs = caller_session(caller["id"]) or ""
                 if cs.startswith("auftrag-"):

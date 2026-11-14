@@ -12,7 +12,7 @@ import secrets
 import threading
 import time
 
-from . import basis, ereignisse, dienste, bots, sitzungen, home, automatik
+from . import basis, ereignisse, dienste, bots, sitzungen, home, automatik, projekte
 
 ZEITEN = ["09:30", "13:30", "18:00"]
 MAX_TAG = 3            # Meldungen am Tag – mehr wäre Lärm
@@ -141,6 +141,7 @@ def prompt(d: dict) -> str:
     abschnitte = [("Neues von den anderen Bots seit dem letzten Rundblick", _neues_von_bots(seit)),
                   ("Offene Freigaben", _offene_freigaben()),
                   ("Erinnerungen in den nächsten 24 Stunden", _erinnerungen_bald()),
+                  ("Projekte, die dich brauchen", projekte.lage()),
                   ("Was du in den letzten 7 Tagen gemeldet hast (👍/👎 = wie %NUTZER% es fand) – nicht wiederholen", _zuletzt(d))]
     tag = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"][time.localtime().tm_wday]
     return (f"[Rundblick, {tag} " + time.strftime("%d.%m.%Y %H:%M") + "]\n\n"

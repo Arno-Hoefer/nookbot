@@ -142,6 +142,7 @@ fun HomeScreen(vm: NookViewModel) {
         val eintraege = (bots.filter { !it.kapitaen }.map { b -> sitz.firstOrNull { it.id == b.sitzung }.let { s -> Eintrag("b-" + b.id, s, b, false, s?.aktualisiert ?: 0) } } +
             sitz.filter { it.art == "runde" }.map { Eintrag("r-" + it.id, it, vm.bot(it.bot), true, it.aktualisiert) }).sortedByDescending { it.zeit }
         LazyColumn(Modifier.weight(1f)) {
+            item(key = "projekte") { ProjekteListe(vm, sitz.filter { it.art == "projekt" }.sortedByDescending { it.aktualisiert }) }
             if (eintraege.isEmpty()) item {
                 Hint("Noch keine weiteren Bots. Beschreib ${kap?.name ?: "dem Kapitän"}, was ein neuer Bot können soll – er legt ihn an. Oder „+“ → Neuer Bot.",
                     Modifier.padding(20.dp))
@@ -285,8 +286,8 @@ fun ChatScreen(vm: NookViewModel, sid: String) {
         when {
             msgs.isEmpty() -> {}
             vm.obenBleiben -> { vm.obenBleiben = false; list.scrollToItem(0) }
-            vorher == 0 -> list.scrollToItem(msgs.size)  // frisch geöffnet: ohne Animation ans Ende
-            else -> list.animateScrollToItem(msgs.size)
+            vorher == 0 -> list.scrollToItem(msgs.size + 1)  // frisch geöffnet: ohne Animation ans Ende (+1: Kopf mit Plan/Karten)
+            else -> list.animateScrollToItem(msgs.size + 1)
         }
         vorher = msgs.size
     }
@@ -313,7 +314,11 @@ fun ChatScreen(vm: NookViewModel, sid: String) {
             }
         }
         Column(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(if (runde) "Runde" else listOfNotNull(b?.name, b?.rolle?.takeIf { it.isNotBlank() }).joinToString(" · ").ifBlank { "…" },
+            Text(when {
+                runde -> "Runde"
+                s?.art == "projekt" -> listOf(s.titel, s.status).filter { it.isNotBlank() }.joinToString(" · ")
+                else -> listOfNotNull(b?.name, b?.rolle?.takeIf { it.isNotBlank() }).joinToString(" · ").ifBlank { "…" }
+            },
                 color = P.fg2, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             run {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -328,6 +333,7 @@ fun ChatScreen(vm: NookViewModel, sid: String) {
         }
 
         LazyColumn(Modifier.weight(1f).padding(horizontal = 16.dp), state = list) {
+            item(key = "kopf") { KopfKarten(vm) }
             if (msgs.isEmpty() && !busy) item {
                 Hint(if (b?.zugriffe == true) "Worum geht’s? ${b.name} kann in Kalender, Mail, Slack, GitLab und die Datenbank schauen und im Web suchen. " +
                     "Eintragen und Entwürfe gehen nur mit deiner Freigabe." else "Worum geht’s? ${b?.name ?: "Der Bot"} kann im Web suchen und sein Wissen nutzen.",

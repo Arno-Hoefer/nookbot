@@ -14,6 +14,8 @@ data class Bot(
     val stimme: String = "pi:thorsten-high",
     /** Regeln für Schreibendes: Werkzeug → „frei“ oder „nie“ (fehlt = fragen) */
     val regeln: Map<String, String> = emptyMap(),
+    /** „frei“ auf Zeit: Werkzeug → Ablauf (Unix-Sekunden); fehlt = unbegrenzt */
+    val regelnBis: Map<String, Double> = emptyMap(),
 ) {
     companion object {
         fun from(o: JSONObject) = Bot(
@@ -22,6 +24,7 @@ data class Bot(
             o.optString("modell"), o.optBoolean("laeuft"), WissenDatei.list(o.optJSONArray("wissen")), o.optString("sitzung"),
             o.optBoolean("merken", true), o.optJSONObject("rechte") ?: JSONObject(), o.optString("stimme", "pi:thorsten-high").ifBlank { "pi:thorsten-high" },
             o.optJSONObject("regeln")?.let { r -> r.keys().asSequence().associateWith { r.optString(it) } } ?: emptyMap(),
+            o.optJSONObject("regeln_bis")?.let { r -> r.keys().asSequence().associateWith { r.optDouble(it) } } ?: emptyMap(),
         )
     }
 }
@@ -41,13 +44,36 @@ fun colorHex(c: Long): String = "#%06X".format(c and 0xFFFFFF)
 data class Sitzung(
     val id: String, val bot: String, val art: String, val titel: String, val aktualisiert: Long, val letzte: String,
     val laeuft: Boolean, val ungelesen: Int, val teilnehmer: List<String> = emptyList(),
+    /** Projekte: Statuszeile, Stand des Plans („8 Punkte · 3 erledigt“), wie viele Punkte dich brauchen */
+    val status: String = "", val plan: String = "", val brauchtDich: Int = 0,
 ) {
     companion object {
         fun from(o: JSONObject) = Sitzung(
             o.optString("id"), o.optString("bot"), o.optString("art", "chat"), o.optString("titel"),
             (o.optDouble("aktualisiert", 0.0) * 1000).toLong(), o.optString("letzte"), o.optBoolean("laeuft"), o.optInt("ungelesen"),
             o.optJSONArray("teilnehmer")?.let { a -> (0 until a.length()).map { a.getString(it) } } ?: emptyList(),
+            o.optString("status"), o.optString("plan"), o.optInt("braucht_dich"),
         )
+    }
+}
+
+/** Ein Punkt im Plan eines Projekts (oder Chats). status: offen, erledigt, beobachten, braucht_dich */
+data class PlanPunkt(val id: String, val text: String, val status: String, val notiz: String, val faellig: String) {
+    companion object {
+        fun list(a: JSONArray?) = (0 until (a?.length() ?: 0)).map { a!!.getJSONObject(it) }.map {
+            PlanPunkt(it.optString("id"), it.optString("text"), it.optString("status", "offen"), it.optString("notiz"), it.optString("faellig"))
+        }
+    }
+}
+
+/** Angepinnte Live-Karte oben im Chat – ein Bot hält sie aktuell. */
+data class LiveKarte(val id: String, val titel: String, val inhalt: String, val werte: List<Pair<String, String>>, val aktualisiert: Long) {
+    companion object {
+        fun list(a: JSONArray?) = (0 until (a?.length() ?: 0)).map { a!!.getJSONObject(it) }.map { o ->
+            LiveKarte(o.optString("id"), o.optString("titel"), o.optString("inhalt"),
+                o.optJSONArray("werte")?.let { w -> (0 until w.length()).map { w.getJSONObject(it).let { x -> x.optString("label") to x.optString("wert") } } } ?: emptyList(),
+                (o.optDouble("aktualisiert", 0.0) * 1000).toLong())
+        }
     }
 }
 

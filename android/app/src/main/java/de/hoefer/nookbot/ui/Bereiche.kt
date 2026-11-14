@@ -532,6 +532,7 @@ fun SettingsScreen(vm: NookViewModel) {
                 Switch(listen, { vm.setListen(it) }, colors = SwitchDefaults.colors(checkedTrackColor = A.accent))
             }
             if (listen) SideButton("Test-Benachrichtigung") { vm.testPush() }
+            MeldungenWahl(vm)
 
             val erreichbar by vm.erreichbar.collectAsState()
             val ctxE = LocalContext.current
@@ -1004,4 +1005,36 @@ private fun AusspracheBereich(vm: NookViewModel) {
         if (wort.isNotBlank() && laut.isNotBlank()) { liste = liste.filterNot { it.first.equals(wort.trim(), true) } + (wort.trim() to laut.trim()); vm.ausspracheSpeichern(liste.toMap()); wort = ""; laut = "" }
     }
     Hint("Tipp: so schreiben, wie man es auf Deutsch lesen würde – „Släck“, „Klohd“, „Git-Läb“. In der Bot-Einstellung mit „▶ Probe“ anhören.")
+}
+
+
+/** Welche Meldungen aufs Handy kommen und wann Ruhe ist (GET/PUT /api/meldungen). Freigaben kommen immer. */
+@Composable
+private fun MeldungenWahl(vm: NookViewModel) {
+    val m by vm.meldungen.collectAsState()
+    androidx.compose.runtime.LaunchedEffect(Unit) { vm.meldungenLaden() }
+    val o = m ?: return
+    val themen = o.optJSONObject("themen") ?: org.json.JSONObject()
+    val namen = o.optJSONObject("namen") ?: org.json.JSONObject()
+    Text("Was soll sich melden?", color = P.fg, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 14.dp))
+    namen.keys().forEach { k ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(namen.optString(k), color = P.fg, fontSize = 14.sp, modifier = Modifier.weight(1f))
+            Switch(themen.optBoolean(k, true), { vm.meldungenSetzen(org.json.JSONObject().put("themen", org.json.JSONObject().put(k, it))) },
+                colors = SwitchDefaults.colors(checkedTrackColor = A.accent))
+        }
+    }
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
+        Column(Modifier.weight(1f)) {
+            Text("Ruhezeit", color = P.fg, fontSize = 14.sp)
+            Text("dann nur noch Freigaben", color = P.mut, fontSize = 12.sp)
+        }
+        Switch(o.optBoolean("ruhe_an"), { vm.meldungenSetzen(org.json.JSONObject().put("ruhe_an", it)) }, colors = SwitchDefaults.colors(checkedTrackColor = A.accent))
+    }
+    if (o.optBoolean("ruhe_an")) Row {
+        var von by remember(o) { mutableStateOf(o.optString("ruhe_von")) }
+        var bis by remember(o) { mutableStateOf(o.optString("ruhe_bis")) }
+        Field("von (HH:MM)", von, modifier = Modifier.weight(1f).padding(end = 8.dp)) { von = it.take(5); if (Regex("\\d\\d:\\d\\d").matches(von)) vm.meldungenSetzen(org.json.JSONObject().put("ruhe_von", von)) }
+        Field("bis (HH:MM)", bis, modifier = Modifier.weight(1f)) { bis = it.take(5); if (Regex("\\d\\d:\\d\\d").matches(bis)) vm.meldungenSetzen(org.json.JSONObject().put("ruhe_bis", bis)) }
+    }
 }

@@ -230,7 +230,15 @@ REGEL_FREI_MAX = 10
 
 def regel(b: dict, tool: str) -> str:
     r = (b.get("regeln") or {}).get(tool, "fragen")
+    bis = (b.get("regeln_bis") or {}).get(tool)
+    if r == "frei" and bis and time.time() > float(bis):
+        r = "fragen"  # „frei“ auf Zeit ist abgelaufen
     return "fragen" if r == "frei" and tool in REGEL_NIE_FREI else r if r in ("frei", "fragen", "nie") else "fragen"
+
+
+def regeln_bis_norm(r: dict, bis: dict) -> dict:
+    """Ablaufzeit (Unix-Zeit) je Werkzeug, nur für „frei“; nichts = unbegrenzt."""
+    return {k: float(v) for k, v in (bis or {}).items() if r.get(k) == "frei" and isinstance(v, (int, float)) and v > time.time()}
 
 
 def regeln_norm(r: dict) -> dict:

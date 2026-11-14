@@ -15,7 +15,8 @@ NookBot-Adapter – sitzt zwischen der App und den Bots (je ein PicoClaw-Prozess
 
 Läuft als Benutzer picoclaw. Nur Standardbibliothek.
 
-Aufgeteilt in Module (Reihenfolge = Ladereihenfolge): basis, ereignisse, dienste, claude, gesundheit, stimmen, wissen, home, bots, sitzungen, seiten, gedaechtnis, rechner, automatik, team, vorschlaege, aufraeumen, rundblick, mcp, schnittstelle, start.
+Aufgeteilt in Module (Reihenfolge = Ladereihenfolge): basis, ereignisse, dienste, claude, gesundheit, stimmen, wissen, home, bots, sitzungen, seiten, gedaechtnis, rechner, automatik, team, vorschlaege, aufraeumen, projekte, rundblick, mcp, schnittstelle, start.
+- Projekte mit Statuszeile, Plänen (Checkliste) und angepinnten Live-Karten (projekte.py).
 """
 import os
 import sys
@@ -25,7 +26,7 @@ _HIER = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _HIER not in sys.path:
     sys.path.insert(0, _HIER)
 
-from . import basis, ereignisse, dienste, claude, gesundheit, stimmen, wissen, home, bots, sitzungen, seiten, gedaechtnis, rechner, automatik, team, vorschlaege, aufraeumen, rundblick, mcp, schnittstelle, start  # noqa: E402,F401
+from . import basis, ereignisse, dienste, claude, gesundheit, stimmen, wissen, home, bots, sitzungen, seiten, gedaechtnis, rechner, automatik, team, vorschlaege, aufraeumen, projekte, rundblick, mcp, schnittstelle, start  # noqa: E402,F401
 
 # Welcher Name in welchem Modul wohnt – für nookbot_server.py (alte Namen, Monkeypatching in Tests)
 HERKUNFT = {

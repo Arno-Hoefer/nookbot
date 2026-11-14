@@ -11,7 +11,7 @@ import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler
 
-from . import basis, ereignisse, dienste, claude, gesundheit, stimmen, wissen, home, bots, sitzungen, gedaechtnis, rechner, automatik, team, vorschlaege, aufraeumen, rundblick, mcp
+from . import basis, ereignisse, dienste, claude, gesundheit, stimmen, wissen, home, bots, sitzungen, gedaechtnis, rechner, automatik, team, vorschlaege, aufraeumen, projekte, rundblick, mcp
 
 
 # ── HTTP ───────────────────────────────────────────────────────────
@@ -113,6 +113,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, {"ablaeufe": gedaechtnis.ablaeufe()})
         if p == "/api/vorschlaege":
             return self._send(200, {"vorschlaege": vorschlaege.liste()[::-1], "einstellungen": vorschlaege.einstellungen()})
+        if p == "/api/meldungen":
+            return self._send(200, dienste.meldungen())
         if p == "/api/rundblick":
             d_ = rundblick.daten()
             return self._send(200, {"einstellungen": rundblick.einstellungen(), "aufgaben": rundblick.aufgaben(), "letzter": d_["letzter"],
@@ -367,6 +369,11 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(400, {"error": str(e)})
 
     def _post(self, p: str, d: dict):
+        if p == "/api/projekte":
+            b = bots.bot(str(d.get("bot") or bots.kapitaen()["id"]))
+            if not b:
+                raise KeyError("Bot gibt es nicht.")
+            return self._send(200, sitzungen.SESS.meta(projekte.anlegen(b["id"], str(d.get("titel") or ""), str(d.get("ziel") or ""))))
         if p == "/api/sessions":
             b = bots.bot(str(d.get("bot") or bots.kapitaen()["id"]))
             if not b:
@@ -553,6 +560,14 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, {"einstellungen": rundblick.einstellungen_setzen(d), "aufgaben": rundblick.aufgaben()})
             if p == "/api/gedaechtnis":
                 return self._send(200, {"eintraege": gedaechtnis.ged_set(list(d.get("eintraege") or []))})
+            if p == "/api/meldungen":
+                return self._send(200, dienste.meldungen_setzen(d))
+            m = re.match(r"^/api/sessions/([a-z0-9-]+)/status$", p)
+            if m:
+                return self._send(200, {"text": projekte.status_setzen(m.group(1), str(d.get("status") or ""))})
+            m = re.match(r"^/api/sessions/([a-z0-9-]+)/plan/([a-z0-9]+)$", p)
+            if m:
+                return self._send(200, {"text": projekte.plan_punkt(m.group(1), m.group(2), str(d.get("status") or ""))})
             m = re.match(r"^/api/ablaeufe/([a-z0-9]+)$", p)
             if m:
                 return self._send(200, gedaechtnis.ablauf_aendern(m.group(1), d))
@@ -571,6 +586,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         p = urllib.parse.unquote(self.path.split("?")[0])
         try:
+            m = re.match(r"^/api/sessions/([a-z0-9-]+)/karten/([a-z0-9]+)$", p)
+            if m:
+                return self._send(200, {"text": projekte.karte_weg(m.group(1), m.group(2))})
             m = re.match(r"^/api/sessions/([a-z0-9-]+)$", p)
             if m:
                 sitzungen.SESS.delete(m.group(1))

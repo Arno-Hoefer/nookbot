@@ -102,3 +102,16 @@ home-mcp liefert unter anderem `termine`, `termin_anlegen`, `termine_anlegen` (e
 Bei `drive_hochladen` und `drive_ordner_paket` ergänzt der Adapter die Beschreibung um `pfad`: Der Bot nennt eine Datei oder einen
 Ordner im Arbeitsordner (`/arbeit/…`) oder in seinem Arbeitsbereich (`anhaenge/…`), der Adapter liest sie und reicht sie Base64-kodiert
 an home-mcp weiter. Versteckte Pfade und alles außerhalb dieser beiden Orte lehnt er ab. Grenzen: 20 MB je Datei, 25 MB je Paket.
+
+### Projekte, Pläne, Karten, Meldungen (ab 0.23.0)
+
+| Methode | Pfad | Zweck |
+|---|---|---|
+| POST | `/api/projekte` | Projekt anlegen `{titel, bot?, ziel?}` → Sitzung (art `projekt`) |
+| PUT | `/api/sessions/<id>/status` | Statuszeile `{status}` |
+| PUT | `/api/sessions/<id>/plan/<punkt>` | Planpunkt `{status}` (offen, erledigt, beobachten, braucht_dich) |
+| DELETE | `/api/sessions/<id>/karten/<karte>` | Live-Karte abnehmen |
+| GET/PUT | `/api/meldungen` | Themen an/aus, Ruhezeit `{themen, ruhe_an, ruhe_von, ruhe_bis}` |
+
+`GET /api/sessions/<id>` liefert zusätzlich `plan`, `karten`, `status`, `ziel`; die Sitzungsliste `status`, `plan` (Zusammenfassung), `braucht_dich`, `karten`.
+Ereignis `{"t": "sitzung", "s": id}`: Plan oder Karten haben sich geändert. Bot-Regeln können `regeln_bis` (Werkzeug → Unix-Zeit) tragen.

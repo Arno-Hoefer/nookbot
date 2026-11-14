@@ -100,7 +100,7 @@ def runde(frage: str, teilnehmer: list[str], kap: str | None, gespraech: int = 0
         sitzungen.SESS.upsert(s["id"], {"id": "summary", "role": "bot", "text": summ, "ts": time.time(), "bot": k["id"], "zusammenfassung": True})
         sitzungen.SESS.rt[s["id"]]["n0"] = 0
         sitzungen.SESS.end_turn(s["id"])
-        dienste.push(f"Runde fertig: {s['titel']}", summ[:300], s["id"])
+        dienste.push(f"Runde fertig: {s['titel']}", summ[:300], s["id"], tags="runde")
 
     threading.Thread(target=run, daemon=True, name="runde").start()
     return sitzungen.SESS.meta(s)

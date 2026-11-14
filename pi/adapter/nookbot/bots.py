@@ -79,7 +79,8 @@ def bot_public(b: dict) -> dict:
     cfg = basis.read_json(os.path.join(b["home"], ".picoclaw", "config.json"), {})
     return {k: b.get(k) for k in ("id", "name", "rolle", "farbe", "form", "kapitaen", "zugriffe", "persoenlichkeit", "fokus")} | {"sitzung": bot_session(b["id"]),
         "rechte": home.rechte(b),
-        "merken": b.get("merken", True), "regeln": rechner.regeln_norm(b.get("regeln") or {}), "stimme": b.get("stimme") or stimmen.STANDARD_STIMME,
+        "merken": b.get("merken", True), "regeln": rechner.regeln_norm(b.get("regeln") or {}),
+        "regeln_bis": {k: v for k, v in (b.get("regeln_bis") or {}).items() if v > time.time()}, "stimme": b.get("stimme") or stimmen.STANDARD_STIMME,
         "modell": bot_model(cfg), "laeuft": unit_active(b["unit"]), "wissen": wissen.wissen_list(b["id"])}
 
 
@@ -199,6 +200,15 @@ def agent_md(b: dict) -> str:
                  "Gespräch mit `ablauf_vorschlagen` zusammen: Name, wann er passt, und die Schritte (welche Werkzeuge, welche Abfragen/Dateien, "
                  "welches Ergebnisformat) – so konkret, dass du ihn später ohne das Gespräch ausführen kannst. Gespeichert wird erst nach "
                  "%NUTZER%s OK in der App. Bestätigte Abläufe findest du als Skills `ablauf-…`.\n")
+    parts.append("## Pläne und Live-Karten\n\n"
+                 "- Geht es um ein Ziel mit mehreren Schritten (Umzug, Reise, Antrag, Feier), leg mit `plan_setzen` einen Plan an "
+                 "(kurze Punkte, wo sinnvoll mit Fälligkeit). Halte ihn mit `plan_punkt` aktuell: erledigt, beobachten (du hast es im Blick) "
+                 "oder braucht_dich (%NUTZER% muss etwas tun). %NUTZER% sieht ihn oben im Chat und hakt dort auch selbst ab.\n"
+                 "- Will %NUTZER% etwas immer wieder sehen (Pakete, Termine heute, eine Kennzahl), pinn es mit `karte_anpinnen` an "
+                 "(gleicher Titel = dieselbe Karte). Regelmäßig aktualisieren: eine Routine, die die Karte neu schreibt.\n"
+                 + ("- Dauert ein Thema eher Wochen, schlag ein Projekt vor und leg es mit `projekt_anlegen` an. Im Projekt hältst du mit "
+                    "`projekt_status` eine kurze Statuszeile aktuell (\"wartet auf …\", \"3 von 8 erledigt\").\n" if b.get("kapitaen") else
+                    "- Bist du in einem Projekt, halte mit `projekt_status` die Statuszeile aktuell.\n"))
     parts.append("## Vorschläge\n\nFällt dir auf, dass sich etwas wiederholt – %NUTZER% kopiert dieselben Daten in den Chat, stellt dieselbe "
                  "Frage immer wieder, ein Umweg kostet jedes Mal Zeit –, biete am Ende deiner Antwort **einmal** mit `vorschlag_machen` an, es "
                  "dauerhaft zu lösen (Ablauf, Routine, Auslöser, Gedächtnis, Wissensdatei). Nie ungefragt umsetzen, nie bei Kleinigkeiten, nie "

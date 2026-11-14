@@ -156,7 +156,7 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
         if (stack.value.size <= 1) return false
         val leaving = stack.value.last()
         stack.value = stack.value.dropLast(1)
-        if (leaving is Route.Chat) { msgs.value = emptyList(); aelter.value = 0 }
+        if (leaving is Route.Chat) { msgs.value = emptyList(); aelter.value = 0; plan.value = emptyList(); karten.value = emptyList(); projekt.value = null }
         if (stack.value.last() is Route.Chat) loadSession((stack.value.last() as Route.Chat).sid)
         return true
     }
@@ -245,6 +245,7 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
                 if (s.art != "intern") sitzungen.value = (listOf(s) + sitzungen.value.filterNot { it.id == s.id }).sortedByDescending { it.aktualisiert }
             }
             "session_del" -> sitzungen.value = sitzungen.value.filterNot { it.id == ev.optString("s") }
+            "sitzung" -> if (sid == current) loadSession(sid)  // Plan oder Karten haben sich geändert
             "bots", "routinen", "erinnerungen", "ablaeufe", "gedaechtnis", "ausloeser" -> io { loadStateNow() }
             "aktivitaet" -> if (stack.value.lastOrNull() == Route.Aktivitaet) loadAktivitaet()
             "arbeit" -> if (stack.value.lastOrNull() == Route.Arbeit) loadArbeit()
@@ -275,6 +276,7 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
     fun openChat(sid: String) {
         msgs.value = emptyList()
         aelter.value = 0
+        plan.value = emptyList(); karten.value = emptyList(); projekt.value = null
         if (sid != current) anhaenge.value = emptyList()
         stack.value = stack.value.filterNot { it is Route.Chat } + Route.Chat(sid)
         io {
@@ -294,7 +296,46 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
         if (!alle) zs.schreiben("chat-$sid", s)
     }
 
+    /** Plan, Live-Karten und Projekt-Angaben der offenen Unterhaltung */
+    val plan = MutableStateFlow<List<de.hoefer.nookbot.data.PlanPunkt>>(emptyList())
+    val karten = MutableStateFlow<List<de.hoefer.nookbot.data.LiveKarte>>(emptyList())
+    val projekt = MutableStateFlow<JSONObject?>(null)
+
+    fun planHaken(p: de.hoefer.nookbot.data.PlanPunkt) {
+        val sid = current ?: return
+        val neu = if (p.status == "erledigt") "offen" else "erledigt"
+        plan.value = plan.value.map { if (it.id == p.id) it.copy(status = neu) else it }
+        io { api.put("/api/sessions/$sid/plan/${p.id}", JSONObject().put("status", neu)) }
+    }
+
+    fun karteWeg(k: de.hoefer.nookbot.data.LiveKarte) {
+        val sid = current ?: return
+        karten.value = karten.value.filterNot { it.id == k.id }
+        io { api.delete("/api/sessions/$sid/karten/${k.id}") }
+    }
+
+    fun projektAnlegen(titel: String) = io {
+        val s = Sitzung.from(api.post("/api/projekte", JSONObject().put("titel", titel.trim())))
+        withContext(Dispatchers.Main) {
+            sitzungen.value = listOf(s) + sitzungen.value.filterNot { it.id == s.id }
+            openChat(s.id)
+        }
+    }
+
+    fun projektStatus(text: String) {
+        val sid = current ?: return
+        io { api.put("/api/sessions/$sid/status", JSONObject().put("status", text.trim())) }
+    }
+
+    /** Meldungen je Thema und Ruhezeit (GET/PUT /api/meldungen) */
+    val meldungen = MutableStateFlow<JSONObject?>(null)
+    fun meldungenLaden() = io { meldungen.value = api.get("/api/meldungen") }
+    fun meldungenSetzen(d: JSONObject) = io { meldungen.value = api.put("/api/meldungen", d) }
+
     private fun zeigen(sid: String, s: JSONObject) {
+        plan.value = de.hoefer.nookbot.data.PlanPunkt.list(s.optJSONArray("plan"))
+        karten.value = de.hoefer.nookbot.data.LiveKarte.list(s.optJSONArray("karten"))
+        projekt.value = if (s.optString("art") == "projekt") JSONObject().put("status", s.optString("status")).put("ziel", s.optString("ziel")) else null
         // Ältere schon geladen? Dann nicht wieder auf die letzten 80 kürzen.
         val neu = arr(s.optJSONArray("msgs")).map { Msg.from(it) }
         val alt = msgs.value
