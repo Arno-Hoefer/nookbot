@@ -154,7 +154,15 @@ class Sessions:
         r["done"].set()
         b = bots.bot(r.get("bot") or "")
         txt = self.final_text(sid)
-        if b and s.get("art") in ("chat", "routine"):
+        if b and s.get("art") in ("chat", "routine") and teambericht.ueber_kapitaen(b):
+            # Unter-Bots melden sich über den Kapitän: Freigaben und Antworten im Gespräch sofort (von ihm), Hintergrund gesammelt
+            if FREIGABE_RE.findall(txt):
+                teambericht.melden_sofort(b, "braucht deine Freigabe – " + txt[:300], sid, prio="high", tags="warning")
+            elif r.get("von_dir"):
+                teambericht.melden_sofort(b, (txt or error or "fertig")[:300], sid)
+            else:
+                teambericht.vormerken(b, sid, txt or error or "")
+        elif b and s.get("art") in ("chat", "routine"):
             fids = FREIGABE_RE.findall(txt)
             if fids:
                 dienste.push(b["name"], "Freigabe wartet – " + txt[:300], sid, prio="high", tags="warning", bot=b)
@@ -361,4 +369,4 @@ def watchdog():
 from . import gedaechtnis, automatik  # noqa: E402
 
 
-from . import projekte  # noqa: E402
+from . import projekte, teambericht  # noqa: E402

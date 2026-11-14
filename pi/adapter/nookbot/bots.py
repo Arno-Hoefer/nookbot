@@ -162,7 +162,10 @@ def agent_md(b: dict) -> str:
     if others:
         parts.append("## Dein Team\n\nMit `bot_fragen` gibst du anderen Bots einen Auftrag und bekommst ihre Antwort:\n"
                      + "\n".join(f"- **{o['name']}** (`{o['id']}`): {o.get('rolle') or ''} – {(o.get('fokus') or '').strip()[:200]}" for o in others)
-                     + ("\n\nFrag sie, wenn ihr Fokus besser passt, und fasse ihre Antworten für %NUTZER% zusammen.\n" if b.get("kapitaen") else
+                     + ("\n\nDu bist %NUTZER%s Anlaufstelle: Fällt eine Frage in den Bereich eines anderen Bots, gib sie mit `bot_fragen` "
+                        "an ihn weiter (vollständig beschrieben) und fasse seine Antwort zusammen – sag dabei, wer es war. Die anderen Bots "
+                        "melden sich nicht mehr selbst bei %NUTZER%, sondern bei dir: Ergebnisse aus ihren Routinen und Auslösern bekommst du "
+                        "gesammelt als „[Team-Bericht]“ und fasst sie für %NUTZER% zusammen.\n" if b.get("kapitaen") else
                         "\n\nFrag sie nur, wenn es wirklich hilft. Erledigst du selbst gerade einen Auftrag, gibst du keinen weiter.\n"))
     if b.get("merken", True):
         parts.append("## Gedächtnis\n\nDein Gedächtnis steht in `memory/MEMORY.md` (wird dir automatisch gezeigt). Mit `merken` hältst du "
@@ -200,6 +203,11 @@ def agent_md(b: dict) -> str:
                  "Gespräch mit `ablauf_vorschlagen` zusammen: Name, wann er passt, und die Schritte (welche Werkzeuge, welche Abfragen/Dateien, "
                  "welches Ergebnisformat) – so konkret, dass du ihn später ohne das Gespräch ausführen kannst. Gespeichert wird erst nach "
                  "%NUTZER%s OK in der App. Bestätigte Abläufe findest du als Skills `ablauf-…`.\n")
+    if not b.get("kapitaen"):
+        parts.append("## Wer %NUTZER% Bescheid gibt\n\nDu meldest dich nicht selbst bei %NUTZER%: Was du in Routinen und Auslösern "
+                     "herausfindest, geht an den Kapitän, der es mit dem anderen zusammenfasst. Schreib deine Ergebnisse deshalb so, "
+                     "dass sie ohne Rückfrage verständlich sind (was, wann, was zu tun ist). Schreibt %NUTZER% dir direkt, "
+                     "antwortest du ihm direkt.\n")
     parts.append("## Pläne und Live-Karten\n\n"
                  "- Geht es um ein Ziel mit mehreren Schritten (Umzug, Reise, Antrag, Feier), leg mit `plan_setzen` einen Plan an "
                  "(kurze Punkte, wo sinnvoll mit Fälligkeit). Halte ihn mit `plan_punkt` aktuell: erledigt, beobachten (du hast es im Blick) "

@@ -181,3 +181,13 @@ Angelehnt an Claude Duet und Meta Muse.
 - **Rechte auf Zeit:** Beim Stellen einer Regel auf *frei* fragt die App „1 Tag · 1 Woche · Immer“. Danach wird automatisch wieder gefragt.
 - **Meldungen:** Einstellungen → Benachrichtigungen: je Thema an/aus (Antworten, Rundblick, Vorschläge, Runden) und eine Ruhezeit.
   Freigaben kommen immer.
+
+## Team-Bericht: Reacher ist die Anlaufstelle (ab 0.24.0)
+
+- Die Unter-Bots melden sich nicht mehr selbst. Ergebnisse aus ihren Routinen und Auslösern sammelt der Adapter; nach 10 Minuten
+  (oder bei 6 Ergebnissen) fasst Reacher sie zusammen – Karte **„Aus dem Team“** in seinem Chat (mit Knöpfen zu den Bots) und eine
+  Benachrichtigung von ihm. Ist nichts wichtig, bleibt er still (`TEAM_OK`).
+- Sofort, aber von Reacher: Freigaben eines Unter-Bots, seine Vorschläge und Antworten, wenn du ihm selbst geschrieben hast.
+- Direkt mit den Unter-Bots chatten und ihnen etwas beibringen geht weiter. Fragst du Reacher, gibt er es mit `bot_fragen`
+  an den passenden Bot weiter und sagt, wer geantwortet hat.
+- Abschaltbar in `config.json` (`"teambericht": {"aktiv": false}`); das Thema „Team-Bericht“ unter Einstellungen → Meldungen.

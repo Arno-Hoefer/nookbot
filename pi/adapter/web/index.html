@@ -439,6 +439,7 @@ function karte(m) {
       ${st === 'entwurf' && a ? `<div class="knoepfe"><button class="pri klein" data-abl-ok="${esc(a.id)}">Speichern</button><button class="klein" data-abl-edit="${esc(a.id)}">Ändern</button><button class="klein text" data-abl-weg="${esc(a.id)}">Verwerfen</button></div>` : ''}</div>`;
   }
   if (m.art === 'vorschlag') return vorschlagKarte(m);
+  if (m.art === 'team') return `<div class="karte rb" style="display:block"><div class="mut" style="font-size:12px">AUS DEM TEAM</div><div class="md">${md(m.text || '')}</div>${(m.teile || []).length ? `<div class="mut" style="font-size:12px;margin-top:6px">${esc([...new Set(m.teile.map((t) => t.name))].join(' · '))}</div>` : ''}</div>`;
   if (m.art === 'rundblick') {
     return `<div class="karte rb"><div class="titel">🧭 Rundblick <span class="mut">· von sich aus</span></div><div class="md">${md(m.text || '')}</div>
       <div class="knoepfe"><button class="klein text bew ${m.status === 'gut' ? 'an' : ''}" data-rb="${esc(m.ref)}" data-bew="gut" title="hilfreich">👍</button>

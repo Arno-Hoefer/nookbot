@@ -531,6 +531,20 @@ private fun InfoKarte(vm: NookViewModel, m: Msg) {
             SelectionContainer { Text(markdown(satz[0], P.fg2), color = P.fg, fontSize = 21.sp, lineHeight = 26.sp, fontFamily = Serif, modifier = Modifier.padding(top = 4.dp)) }
             if (satz.size > 1) SelectionContainer { Text(markdown(satz[1], P.fg2), color = P.fg2, fontSize = 14.sp, lineHeight = 20.sp, modifier = Modifier.padding(top = 6.dp)) }
         }
+        // Team-Bericht: der Kapitän fasst zusammen, was die anderen Bots im Hintergrund geliefert haben
+        "team" -> Card(Modifier.padding(vertical = 8.dp)) {
+            Text("AUS DEM TEAM · ${uhrzeit(m.ts)}", color = P.mut, fontSize = 11.sp, letterSpacing = 0.8.sp)
+            SelectionContainer { Text(markdown(m.text, P.fg2), color = P.fg, fontSize = 15.sp, lineHeight = 21.sp, modifier = Modifier.padding(top = 6.dp)) }
+            if (m.teile.isNotEmpty()) androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                m.teile.distinctBy { it.sitzung }.forEach { t ->
+                    Row(Modifier.clip(RoundedCornerShape(16.dp)).background(P.field).clickable { vm.openChat(t.sitzung) }.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        BotFigure(vm.bot(t.bot), 16.dp)
+                        Text(t.name, color = P.fg2, fontSize = 12.sp, modifier = Modifier.padding(start = 6.dp))
+                    }
+                }
+            }
+        }
         "auftraege" -> {
             var zeigen by remember { mutableStateOf<String?>(null) }
             Card(Modifier.padding(vertical = 8.dp)) {

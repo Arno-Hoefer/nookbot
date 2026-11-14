@@ -25,8 +25,8 @@ def modelle() -> list[str]:
 # ── Benachrichtigungen (ntfy) ──────────────────────────────────────
 
 # Welche Meldungen aufs Handy kommen (App → Einstellungen → Meldungen) und wann Ruhe ist. Freigaben kommen immer (sie warten auf dich).
-THEMEN = {"antworten": "Antworten der Bots", "rundblick": "Rundblick", "vorschlaege": "Vorschläge", "runden": "Runden fertig"}
-_THEMA = {"compass": "rundblick", "bulb": "vorschlaege", "runde": "runden"}
+THEMEN = {"antworten": "Antworten der Bots", "team": "Team-Bericht (Reacher fasst zusammen)", "rundblick": "Rundblick", "vorschlaege": "Vorschläge", "runden": "Runden fertig"}
+_THEMA = {"compass": "rundblick", "bulb": "vorschlaege", "runde": "runden", "team": "team"}
 
 
 def meldungen() -> dict:
