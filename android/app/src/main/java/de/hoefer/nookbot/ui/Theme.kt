@@ -9,20 +9,31 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 
-/** Farben des NookBot-Designs – dunkel (Standard aus dem Prototyp) und hell. Akzente sind in beiden gleich. */
+/**
+ * Farben des NookBot-Designs (seit 0.23 ruhig und warm, angelehnt an Claude Duet): Off-White statt Schwarz,
+ * Bot-Blasen grau, eigene Nachrichten lachsfarben, Hauptknöpfe schwarz (dunkel: hell). Akzent nur noch sparsam.
+ */
 data class Pal(
     val dark: Boolean,
     val bg: Color, val card: Color, val field: Color, val line: Color, val chip: Color,
     val fg: Color, val fg2: Color, val mut: Color,
+    /** Blase des Bots */ val bubble: Color,
+    /** eigene Nachricht und Text darauf */ val mine: Color, val onMine: Color,
+    /** Hauptknopf (schwarz bzw. im Dunklen hell) und Inhalt darauf */ val ink: Color, val onInk: Color,
 )
 
-val DarkPal = Pal(true, Color(0xFF0E0E10), Color(0xFF17171A), Color(0xFF1C1C1F), Color(0xFF2C2C30), Color(0xFF26262A),
-    Color(0xFFF3F2EF), Color(0xFFC9C8CD), Color(0xFF8D8C93))
-val LightPal = Pal(false, Color(0xFFF6F5F2), Color(0xFFFFFFFF), Color(0xFFEDECE8), Color(0xFFDEDCD6), Color(0xFFE6E4DF),
-    Color(0xFF17161A), Color(0xFF45444A), Color(0xFF7A7980))
+val DarkPal = Pal(true, Color(0xFF171614), Color(0xFF22201D), Color(0xFF2A2825), Color(0xFF33302C), Color(0xFF2A2825),
+    Color(0xFFEEEAE3), Color(0xFFCFCAC1), Color(0xFFA39E95),
+    bubble = Color(0xFF2A2825), mine = Color(0xFFE5876D), onMine = Color(0xFF1F120D), ink = Color(0xFFEEEAE3), onInk = Color(0xFF171614))
+val LightPal = Pal(false, Color(0xFFF3F1EC), Color(0xFFFFFFFF), Color(0xFFEDEBE6), Color(0xFFE6E2DA), Color(0xFFEDEBE6),
+    Color(0xFF1F1E1C), Color(0xFF4A4741), Color(0xFF77736C),
+    bubble = Color(0xFFE9E7E2), mine = Color(0xFFF6B9A5), onMine = Color(0xFF2A1A14), ink = Color(0xFF151413), onInk = Color(0xFFFFFFFF))
+
+/** Überschriften in Serifenschrift (wie Duet), Text bleibt schlicht. */
+val Serif = androidx.compose.ui.text.font.FontFamily.Serif
 
 object A {
-    val accent = Color(0xFFFF3B4E)
+    val accent = Color(0xFFE06A4E)
     val amber = Color(0xFFF5A524)
     val green = Color(0xFF2FBF71)
     val blue = Color(0xFF3B8CFF)

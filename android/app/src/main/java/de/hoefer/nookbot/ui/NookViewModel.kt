@@ -54,6 +54,7 @@ sealed class Route {
     data object Ablaeufe : Route()
     data object Gedaechtnis : Route()
     data object Settings : Route()
+    data object Aufgaben : Route()
 }
 
 class NookViewModel(app: Application) : AndroidViewModel(app) {
@@ -162,6 +163,18 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
 
     fun home() { stack.value = listOf(Route.Home); refreshFreigaben() }
 
+    /** Leiste unten: „Chat“ = Unterhaltung mit dem Kapitän, „Aufgaben“ = was wartet und läuft. */
+    fun zumKapitaen() { bots.value.firstOrNull { it.kapitaen }?.let { k -> stack.value = listOf(Route.Home); openBot(k.id) } }
+    fun zuAufgaben() { stack.value = listOf(Route.Home, Route.Aufgaben); refreshFreigaben() }
+    /** Beim Start gleich in den Chat mit dem Kapitän (wie Duet) – einmal pro App-Start. */
+    private var gestartet = false
+    private fun startChat() {
+        if (gestartet || stack.value != listOf(Route.Home)) return
+        val k = bots.value.firstOrNull { it.kapitaen } ?: return
+        gestartet = true
+        openBot(k.id)
+    }
+
     fun say(s: String?) { toast.value = s }
 
     // ── Verbindung zum Adapter ──
@@ -197,6 +210,7 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
         run {
             if (!ausSpeicher) seq = st.optLong("seq")
             bots.value = arr(st.optJSONArray("bots")).map { Bot.from(it) }
+            if (!ausSpeicher) startChat()
             sitzungen.value = arr(st.optJSONArray("sessions")).map { Sitzung.from(it) }.sortedByDescending { it.aktualisiert }
             busy.value = sitzungen.value.filter { it.laeuft }.map { it.id }.toSet()
             routinen.value = arr(st.optJSONArray("routinen")).map { Routine.from(it) }

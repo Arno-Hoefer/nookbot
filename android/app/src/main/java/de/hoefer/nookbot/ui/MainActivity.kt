@@ -84,6 +84,7 @@ class MainActivity : ComponentActivity() {
                             Route.Archiv -> ArchivScreen(vm)
                             Route.Ablaeufe -> AblaeufeScreen(vm)
                             Route.Gedaechtnis -> GedaechtnisScreen(vm)
+                            Route.Aufgaben -> AufgabenScreen(vm)
                         }
                     }
                 }

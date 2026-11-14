@@ -75,7 +75,7 @@ fun BotFigure(b: Bot?, size: Dp) = BotFigure(size, b?.form ?: "kapsel", b?.let {
 
 @Composable
 fun RoundIcon(icon: ImageVector, label: String, onClick: () -> Unit) {
-    Box(Modifier.size(44.dp).clip(CircleShape).background(P.field).border(1.dp, P.line, CircleShape).clickable(onClick = onClick),
+    Box(Modifier.size(44.dp).clip(CircleShape).background(P.card).border(1.dp, P.line, CircleShape).clickable(onClick = onClick),
         contentAlignment = Alignment.Center) {
         Icon(icon, label, tint = P.fg, modifier = Modifier.size(20.dp))
     }
@@ -86,7 +86,7 @@ fun TopBar(title: String, onBack: () -> Unit, sub: String? = null, right: @Compo
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
         RoundIcon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück", onBack)
         Column(Modifier.padding(start = 14.dp).weight(1f)) {
-            Text(title, color = P.fg, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(title, color = P.fg, fontSize = 22.sp, fontFamily = Serif, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             sub?.let { Text(it, color = P.mut, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
         }
         right()
@@ -127,26 +127,29 @@ private fun LocalTextStyleMono(mono: Boolean) =
 @Composable
 fun Chip(text: String, selected: Boolean, color: Color? = null, onClick: () -> Unit) {
     Text(text, fontSize = 13.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-        color = if (selected) P.bg else P.fg2,
-        modifier = Modifier.padding(end = 8.dp, bottom = 6.dp).clip(RoundedCornerShape(16.dp))
-            .background(if (selected) (color ?: P.fg) else P.field).clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 7.dp))
+        color = if (selected) (if (color == null) P.onInk else Color.White) else P.fg2,
+        modifier = Modifier.padding(end = 8.dp, bottom = 6.dp).clip(RoundedCornerShape(18.dp))
+            .background(if (selected) (color ?: P.ink) else P.card).border(1.dp, if (selected) Color.Transparent else P.line, RoundedCornerShape(18.dp))
+            .clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 8.dp))
 }
 
 @Composable
 fun MainButton(text: String, enabled: Boolean = true, onClick: () -> Unit) {
-    Button(onClick = onClick, enabled = enabled, shape = RoundedCornerShape(14.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = A.accent, contentColor = Color.White)) { Text(text, fontWeight = FontWeight.SemiBold) }
+    Button(onClick = onClick, enabled = enabled, shape = RoundedCornerShape(24.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = P.ink, contentColor = P.onInk, disabledContainerColor = P.field, disabledContentColor = P.mut)) {
+        Text(text, fontWeight = FontWeight.SemiBold)
+    }
 }
 
 @Composable
 fun SideButton(text: String, color: Color? = null, onClick: () -> Unit) {
-    OutlinedButton(onClick = onClick, shape = RoundedCornerShape(14.dp)) { Text(text, color = color ?: P.fg) }
+    OutlinedButton(onClick = onClick, shape = RoundedCornerShape(24.dp), border = androidx.compose.foundation.BorderStroke(1.dp, P.line)) { Text(text, color = color ?: P.fg) }
 }
 
 @Composable
 fun Card(modifier: Modifier = Modifier, border: Color? = null, onClick: (() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
-    Column(modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(P.card).border(1.dp, border ?: P.line, RoundedCornerShape(16.dp))
-        .let { if (onClick != null) it.clickable(onClick = onClick) else it }.padding(14.dp), content = content)
+    Column(modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(P.card).border(1.dp, border ?: P.line, RoundedCornerShape(22.dp))
+        .let { if (onClick != null) it.clickable(onClick = onClick) else it }.padding(16.dp), content = content)
 }
 
 @Composable

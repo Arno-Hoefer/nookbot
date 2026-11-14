@@ -76,7 +76,7 @@ fun HomeScreen(vm: NookViewModel) {
         Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             RoundIcon(Icons.Default.Menu, "Menü") { vm.go(Route.Mehr) }
             Spacer(Modifier.weight(1f))
-            Text("NookBot", color = P.fg, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+            Text("NookBot", color = P.fg, fontSize = 24.sp, fontFamily = Serif, fontWeight = FontWeight.Medium)
             Spacer(Modifier.weight(1f))
             RoundIcon(Icons.Default.Search, "Suchen") { suchen = !suchen; if (!suchen) { q = ""; vm.suche("") } }
             Spacer(Modifier.width(10.dp))
@@ -188,6 +188,7 @@ fun HomeScreen(vm: NookViewModel) {
                 color = P.fg2, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(start = 10.dp).weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text("Tailnet", color = P.mut, fontSize = 13.sp)
         }
+        Leiste(vm, Tab.BOTS)
     }
 
     loeschen?.let { s ->
@@ -291,23 +292,15 @@ fun ChatScreen(vm: NookViewModel, sid: String) {
     }
 
     Column(Modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            RoundIcon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück") { vm.back() }
-            Row(Modifier.weight(1f).clickable(enabled = b != null && !runde) { vm.go(Route.BotEdit(b?.id)) }, verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.padding(start = 12.dp)) { BotFigure(b, 34.dp) }
-                Column(Modifier.padding(start = 10.dp)) {
-                    Text(if (runde) "Runde" else b?.name ?: "…", color = P.fg, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(8.dp).clip(CircleShape).background(if (!online) A.accent else if (busy) A.amber else A.green))
-                        Text(when {
-                            !online -> "Pi nicht erreichbar"
-                            runde -> "Kapitän ${b?.name ?: ""} fasst zusammen"
-                            else -> "${b?.modell ?: ""} · auf dem Pi"
-                        }, color = P.mut, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 6.dp))
-                    }
-                }
+        // Kopf wie bei Duet: Menü links, der Bot groß in der Mitte, Mehr rechts
+        Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            RoundIcon(Icons.Default.Menu, "Alle Bots") { vm.home() }
+            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(68.dp).clip(CircleShape).background(P.card).border(1.dp, P.line, CircleShape)
+                    .clickable(enabled = b != null && !runde) { vm.go(Route.BotEdit(b?.id)) }, contentAlignment = Alignment.Center) { BotFigure(b, 40.dp) }
             }
-            if (!runde && b != null) Box {
+            if (runde || b == null) Spacer(Modifier.size(44.dp))
+            else Box {
                 RoundIcon(Icons.Default.MoreVert, "Mehr") { menu = true }
                 DropdownMenu(menu, { menu = false }, containerColor = P.card) {
                     DropdownMenuItem({ Text("📞 ${b.name} anrufen", color = P.fg) }, {
@@ -316,6 +309,20 @@ fun ChatScreen(vm: NookViewModel, sid: String) {
                     DropdownMenuItem({ Text("Einstellungen von ${b.name}", color = P.fg) }, { menu = false; vm.go(Route.BotEdit(b.id)) })
                     DropdownMenuItem({ Text("Als Ablauf speichern …", color = P.fg) }, { menu = false; ablauf = true })
                     DropdownMenuItem({ Text("Neu beginnen …", color = P.fg) }, { menu = false; neu = true })
+                }
+            }
+        }
+        Column(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(if (runde) "Runde" else listOfNotNull(b?.name, b?.rolle?.takeIf { it.isNotBlank() }).joinToString(" · ").ifBlank { "…" },
+                color = P.fg2, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            run {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(8.dp).clip(CircleShape).background(if (!online) A.accent else if (busy) A.amber else A.green))
+                        Text(when {
+                            !online -> "Pi nicht erreichbar"
+                            runde -> "Kapitän ${b?.name ?: ""} fasst zusammen"
+                            else -> "${b?.modell ?: ""} · auf dem Pi"
+                        }, color = P.mut, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 6.dp))
                 }
             }
         }
@@ -367,9 +374,12 @@ fun ChatScreen(vm: NookViewModel, sid: String) {
             }
             if (anhangLaeuft) Text("lädt hoch …", color = P.mut, fontSize = 13.sp)
         }
-        if (!runde) Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp, top = 6.dp), verticalAlignment = Alignment.Bottom) {
+        // Eingabe als eine Pille: + · Text · Mikrofon · schwarzer Knopf (Sprachmodus bzw. Senden)
+        if (!runde) Row(Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, bottom = 8.dp, top = 6.dp)
+            .clip(RoundedCornerShape(28.dp)).background(P.card).border(1.dp, P.line, RoundedCornerShape(28.dp)).padding(6.dp),
+            verticalAlignment = Alignment.Bottom) {
             Box {
-                Box(Modifier.size(52.dp).clip(CircleShape).background(P.field).clickable { anhang = true }, contentAlignment = Alignment.Center) {
+                Box(Modifier.size(44.dp).clip(CircleShape).clickable { anhang = true }, contentAlignment = Alignment.Center) {
                     Icon(Icons.Default.Add, "Anhängen", tint = P.fg, modifier = Modifier.size(22.dp))
                 }
                 DropdownMenu(anhang, { anhang = false }, containerColor = P.card) {
@@ -386,7 +396,6 @@ fun ChatScreen(vm: NookViewModel, sid: String) {
                     DropdownMenuItem({ Text("📚  Datei als Wissen für ${b?.name ?: "den Bot"}", color = P.fg) }, { anhang = false; wissenPick.launch(WISSEN_MIME) })
                 }
             }
-            Spacer(Modifier.width(8.dp))
             TextField(
                 value = input, onValueChange = { input = it },
                 placeholder = { Text(when {
@@ -394,8 +403,8 @@ fun ChatScreen(vm: NookViewModel, sid: String) {
                     notizStatus != null -> notizStatus ?: ""
                     else -> "Nachricht an ${b?.name ?: "Bot"}"
                 }, color = if (diktat != null) A.accent else P.mut) },
-                modifier = Modifier.weight(1f).clip(RoundedCornerShape(24.dp)),
-                colors = TextFieldDefaults.colors(focusedContainerColor = P.field, unfocusedContainerColor = P.field,
+                modifier = Modifier.weight(1f),
+                colors = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent,
                     focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent,
                     focusedTextColor = P.fg, unfocusedTextColor = P.fg, cursorColor = A.accent),
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
@@ -403,7 +412,7 @@ fun ChatScreen(vm: NookViewModel, sid: String) {
                     if (diktat != null) Box(Modifier.size((30 + diktatPegel * 12).dp).clip(CircleShape).background(A.accent)
                         .clickable { diktatStopp() }, contentAlignment = Alignment.Center) { Text("■", color = Color.White, fontSize = 14.sp) }
                     else if (notizStatus != null) CircularProgressIndicator(Modifier.size(20.dp), color = A.accent, strokeWidth = 2.dp)
-                    else Text("🎙", fontSize = 18.sp, modifier = Modifier.clip(CircleShape).combinedClickable(
+                    else Box(Modifier.clip(CircleShape).combinedClickable(
                         onLongClick = {
                             // Nur Entwicklerversion: Testaufnahme aus dem Cache umwandeln (Emulator hat kein Mikrofon)
                             val t = java.io.File(ctx.cacheDir, "test.wav")
@@ -411,22 +420,22 @@ fun ChatScreen(vm: NookViewModel, sid: String) {
                         }) {
                         if (ctx.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED) diktatStart()
                         else mikroErlaubnis.launch(android.Manifest.permission.RECORD_AUDIO)
-                    }.padding(8.dp))
+                    }.padding(8.dp)) { Mikro(P.fg) }
                 },
                 maxLines = 6,
             )
-            Spacer(Modifier.width(8.dp))
             val leer = input.isBlank() && anhaenge.isEmpty() && diktat == null
             val can = (input.isNotBlank() || anhaenge.isNotEmpty()) && online && !anhangLaeuft
             // Wie bei ChatGPT: leeres Feld → Sprachmodus, sonst Senden
-            if (leer) Box(Modifier.size(52.dp).clip(CircleShape).background(if (online) P.fg else P.field)
+            if (leer) Box(Modifier.size(44.dp).clip(CircleShape).background(if (online) P.ink else P.field)
                 .clickable(enabled = online) { sprache = true }, contentAlignment = Alignment.Center) {
-                Text("🗣", fontSize = 22.sp)
-            } else Box(Modifier.size(52.dp).clip(CircleShape).background(if (can) A.accent else P.field)
+                Wellen(if (online) P.onInk else P.mut)
+            } else Box(Modifier.size(44.dp).clip(CircleShape).background(if (can) P.ink else P.field)
                 .clickable(enabled = can) { vm.send(input); input = "" }, contentAlignment = Alignment.Center) {
-                Icon(Icons.AutoMirrored.Filled.Send, "Senden", tint = if (can) Color.White else P.mut, modifier = Modifier.size(22.dp))
+                Icon(Icons.AutoMirrored.Filled.Send, "Senden", tint = if (can) P.onInk else P.mut, modifier = Modifier.size(20.dp))
             }
         }
+        if (!runde && s?.art != "intern" && s?.art != "archiv") Leiste(vm, if (b?.kapitaen == true) Tab.CHAT else Tab.BOTS)
     }
     ChatDialoge(vm, b, neu, notiz, { neu = false }, { notiz = false })
     if (sprache) Sprachmodus(vm, sid, b) { sprache = false }
@@ -500,10 +509,9 @@ private fun InfoKarte(vm: NookViewModel, m: Msg) {
                 TextButton({ vm.vorschlagEntscheiden(m.ref, false) }) { Text("Nein danke", color = P.mut) }
             }
         }
-        "rundblick" -> Card(Modifier.padding(vertical = 8.dp), border = A.green.copy(alpha = 0.5f)) {
+        "rundblick" -> Card(Modifier.padding(vertical = 8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Badge("RUNDBLICK", A.green)
-                Text("von sich aus", color = P.mut, fontSize = 12.sp, modifier = Modifier.padding(start = 8.dp).weight(1f))
+                Text("RUNDBLICK · ${uhrzeit(m.ts)}", color = P.mut, fontSize = 11.sp, letterSpacing = 0.8.sp, modifier = Modifier.weight(1f))
                 // 👍/👎: der Kapitän sieht beim nächsten Rundblick, was ankam – nochmal tippen nimmt es zurück
                 TextButton({ vm.rundblickBewerten(m.ref, if (m.status == "gut") "" else "gut") }) {
                     Text("👍", fontSize = 16.sp, color = if (m.status == "gut") P.fg else P.mut.copy(alpha = if (m.status == "schlecht") 0.4f else 1f))
@@ -512,7 +520,10 @@ private fun InfoKarte(vm: NookViewModel, m: Msg) {
                     Text("👎", fontSize = 16.sp, color = if (m.status == "schlecht") P.fg else P.mut.copy(alpha = if (m.status == "gut") 0.4f else 1f))
                 }
             }
-            SelectionContainer { Text(markdown(m.text, P.fg2), color = P.fg, fontSize = 14.sp, lineHeight = 20.sp, modifier = Modifier.padding(top = 4.dp)) }
+            // Erster Satz als Überschrift (Serifen), der Rest normal – wie die Karten bei Duet
+            val satz = m.text.trim().split(Regex("(?<=[.!?:])\\s+"), limit = 2)
+            SelectionContainer { Text(markdown(satz[0], P.fg2), color = P.fg, fontSize = 21.sp, lineHeight = 26.sp, fontFamily = Serif, modifier = Modifier.padding(top = 4.dp)) }
+            if (satz.size > 1) SelectionContainer { Text(markdown(satz[1], P.fg2), color = P.fg2, fontSize = 14.sp, lineHeight = 20.sp, modifier = Modifier.padding(top = 6.dp)) }
         }
         "auftraege" -> {
             var zeigen by remember { mutableStateOf<String?>(null) }
@@ -591,9 +602,9 @@ private fun ChatDialoge(vm: NookViewModel, b: de.hoefer.nookbot.data.Bot?, neu: 
 private fun MessageView(m: Msg, from: de.hoefer.nookbot.data.Bot?) {
     when (m.role) {
         "user" -> Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.End) {
-            Column(Modifier.widthIn(max = 300.dp).clip(RoundedCornerShape(18.dp, 18.dp, 4.dp, 18.dp)).background(P.chip)
-                .padding(horizontal = 14.dp, vertical = 10.dp), horizontalAlignment = Alignment.End) {
-                SelectionContainer { Text(m.text, color = P.fg, fontSize = 15.sp) }
+            Column(Modifier.widthIn(max = 300.dp).clip(RoundedCornerShape(20.dp)).background(P.mine)
+                .padding(horizontal = 16.dp, vertical = 10.dp), horizontalAlignment = Alignment.End) {
+                SelectionContainer { Text(m.text, color = P.onMine, fontSize = 15.sp) }
                 Zeit(m.ts)
             }
         }
@@ -609,9 +620,9 @@ private fun MessageView(m: Msg, from: de.hoefer.nookbot.data.Bot?) {
             Text(toolLine(m.text), color = P.fg2, fontSize = 13.sp, modifier = Modifier.padding(start = 6.dp))
         }
         "error" -> Text("⚠ ${m.text}", color = A.accent, fontSize = 13.sp, modifier = Modifier.padding(vertical = 6.dp))
-        else -> if (m.text.isNotBlank()) Column(Modifier.padding(vertical = 6.dp).padding(end = 28.dp)
-            .clip(RoundedCornerShape(18.dp, 18.dp, 18.dp, 4.dp)).background(P.card).border(1.dp, P.line, RoundedCornerShape(18.dp, 18.dp, 18.dp, 4.dp))
-            .padding(horizontal = 14.dp, vertical = 10.dp)) {
+        else -> if (m.text.isNotBlank()) Column(Modifier.padding(vertical = 5.dp).padding(end = 36.dp)
+            .clip(RoundedCornerShape(20.dp)).background(P.bubble)
+            .padding(horizontal = 14.dp, vertical = 11.dp)) {
             if (from != null || m.zusammenfassung) Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 4.dp)) {
                 BotFigure(from, 22.dp)
                 Text((from?.name ?: "") + if (m.zusammenfassung) " · Zusammenfassung" else if (m.gespraech > 0) " · Gespräch ${m.gespraech}" else "", color = P.fg2, fontSize = 13.sp,
