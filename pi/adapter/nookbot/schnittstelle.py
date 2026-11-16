@@ -11,7 +11,7 @@ import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler
 
-from . import basis, ereignisse, dienste, claude, gesundheit, stimmen, wissen, home, bots, sitzungen, gedaechtnis, rechner, automatik, team, vorschlaege, aufraeumen, projekte, rundblick, mcp
+from . import basis, ereignisse, dienste, claude, gesundheit, stimmen, wissen, home, bots, sitzungen, gedaechtnis, rechner, automatik, vorschlaege, aufraeumen, projekte, rundblick, mcp
 
 
 # ── HTTP ───────────────────────────────────────────────────────────
@@ -73,7 +73,7 @@ class Handler(BaseHTTPRequestHandler):
         if p == "/api/state":
             return self._send(200, {"version": basis.VERSION, "seq": ereignisse.EV.seq, "bots": [bots.bot_public(b) for b in bots.bots()],
                                     "sessions": [dict(x, laeuft=sitzungen.SESS.running(x["id"])) for x in sitzungen.SESS.index() if x.get("art") != "intern"],
-                                    "routinen": automatik.routinen(), "ausloeser": automatik.ausloeser(), "erinnerungen": automatik.erinnerungen(), "ablaeufe": gedaechtnis.ablaeufe(),
+                                    "routinen": automatik.routinen_public(), "ausloeser": automatik.ausloeser(), "erinnerungen": automatik.erinnerungen(), "ablaeufe": gedaechtnis.ablaeufe(),
                                     "gedaechtnis": gedaechtnis.gedaechtnis(), "freigaben_web": bool(basis.conf().get("freigabe_key")),
                                     "ntfy": bool((basis.conf().get("ntfy") or {}).get("url"))})
         if p == "/api/erinnerungen":
@@ -383,16 +383,12 @@ class Handler(BaseHTTPRequestHandler):
         if m:
             sitzungen.send(m.group(1), str(d.get("text") or ""), zusatz=vorschlaege.im_chat(m.group(1)) + rundblick.im_chat(m.group(1)))
             return self._send(200, {"ok": True})
-        if p == "/api/runden":
-            return self._send(200, team.runde(str(d.get("frage") or "").strip(), list(d.get("bots") or []), d.get("kapitaen"), int(d.get("gespraech") or 0)))
         m = re.match(r"^/api/ausloeser/([a-z0-9]+)/pruefen$", p)
         if m:
             a = next((x for x in automatik.ausloeser() if x["id"] == m.group(1)), None)
             if not a:
                 raise KeyError("Auslöser gibt es nicht.")
             return self._send(200, {"ergebnis": automatik.ausloeser_pruefen(a, sofort=True), "ausloeser": automatik.ausloeser()})
-        if p == "/api/bots":
-            return self._send(200, claude.create_bot(d))
         m = re.match(r"^/api/bots/([a-z0-9-]+)/neu$", p)
         if m:
             return self._send(200, {"sitzung": bots.neu_beginnen(m.group(1))})
@@ -405,8 +401,11 @@ class Handler(BaseHTTPRequestHandler):
             r = next((x for x in automatik.routinen() if x["id"] == m.group(1)), None)
             if not r:
                 raise KeyError("Routine gibt es nicht.")
-            automatik.run_routine(r)
-            return self._send(200, {"ok": True, "session": "rt" + r["id"]})
+            return self._send(200, {"ok": True, "session": automatik.run_routine(r, von_hand=True)})
+        m = re.match(r"^/api/routinen/([a-z0-9]+)/gelesen$", p)
+        if m:
+            automatik.gelesen(m.group(1), d.get("gelesen", True) is not False)
+            return self._send(200, {"routinen": automatik.routinen_public()})
         if p == "/api/gedaechtnis":
             e = gedaechtnis.merken(str(d.get("text") or ""), str(d.get("fuer") or "global"), "app", "app")
             return self._send(200, e)
@@ -433,7 +432,7 @@ class Handler(BaseHTTPRequestHandler):
             a = gedaechtnis.ablauf(m.group(1))
             bid = str(d.get("bot") or (a["fuer"] if a["fuer"] != "global" else bots.kapitaen()["id"]))
             r = automatik.add_routine({"name": a["name"], "bot": bid, "auftrag": gedaechtnis.ablauf_text(a), "zeit": d.get("zeit"), "datum": d.get("datum"),
-                             "tage": d.get("tage")})
+                             "tage": d.get("tage"), "cron": d.get("cron")})
             return self._send(200, r)
         if p == "/api/rundblick/jetzt":
             threading.Thread(target=lambda: basis.log("Rundblick (von Hand):", rundblick.rundblick(von_hand=True)), daemon=True).start()
@@ -538,7 +537,11 @@ class Handler(BaseHTTPRequestHandler):
             if m:
                 return self._send(200, claude.update_bot(m.group(1), d))
             if p == "/api/routinen":
-                return self._send(200, {"routinen": automatik.set_routinen(list(d.get("routinen") or []))})
+                automatik.set_routinen(list(d.get("routinen") or []))
+                return self._send(200, {"routinen": automatik.routinen_public()})
+            if p == "/api/routinen/reihenfolge":
+                automatik.reihenfolge([str(x) for x in d.get("ids") or []])
+                return self._send(200, {"routinen": automatik.routinen_public()})
             if p == "/api/erinnerungen":
                 return self._send(200, {"erinnerungen": automatik.set_erinnerungen(list(d.get("erinnerungen") or []))})
             if p == "/api/ausloeser":

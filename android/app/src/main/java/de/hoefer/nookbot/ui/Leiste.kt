@@ -41,7 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Calendar
 
-// Leiste unten (Chat · Aufgaben · Bots) und die Seite „Aufgaben“: was auf dich wartet, was gerade läuft, was heute geplant ist.
+// Leiste unten (Chat · Projekte · Routinen · Aufgaben) und die Seite „Aufgaben“: was auf dich wartet, was gerade läuft, was heute geplant ist.
 
 /** Sprachmodus-Symbol: fünf Striche wie eine Tonwelle. */
 @Composable
@@ -68,18 +68,21 @@ fun Mikro(farbe: Color, groesse: Int = 20) = Canvas(Modifier.size(groesse.dp)) {
     drawLine(farbe, androidx.compose.ui.geometry.Offset(s * 0.5f, s * 0.72f), androidx.compose.ui.geometry.Offset(s * 0.5f, s * 0.9f), s * 0.08f, StrokeCap.Round)
 }
 
-enum class Tab { CHAT, AUFGABEN, BOTS }
+enum class Tab { CHAT, PROJEKTE, ROUTINEN, AUFGABEN }
 
 @Composable
 fun Leiste(vm: NookViewModel, aktiv: Tab) {
     val fr by vm.freigaben.collectAsState()
     val offen = fr.count { it.offen }
+    val rout by vm.routinen.collectAsState()
+    val neu = rout.count { it.hatErgebnis && !it.gelesen }
     Box(Modifier.fillMaxWidth().padding(bottom = 10.dp, top = 2.dp), contentAlignment = Alignment.Center) {
         Row(Modifier.clip(RoundedCornerShape(30.dp)).background(P.card).border(1.dp, P.line, RoundedCornerShape(30.dp)).padding(5.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             LeistenKnopf("Chat", aktiv == Tab.CHAT, { Sprechblase(it) }) { vm.zumKapitaen() }
+            LeistenKnopf("Projekte", aktiv == Tab.PROJEKTE, { Ordner(it) }) { vm.home() }
+            LeistenKnopf("Routinen", aktiv == Tab.ROUTINEN, { Zeitung(it) }, punkt = neu > 0) { vm.zuRoutinen() }
             LeistenKnopf("Aufgaben", aktiv == Tab.AUFGABEN, { Haken(it) }, punkt = offen > 0) { vm.zuAufgaben() }
-            LeistenKnopf("Bots", aktiv == Tab.BOTS, { Kapsel(it) }) { vm.home() }
         }
     }
 }
@@ -88,12 +91,12 @@ fun Leiste(vm: NookViewModel, aktiv: Tab) {
 private fun LeistenKnopf(text: String, an: Boolean, symbol: @Composable (Color) -> Unit, punkt: Boolean = false, onClick: () -> Unit) {
     val farbe = if (an) P.fg else P.mut
     Box {
-        Column(Modifier.width(92.dp).clip(RoundedCornerShape(24.dp)).background(if (an) P.field else Color.Transparent).clickable(onClick = onClick)
+        Column(Modifier.width(80.dp).clip(RoundedCornerShape(24.dp)).background(if (an) P.field else Color.Transparent).clickable(onClick = onClick)
             .padding(vertical = 7.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             symbol(farbe)
             Text(text, color = farbe, fontSize = 12.sp, fontWeight = FontWeight.Medium)
         }
-        if (punkt) Box(Modifier.align(Alignment.TopEnd).padding(top = 5.dp, end = 24.dp).size(8.dp).clip(CircleShape).background(A.accent))
+        if (punkt) Box(Modifier.align(Alignment.TopEnd).padding(top = 5.dp, end = 20.dp).size(8.dp).clip(CircleShape).background(A.accent))
     }
 }
 
@@ -116,12 +119,24 @@ private fun Haken(c: Color) = Canvas(Modifier.size(20.dp)) {
 }
 
 @Composable
-private fun Kapsel(c: Color) = Canvas(Modifier.size(20.dp)) {
+private fun Ordner(c: Color) = Canvas(Modifier.size(20.dp)) {
     val s = size.width
-    drawRoundRect(c, topLeft = androidx.compose.ui.geometry.Offset(s * 0.1f, s * 0.3f), size = androidx.compose.ui.geometry.Size(s * 0.8f, s * 0.5f),
-        cornerRadius = androidx.compose.ui.geometry.CornerRadius(s * 0.25f), style = androidx.compose.ui.graphics.drawscope.Stroke(s * 0.08f))
-    drawCircle(c, s * 0.05f, androidx.compose.ui.geometry.Offset(s * 0.38f, s * 0.55f))
-    drawCircle(c, s * 0.05f, androidx.compose.ui.geometry.Offset(s * 0.62f, s * 0.55f))
+    val st = androidx.compose.ui.graphics.drawscope.Stroke(s * 0.08f, join = androidx.compose.ui.graphics.StrokeJoin.Round)
+    val p = androidx.compose.ui.graphics.Path().apply {
+        moveTo(s * 0.1f, s * 0.25f); lineTo(s * 0.4f, s * 0.25f); lineTo(s * 0.5f, s * 0.35f); lineTo(s * 0.9f, s * 0.35f)
+        lineTo(s * 0.9f, s * 0.8f); lineTo(s * 0.1f, s * 0.8f); close()
+    }
+    drawPath(p, c, style = st)
+}
+
+@Composable
+private fun Zeitung(c: Color) = Canvas(Modifier.size(20.dp)) {
+    val s = size.width
+    val st = s * 0.08f
+    drawRoundRect(c, topLeft = androidx.compose.ui.geometry.Offset(s * 0.12f, s * 0.15f), size = androidx.compose.ui.geometry.Size(s * 0.76f, s * 0.7f),
+        cornerRadius = androidx.compose.ui.geometry.CornerRadius(s * 0.08f), style = androidx.compose.ui.graphics.drawscope.Stroke(st))
+    drawLine(c, androidx.compose.ui.geometry.Offset(s * 0.26f, s * 0.33f), androidx.compose.ui.geometry.Offset(s * 0.74f, s * 0.33f), st * 1.4f, StrokeCap.Round)
+    for (y in listOf(0.5f, 0.66f)) drawLine(c, androidx.compose.ui.geometry.Offset(s * 0.26f, s * y), androidx.compose.ui.geometry.Offset(s * 0.74f, s * y), st, StrokeCap.Round)
 }
 
 // ── Aufgaben ─────────────────────────────────────────────────────

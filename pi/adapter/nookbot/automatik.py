@@ -11,30 +11,143 @@ from . import basis, ereignisse, home, bots, sitzungen, seiten
 
 
 # ── Routinen ───────────────────────────────────────────────────────
-# Wiederkehrend (zeit + tage) oder einmalig (datum YYYY-MM-DD). Ergebnis in eigener Unterhaltung „rt<id>“
-# oder – wenn ein Bot sie aus einem Chat heraus angelegt hat – in genau diesem Chat (sitzung).
+# Jede Routine hat einen Zeitplan im Cron-Format („Minute Stunde Tag Monat Wochentag“, Europe/Berlin), optional ein Datum
+# (dann einmalig). Sie läuft in ihrer eigenen Unterhaltung „rt-<id>“ – das Ergebnis erscheint NICHT im Chat, sondern als
+# Artikel im Bereich „Routinen“ der App (routinen_ergebnisse.json: Text, Zeitpunkt, gelesen, die letzten Stände).
+# Die Reihenfolge der Liste ist die Reihenfolge in der App.
+
+ERGEBNIS_VERLAUF = 5
+
 
 def routinen() -> list[dict]:
     return basis.read_json(basis.path("routinen.json"), [])
 
 
+# Cron: fünf Felder, je Feld *, Zahl, Liste (1,5), Bereich (1-5), Schritt (*/15, 8-18/2). Wochentag 0 oder 7 = Sonntag.
+_CRON_GRENZEN = ((0, 59), (0, 23), (1, 31), (1, 12), (0, 7))
+
+
+def _cron_feld(f: str, lo: int, hi: int) -> set[int]:
+    werte: set[int] = set()
+    for teil in f.split(","):
+        teil, _, schritt = teil.partition("/")
+        st = int(schritt) if schritt else 1
+        if st < 1:
+            raise ValueError("Schritt muss ≥ 1 sein")
+        if teil == "*":
+            a, b = lo, hi
+        elif "-" in teil:
+            a, b = (int(x) for x in teil.split("-", 1))
+        else:
+            a = b = int(teil)
+            if schritt:
+                b = hi
+        if not (lo <= a <= hi and lo <= b <= hi and a <= b):
+            raise ValueError(f"{teil} liegt außerhalb {lo}–{hi}")
+        werte.update(range(a, b + 1, st))
+    return werte
+
+
+def cron_parse(expr: str) -> list[set[int]]:
+    teile = str(expr or "").split()
+    if len(teile) != 5:
+        raise ValueError("Zeitplan braucht fünf Felder: Minute Stunde Tag Monat Wochentag (z. B. „0 8,12 * * 1-5“).")
+    try:
+        felder = [_cron_feld(t, lo, hi) for t, (lo, hi) in zip(teile, _CRON_GRENZEN)]
+    except ValueError as e:
+        raise ValueError(f"Zeitplan „{expr}“: {e}") from None
+    if 7 in felder[4]:
+        felder[4] = (felder[4] - {7}) | {0}
+    return felder
+
+
+def cron_passt(expr: str, t: time.struct_time) -> bool:
+    mi, st, tag, mon, wt = cron_parse(expr)
+    teile = str(expr).split()
+    tag_ok, wt_ok = t.tm_mday in tag, (t.tm_wday + 1) % 7 in wt
+    # wie cron: sind Tag UND Wochentag eingeschränkt, reicht eins von beiden
+    tage_ok = (tag_ok or wt_ok) if teile[2] != "*" and teile[4] != "*" else (tag_ok and wt_ok)
+    return t.tm_min in mi and t.tm_hour in st and t.tm_mon in mon and tage_ok
+
+
+def cron_aus(zeiten: list[str], tage: list[int], datum: str = "") -> str:
+    """Uhrzeiten (HH:MM) + Wochentage (1=Mo … 7=So) → Cron. Gleiche Minute → eine Zeile mit mehreren Stunden."""
+    zs = sorted({z for z in zeiten if re.match(r"^([01]\d|2[0-3]):[0-5]\d$", str(z))})
+    if not zs:
+        raise ValueError("Mindestens eine Uhrzeit (HH:MM) nötig.")
+    minuten = {z[3:] for z in zs}
+    if len(minuten) > 1:
+        raise ValueError("Mehrere Uhrzeiten nur mit gleicher Minute (z. B. 8:00, 12:00) – sonst den Zeitplan als Cron angeben.")
+    stunden = ",".join(str(int(z[:2])) for z in zs)
+    if datum:
+        return f"{int(minuten.pop())} {stunden} {int(datum[8:10])} {int(datum[5:7])} *"
+    t = sorted({int(x) for x in tage if 1 <= int(x) <= 7}) or list(range(1, 8))
+    wt = "*" if len(t) == 7 else ",".join(str(x % 7) for x in t)
+    return f"{int(minuten.pop())} {stunden} * * {wt}"
+
+
+def cron_zeiten(expr: str) -> tuple[list[str], list[int]]:
+    """Für die App: einfache Zeitpläne als Uhrzeiten + Wochentage (1=Mo … 7=So). Komplizierte → ([], [])."""
+    teile = str(expr).split()
+    if len(teile) != 5 or not teile[0].isdigit() or not re.match(r"^\d+(,\d+)*$", teile[1]):
+        return [], []
+    wt = cron_parse(expr)[4]
+    tage = sorted(7 if w == 0 else w for w in wt)
+    return [f"{int(h):02d}:{int(teile[0]):02d}" for h in sorted(int(x) for x in teile[1].split(","))], tage
+
+
+TAGE_KURZ = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
+
+
+def cron_text(expr: str, datum: str = "") -> str:
+    """Kurz für Menschen: „Mo–Fr · 8, 10, 12 Uhr“, „täglich · 6:45“."""
+    zeiten, tage = cron_zeiten(expr)
+    if not zeiten:
+        return "Zeitplan " + expr
+    if all(z.endswith(":00") for z in zeiten):
+        uhr = ", ".join(str(int(z[:2])) for z in zeiten) + " Uhr"
+    else:
+        uhr = ", ".join(z.lstrip("0") if not z.startswith("00") else z for z in zeiten)
+    if datum:
+        return f"einmalig {datum[8:10]}.{datum[5:7]}. · {uhr}"
+    if len(tage) == 7:
+        wann = "täglich"
+    elif tage == [1, 2, 3, 4, 5]:
+        wann = "Mo–Fr"
+    elif tage == [6, 7]:
+        wann = "Sa + So"
+    else:
+        wann = " ".join(TAGE_KURZ[t - 1] for t in tage)
+    return f"{wann} · {uhr}"
+
+
 def norm_routine(r: dict) -> dict:
-    if not re.match(r"^([01]\d|2[0-3]):[0-5]\d$", str(r.get("zeit", ""))) or not bots.bot(str(r.get("bot", ""))) or not str(r.get("auftrag", "")).strip():
-        raise ValueError(f"Routine „{r.get('name')}“: Zeit (HH:MM), Bot und Auftrag nötig.")
+    if not bots.bot(str(r.get("bot") or "")):
+        r = dict(r, bot=bots.kapitaen()["id"])
+    if not str(r.get("auftrag", "")).strip():
+        raise ValueError(f"Routine „{r.get('name')}“: Auftrag fehlt.")
     datum = str(r.get("datum") or "").strip()
     if datum and not re.match(r"^\d{4}-\d{2}-\d{2}$", datum):
         raise ValueError("datum als YYYY-MM-DD")
-    sitzung = str(r.get("sitzung") or "").strip()
+    cron = str(r.get("cron") or "").strip()
+    if not cron:
+        zeiten = r.get("zeiten") or ([r["zeit"]] if r.get("zeit") else [])
+        cron = cron_aus(list(zeiten), list(r.get("tage") or []), datum)
+    cron_parse(cron)
+    zeiten, tage = cron_zeiten(cron)
     return {"id": r.get("id") or "r" + secrets.token_hex(4), "name": str(r.get("name") or "Routine")[:60], "bot": r["bot"],
-            "auftrag": str(r["auftrag"])[:4000], "zeit": r["zeit"], "datum": datum,
-            "tage": [int(t) for t in (r.get("tage") or [1, 2, 3, 4, 5, 6, 7]) if 1 <= int(t) <= 7],
-            "aktiv": bool(r.get("aktiv", True)), "letzter_lauf": r.get("letzter_lauf", 0), "anruf": bool(r.get("anruf")),
-            "sitzung": sitzung if sitzung and sitzungen.SESS.get(sitzung) else ""}
+            "auftrag": str(r["auftrag"])[:4000], "cron": cron, "zeit": zeiten[0] if zeiten else "", "zeiten": zeiten, "tage": tage,
+            "datum": datum, "aktiv": bool(r.get("aktiv", True)), "letzter_lauf": r.get("letzter_lauf", 0), "anruf": bool(r.get("anruf"))}
 
 
 def set_routinen(lst: list[dict]):
     out = [norm_routine(r) for r in lst]
     basis.write_json(basis.path("routinen.json"), out)
+    ids = {r["id"] for r in out}
+    with _erg_lock:
+        e = ergebnisse()
+        if any(k not in ids for k in e):
+            basis.write_json(basis.path("routinen_ergebnisse.json"), {k: v for k, v in e.items() if k in ids})
     ereignisse.EV.emit({"t": "routinen"})
     return out
 
@@ -46,23 +159,92 @@ def add_routine(r: dict) -> dict:
     return n
 
 
-def run_routine(r: dict):
-    sid = r.get("sitzung") if r.get("sitzung") and sitzungen.SESS.get(r["sitzung"]) else bots.bot_session(r["bot"])
+def reihenfolge(ids: list[str]) -> list[dict]:
+    """Die App sortiert die Artikel – unbekannte ids ignoriert, fehlende bleiben hinten."""
+    with basis._lock:
+        lst = routinen()
+        pos = {i: n for n, i in enumerate(ids)}
+        lst.sort(key=lambda r: pos.get(r["id"], len(ids)))
+        return set_routinen(lst)
+
+
+# ── Ergebnisse der Routinen (die „Artikel“) ──
+
+_erg_lock = threading.Lock()
+
+
+def ergebnisse() -> dict:
+    return basis.read_json(basis.path("routinen_ergebnisse.json"), {})
+
+
+def routine_sitzung(rid: str) -> str:
+    return "rt-" + rid
+
+
+def routinen_public() -> list[dict]:
+    e = ergebnisse()
+    out = []
+    for r in routinen():
+        x = e.get(r["id"]) or {}
+        sid = routine_sitzung(r["id"])
+        out.append(dict(r, beschreibung=cron_text(r["cron"], r.get("datum", "")), sitzung=sid, laeuft=sitzungen.SESS.running(sid),
+                        ergebnis={k: x.get(k) for k in ("text", "ts", "fehler", "freigabe", "privat")} if x.get("ts") else None,
+                        gelesen=bool(x.get("ts") and x.get("gelesen", 0) >= x["ts"]),
+                        verlauf=[{"text": v.get("text", ""), "ts": v.get("ts", 0)} for v in (x.get("verlauf") or [])]))
+    return out
+
+
+def gelesen(rid: str, ja: bool = True):
+    with _erg_lock:
+        e = ergebnisse()
+        if rid not in e:
+            raise KeyError("Diese Routine hat noch kein Ergebnis.")
+        e[rid]["gelesen"] = time.time() if ja else 0
+        basis.write_json(basis.path("routinen_ergebnisse.json"), e)
+    ereignisse.EV.emit({"t": "routinen"})
+
+
+def routine_fertig(sid: str, text: str, fehler: str | None, privat: bool) -> dict | None:
+    """Ende eines Routinen-Laufs: Ergebnis als neuen Artikel ablegen (der alte wandert in den Verlauf)."""
+    rid = sid[3:] if sid.startswith("rt-") else ""
+    r = next((x for x in routinen() if x["id"] == rid), None)
+    if not r:
+        return None
+    text = (text or "").strip()
+    with _erg_lock:
+        e = ergebnisse()
+        alt = e.get(rid) or {}
+        verlauf = ([{"text": alt["text"], "ts": alt["ts"]}] if alt.get("text") else []) + (alt.get("verlauf") or [])
+        neu = {"text": text[:20000], "ts": time.time(), "fehler": (fehler or "")[:500], "privat": privat,
+               "freigabe": bool(sitzungen.FREIGABE_RE.findall(text)), "gelesen": 0, "verlauf": verlauf[:ERGEBNIS_VERLAUF]}
+        e[rid] = neu
+        basis.write_json(basis.path("routinen_ergebnisse.json"), e)
+    ereignisse.EV.emit({"t": "routinen"})
+    return dict(neu, name=r["name"], id=rid)
+
+
+def run_routine(r: dict, von_hand: bool = False) -> str:
+    sid = routine_sitzung(r["id"])
+    if sitzungen.SESS.running(sid):
+        raise ValueError("Die Routine läuft gerade schon.")
+    if not sitzungen.SESS.get(sid):
+        sitzungen.SESS.create(r["bot"], art="routine", titel=r["name"], sid=sid)
     s = sitzungen.SESS.get(sid)
     lst = routinen()
     for x in lst:
         if x["id"] == r["id"]:
             x["letzter_lauf"] = time.time()
-            if x.get("datum"):
+            if x.get("datum") and not von_hand:
                 x["aktiv"] = False  # einmalig: erledigt
     basis.write_json(basis.path("routinen.json"), lst)
     ereignisse.EV.emit({"t": "routinen"})
     stamp = time.strftime("%a %d.%m. %H:%M")
-    # Im Chat nur eine kleine Zeile – den vollständigen Auftrag bekommt der Bot, ohne dass er als Nachricht erscheint
     sitzungen.SESS.upsert(sid, {"id": "rt-" + secrets.token_hex(4), "role": "info", "art": "routine", "ts": time.time(), "bot": s["bot"],
-                      "text": f"⏰ Routine „{r['name']}“ · {stamp}"})
+                                "text": f"⏰ Routine „{r['name']}“ · {stamp}" + (" · von Hand gestartet" if von_hand else "")})
     aktivitaet(s["bot"], "routine", r["name"], r["auftrag"][:120], sitzung=sid)
-    auftrag = f"[Routine „{r['name']}“, {stamp}]\n\n{r['auftrag']}"
+    auftrag = basis.n(f"[Routine „{r['name']}“, {stamp}]\n\n{r['auftrag']}\n\n[Dein Ergebnis erscheint als Artikel unter „Routinen“ in der App, "
+                      "nicht im Chat: Schreib es so, dass es für sich allein verständlich ist – das Wichtigste zuerst, ohne Begrüßung "
+                      "und ohne Rückfragen. Frühere Läufe stehen weiter oben in dieser Unterhaltung, falls ein Vergleich hilft.]")
     if r.get("anruf"):
         auftrag += ANRUF_HINWEIS
 
@@ -72,6 +254,7 @@ def run_routine(r: dict):
             anruf_einreihen(s["bot"], sid, txt, r["name"])
 
     threading.Thread(target=lauf, daemon=True).start()
+    return sid
 
 
 def scheduler():
@@ -83,16 +266,19 @@ def scheduler():
         if key == last:
             continue
         last = key
-        hm, heute = time.strftime("%H:%M", now), time.strftime("%Y-%m-%d", now)
+        heute = time.strftime("%Y-%m-%d", now)
         for r in routinen():
-            if not r.get("aktiv") or r["zeit"] != hm or time.time() - r.get("letzter_lauf", 0) < 120:
+            if not r.get("aktiv") or time.time() - r.get("letzter_lauf", 0) < 60:
                 continue
-            if (r.get("datum") and r["datum"] == heute) or (not r.get("datum") and now.tm_wday + 1 in r.get("tage", [])):
+            if r.get("datum") and r["datum"] != heute:
+                continue
+            try:
+                if not cron_passt(r.get("cron") or "", now):
+                    continue
                 basis.log("Routine", r["name"])
-                try:
-                    run_routine(r)
-                except Exception as e:  # noqa: BLE001
-                    basis.log("Routine fehlgeschlagen:", e)
+                run_routine(r)
+            except Exception as e:  # noqa: BLE001
+                basis.log("Routine fehlgeschlagen:", r.get("name"), e)
 
 
 # ── Erinnerungen ───────────────────────────────────────────────────

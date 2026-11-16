@@ -41,7 +41,6 @@
 | `gedaechtnis` | merken/vergessen, Abläufe → Skills |
 | `rechner` | Arbeitsordner, `python_ausfuehren` (bubblewrap), `seite_ansehen`, Regeln je Aktion |
 | `automatik` | Routinen, Erinnerungen, Auslöser, Aktivität, Anrufe |
-| `team` | Runden (mit Gespräch), Aufträge verteilen |
 | `vorschlaege` | Vorschläge der Bots, Muster ohne Modell, tägliche Durchsicht |
 | `rundblick` | Kapitän sieht sich zu festen Zeiten um (HEARTBEAT.md, still bei HEARTBEAT_OK), 👍/👎, Tageslimit |
 | `aufraeumen` | Gedächtnis aufräumen: Kandidaten ohne Modell, „belanglos/widersprüchlich“ sparsam per Modell, Vorschlag statt Löschen |

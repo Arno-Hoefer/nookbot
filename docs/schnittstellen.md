@@ -22,7 +22,6 @@ Antworten sind JSON, Fehler kommen als `{"error": "…"}`.
 | POST | `/api/sessions/<id>/senden` | Nachricht an den Bot |
 | POST | `/api/sessions/<id>/anhang` | Datei anhängen (Base64), der Pi wandelt in Text |
 | POST | `/api/sessions/<id>/ablauf` | Weg aus dem Gespräch als Ablauf-Entwurf |
-| POST | `/api/runden` | Runde starten (`frage`, `bots`, `kapitaen`, `gespraech` 0–2) |
 | POST/PUT/DELETE | `/api/bots`, `/api/bots/<id>` | Bot anlegen, ändern (auch `rechte`, `regeln`, `stimme`), löschen |
 | POST | `/api/bots/<id>/neu` | neue Unterhaltung, die alte geht ins Archiv |
 | GET | `/api/modelle`, `/api/rechte`, `/api/zugriffe`, `/api/regeln` | Auswahllisten für die Bot-Einstellungen |
@@ -31,7 +30,10 @@ Antworten sind JSON, Fehler kommen als `{"error": "…"}`.
 
 | Methode | Pfad | |
 |---|---|---|
-| GET/PUT | `/api/routinen` · POST `/api/routinen/<id>/jetzt` | Routinen (auch `anruf: true`) |
+| GET/PUT | `/api/routinen` | Routinen mit `cron` (oder `zeiten` + `tage`), dazu `ergebnis`, `gelesen`, `verlauf`, `beschreibung`, `sitzung` |
+| POST | `/api/routinen/<id>/jetzt` | von Hand starten → `{session}` |
+| POST | `/api/routinen/<id>/gelesen` | `{gelesen: true\|false}` – ausblenden bis zum nächsten Stand |
+| PUT | `/api/routinen/reihenfolge` | `{ids: [...]}` – Reihenfolge der Artikel |
 | GET/PUT | `/api/erinnerungen` · POST `/api/erinnerungen/<id>/gezeigt` | Erinnerungen |
 | GET/PUT | `/api/ausloeser` · POST `/api/ausloeser/<id>/pruefen` | Auslöser (mail, slack, webseite, paket) |
 | GET | `/api/aktivitaet?tage=&bot=&art=&hintergrund=1` | Aktivität |
@@ -80,13 +82,11 @@ Antworten sind JSON, Fehler kommen als `{"error": "…"}`.
 
 | Werkzeug | Wer | |
 |---|---|---|
-| `routine_anlegen`, `routinen_liste`, `routine_loeschen` | alle | Zeitpläne (auch `anruf`) |
+| `routine_anlegen`, `routine_aendern`, `routinen_liste`, `routine_loeschen` | alle | Routinen mit `zeiten`/`tage` oder `cron` (auch `anruf`) |
 | `erinnerung_anlegen`, `erinnerungen_liste`, `erinnerung_loeschen` | alle | Erinnerungen |
 | `ausloeser_anlegen`, `ausloeser_liste`, `ausloeser_loeschen` | alle | Auslöser |
-| `bots_liste`, `bot_fragen` | alle (mit Team) | anderen Bot beauftragen (nur ohne Mehr-Rechte) |
-| `auftraege_verteilen`, `bot_anlegen`, `bot_aendern` | Kapitän | Team steuern |
 | `merken`, `vergessen`, `ablauf_vorschlagen` | alle | Gedächtnis, Abläufe |
-| `vorschlag_machen` | alle (nicht in Team-Aufträgen) | Vorschlag als Karte, umgesetzt erst nach Ja |
+| `vorschlag_machen` | alle | Vorschlag als Karte, umgesetzt erst nach Ja |
 | `seite_lesen`, `seite_ansehen` | alle | öffentliche Seiten als Text oder Bild |
 | `dokument_ansehen` | alle | PDF-Seiten und Bilder mit einem Bildmodell |
 | `python_ausfuehren`, `arbeitsordner`, `datei_ablegen` | alle | Pi-Rechner |

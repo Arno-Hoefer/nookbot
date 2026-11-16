@@ -66,7 +66,6 @@ class MainActivity : ComponentActivity() {
                             Route.Home -> HomeScreen(vm)
                             is Route.Chat -> ChatScreen(vm, r.sid)
                             is Route.BotEdit -> BotScreen(vm, r.id)
-                            Route.RundeNeu -> RundeNeuScreen(vm)
                             Route.Freigaben -> FreigabenScreen(vm)
                             Route.Datenbanken -> DatenbankenScreen(vm)
                             is Route.DatenbankEdit -> DatenbankEditScreen(vm, r.index)
@@ -106,7 +105,7 @@ class MainActivity : ComponentActivity() {
             vm.go(Route.Settings); return
         }
         val u = i?.data ?: return
-        if (u.scheme == "nookbot" && u.host == "chat") u.lastPathSegment?.let { vm.openChat(it) }
+        if (u.scheme == "nookbot" && u.host == "chat") u.lastPathSegment?.let { if (it.startsWith("rt-")) vm.zuRoutinen() else vm.openChat(it) }
     }
 
     override fun onResume() {

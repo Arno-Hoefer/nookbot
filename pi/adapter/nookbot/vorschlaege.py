@@ -98,10 +98,7 @@ def vorschlag_neu(bid: str, text: str, aktion: str, grund: str = "", sitzung: st
     automatik.aktivitaet(bid, "vorschlag", "Vorschlag gemacht", text, sitzung=sitzung)
     b = bots.bot(bid)
     if quelle in ("durchsicht", "aufraeumen"):  # im Gespräch sieht man die Karte ohnehin
-        if teambericht.ueber_kapitaen(b):
-            teambericht.melden_sofort(b, "💡 Vorschlag: " + text, sitzung, prio="low", tags="bulb")
-        else:
-            dienste.push(b["name"] if b else bid, "💡 Vorschlag: " + text, sitzung, prio="low", tags="bulb", bot=b)
+        dienste.push(b["name"] if b else bid, "💡 Vorschlag: " + text, sitzung, prio="low", tags="bulb", bot=b)
     ereignisse.EV.emit({"t": "vorschlaege"})
     return v
 
@@ -253,4 +250,3 @@ def planer():
             basis.log("Vorschläge:", ex)
 
 
-from . import teambericht  # noqa: E402

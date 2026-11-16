@@ -5,26 +5,30 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from . import basis, claude, gesundheit, wissen, home, bots, sitzungen, seiten, gedaechtnis, rechner, automatik, team, vorschlaege, projekte
+from . import basis, gesundheit, wissen, home, bots, sitzungen, seiten, gedaechtnis, rechner, automatik, vorschlaege, projekte
 
 
-# ── MCP für die Bots: Routinen, Erinnerungen (alle), Team (Aufträge an andere Bots), Bots anlegen (Kapitän) ──
+# ── MCP für den Bot: Routinen, Erinnerungen, Projekte, Werkzeuge ──
 
 ROUTINE_SCHEMA = {"type": "object", "properties": {
-    "name": {"type": "string", "description": "kurzer Name"},
+    "name": {"type": "string", "description": "kurzer Name – wird die Überschrift des Artikels"},
     "auftrag": {"type": "string", "description": "der vollständige Auftrag, so wie du ihn dann ausführen sollst"},
-    "zeit": {"type": "string", "description": "Uhrzeit HH:MM (Europe/Berlin)"},
+    "zeiten": {"type": "array", "items": {"type": "string"}, "description": "Uhrzeiten HH:MM (Europe/Berlin), mehrere erlaubt, gleiche Minute"},
+    "tage": {"type": "array", "items": {"type": "integer"}, "description": "Wochentage 1=Mo … 7=So, Standard alle"},
     "datum": {"type": "string", "description": "YYYY-MM-DD für EINMALIG, leer = wiederkehrend"},
-    "tage": {"type": "array", "items": {"type": "integer"}, "description": "nur wiederkehrend: Wochentage 1=Mo … 7=So, Standard alle"},
-    "in_diesem_chat": {"type": "boolean", "description": "Ergebnis in diese Unterhaltung (Standard ja) statt in eine eigene"},
+    "cron": {"type": "string", "description": "statt zeiten/tage: Cron-Zeitplan „Minute Stunde Tag Monat Wochentag“, z. B. „*/30 8-18 * * 1-5“"},
     "anruf": {"type": "boolean", "description": "NUR wenn %NUTZER% ausdrücklich angerufen werden will: du rufst an und liest das Ergebnis vor"}},
-    "required": ["name", "auftrag", "zeit"]}
+    "required": ["name", "auftrag"]}
 
 MCP_TOOLS = {
-    "routine_anlegen": ("Legt einen Zeitplan an (NookBot-Routine) – einmalig (mit datum) oder wiederkehrend. %NUTZER% sieht und ändert ihn "
-                        "in der App unter Routinen. Für Aufgaben, die du zu einer Zeit ERLEDIGEN sollst (z. B. Mails prüfen und zusammenfassen). "
-                        "Reine Hinweise an %NUTZER% („erinnere mich an …“) mit erinnerung_anlegen.", ROUTINE_SCHEMA),
-    "routinen_liste": ("Zeigt deine Routinen (Zeitpläne) mit id.", {"type": "object", "properties": {}}),
+    "routine_anlegen": ("Legt eine Routine an – einmalig (mit datum) oder nach Zeitplan. Ihr Ergebnis erscheint als Artikel im Bereich "
+                        "„Routinen“ der App (nicht im Chat); %NUTZER% kann sie dort sortieren, von Hand starten und ändern. Für Aufgaben, die du "
+                        "zu einer Zeit ERLEDIGEN sollst (Mails prüfen, Kennzahl abfragen …). Reine Hinweise („erinnere mich an …“) mit erinnerung_anlegen.",
+                        ROUTINE_SCHEMA),
+    "routinen_liste": ("Zeigt deine Routinen mit id, Zeitplan und wann das letzte Ergebnis kam.", {"type": "object", "properties": {}}),
+    "routine_aendern": ("Ändert eine Routine: Name, Auftrag, Zeitplan (zeiten/tage oder cron) oder aktiv.",
+                        {"type": "object", "properties": dict(ROUTINE_SCHEMA["properties"], id={"type": "string"}, aktiv={"type": "boolean"}),
+                         "required": ["id"]}),
     "routine_loeschen": ("Löscht eine deiner Routinen.", {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]}),
     "erinnerung_anlegen": ("Erinnert %NUTZER% zu einer Uhrzeit (Benachrichtigung auf dem Handy, pünktlich) – nur ein Hinweis, kein Auftrag an dich. "
                            "Für Aufgaben, die du dann erledigen sollst, nimm routine_anlegen.",
@@ -35,32 +39,6 @@ MCP_TOOLS = {
                             "required": ["text", "wann"]}),
     "erinnerungen_liste": ("Zeigt %NUTZER%s offene Erinnerungen mit id.", {"type": "object", "properties": {}}),
     "erinnerung_loeschen": ("Löscht eine Erinnerung.", {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]}),
-    "bot_anlegen": ("NUR Kapitän: legt einen neuen Bot im Team an – aus %NUTZER%s Beschreibung. Zugriffe auf Kalender/Mail/Slack/Datenbank "
-                    "schaltet %NUTZER% selbst in der App frei.",
-                    {"type": "object", "properties": {
-                        "name": {"type": "string", "description": "kurzer Name"},
-                        "rolle": {"type": "string", "description": "ein, zwei Worte, z. B. Recherche, Skeptiker, Analyst"},
-                        "fokus": {"type": "string", "description": "wofür er zuständig ist, worauf er achtet (mehrere Sätze)"},
-                        "persoenlichkeit": {"type": "string", "description": "Ton und Art"},
-                        "modell": {"type": "string", "description": "leer = wie der Kapitän; schnell: glm-5.3-flash"},
-                        "farbe": {"type": "string", "description": "#RRGGBB, leer = automatisch"},
-                        "form": {"type": "string", "description": "kapsel, kreis, wolke, dreieck oder quadrat"}},
-                     "required": ["name", "rolle", "fokus"]}),
-    "bot_aendern": ("NUR Kapitän: ändert Name, Rolle, Fokus, Persönlichkeit oder Modell eines Bots (nicht die Zugriffe).",
-                    {"type": "object", "properties": {"bot": {"type": "string", "description": "id"}, "name": {"type": "string"},
-                                                      "rolle": {"type": "string"}, "fokus": {"type": "string"},
-                                                      "persoenlichkeit": {"type": "string"}, "modell": {"type": "string"}},
-                     "required": ["bot"]}),
-    "bots_liste": ("Zeigt die anderen Bots im NookBot-Team mit Rolle und Fokus.", {"type": "object", "properties": {}}),
-    "auftraege_verteilen": ("NUR Kapitän: gibt mehreren Bots GLEICHZEITIG je einen Teilauftrag und liefert alle Ergebnisse zusammen "
-                            f"(höchstens {team.VERTEILEN_MAX}, dauert ggf. einige Minuten). %NUTZER% sieht den Fortschritt als Karte im Chat.",
-                            {"type": "object", "properties": {
-                                "ziel": {"type": "string", "description": "worum es insgesamt geht (ein Satz, bekommen alle mit)"},
-                                "auftraege": {"type": "array", "description": "je Bot ein vollständig beschriebener Auftrag",
-                                              "items": {"type": "object", "properties": {"bot": {"type": "string", "description": "id aus bots_liste"},
-                                                                                         "auftrag": {"type": "string"}},
-                                                        "required": ["bot", "auftrag"]}}},
-                             "required": ["auftraege"]}),
     "gesundheit": ("Gesundheitsdaten aus Health Connect (Tageswerte): Schritte, Strecke, Kalorien, Puls/Ruhepuls, HRV, Schlaf mit Phasen, "
                    "Trainings (Art, Dauer, App), Gewicht/Körperwerte, Blutdruck, Sauerstoff, Trinken, Ernährung u. a. Standard: letzte 7 Tage. "
                    "Vertraulich – nur für %NUTZER%s Frage nutzen, nie merken oder an andere Bots weitergeben.",
@@ -172,11 +150,6 @@ MCP_TOOLS = {
                        "required": ["url"]}),
     "ausloeser_liste": ("Zeigt deine Auslöser mit id.", {"type": "object", "properties": {}}),
     "ausloeser_loeschen": ("Löscht einen deiner Auslöser.", {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]}),
-    "bot_fragen": ("Gibt einem anderen Bot einen Auftrag und liefert seine Antwort (dauert ggf. 1–3 Minuten). "
-                   "Beschreibe den Auftrag vollständig – der Bot kennt euer Gespräch nicht.",
-                   {"type": "object", "properties": {"bot": {"type": "string", "description": "id des Bots aus bots_liste"},
-                                                     "auftrag": {"type": "string", "description": "der vollständige Auftrag"}},
-                    "required": ["bot", "auftrag"]}),
 }
 
 
@@ -184,13 +157,6 @@ def caller_session(bid: str) -> str | None:
     """Die Unterhaltung, in der der Bot gerade arbeitet (aus ihr kommt der Werkzeugaufruf)."""
     run = [(r.get("start", 0), sid) for sid, r in sitzungen.SESS.rt.items() if r.get("laeuft") and r.get("bot") == bid and not r.get("runde")]
     return max(run)[1] if run else None
-
-
-def gesundheit_sperre(caller: dict):
-    """Gesundheitsdaten gehen nie an andere Bots: kein Auftrag aus einem Gesundheits-Bot oder aus einem Lauf, der sie abgefragt hat."""
-    if rechner.abgeschottet(caller, caller_session(caller["id"]) or ""):
-        raise ValueError("In diesem Lauf sind Gesundheitsdaten im Spiel – die gebe ich nicht an andere Bots weiter. "
-                         "Beantworte es selbst oder bitte %NUTZER%, die Frage in einem neuen Gespräch ohne Gesundheitsdaten zu stellen.")
 
 
 def mcp_rpc(msg: dict, caller: dict):
@@ -204,14 +170,11 @@ def mcp_rpc(msg: dict, caller: dict):
     if method == "ping":
         return ok({})
     if method == "tools/list":
-        team = len(bots.bots()) > 1
         kap = bool(caller.get("kapitaen"))
         zug = bool(home.rechte(caller)["pakete"])
-        allein = home.gesundheit_bot(caller) and not kap  # Gesundheits-Bot: gibt nichts an andere Bots weiter
         merk = caller.get("merken", True)
         return ok({"tools": [{"name": t, "description": basis.n(d), "inputSchema": sc} for t, (d, sc) in MCP_TOOLS.items()
-                             if (team and not allein or t not in ("bots_liste", "bot_fragen", "auftraege_verteilen"))
-                             and (kap or t not in ("bot_anlegen", "bot_aendern", "auftraege_verteilen", "projekt_anlegen"))
+                             if (kap or t != "projekt_anlegen")
                              and (zug or t not in ("pakete", "paket_hinzufuegen"))
                              and (home.rechte(caller).get("gesundheit") or t != "gesundheit")
                              and (merk or t != "merken")]})
@@ -221,20 +184,34 @@ def mcp_rpc(msg: dict, caller: dict):
         name = p.get("name")
         try:
             if name == "routine_anlegen":
-                sid = caller_session(caller["id"]) if a.get("in_diesem_chat", True) else None
-                r = automatik.add_routine({"name": a.get("name"), "bot": caller["id"], "auftrag": a.get("auftrag"), "zeit": a.get("zeit"),
-                                 "datum": a.get("datum"), "tage": a.get("tage"), "sitzung": sid, "anruf": a.get("anruf")})
-                wann = f"am {r['datum']} um {r['zeit']}" if r["datum"] else f"{r['zeit']} an Tagen {r['tage']}"
-                text = f"Routine angelegt (id {r['id']}): „{r['name']}“ {wann}" + (" – Ergebnis in diesem Chat." if r["sitzung"] else ".") + \
-                    " %NUTZER% sieht sie in der App unter Routinen."
+                r = automatik.add_routine({"name": a.get("name"), "bot": caller["id"], "auftrag": a.get("auftrag"), "zeiten": a.get("zeiten"),
+                                           "zeit": a.get("zeit"), "cron": a.get("cron"), "datum": a.get("datum"), "tage": a.get("tage"),
+                                           "anruf": a.get("anruf")})
+                text = (f"Routine angelegt (id {r['id']}): „{r['name']}“ – {automatik.cron_text(r['cron'], r['datum'])} (Cron „{r['cron']}“). "
+                        "Das Ergebnis erscheint als Artikel unter „Routinen“ in der App.")
             elif name == "routinen_liste":
-                own = [r for r in automatik.routinen() if r["bot"] == caller["id"]]
-                text = "\n".join(f"- {r['id']}: {r['name']} · {('am ' + r['datum']) if r['datum'] else 'wiederkehrend'} {r['zeit']}"
-                                 f" · {'aktiv' if r['aktiv'] else 'aus'}" for r in own) or "Keine Routinen."
+                e = automatik.ergebnisse()
+                text = "\n".join(f"- {r['id']}: {r['name']} · {automatik.cron_text(r['cron'], r['datum'])} · {'aktiv' if r['aktiv'] else 'aus'}"
+                                 + (f" · letztes Ergebnis {time.strftime('%d.%m. %H:%M', time.localtime(e[r['id']]['ts']))}" if e.get(r["id"], {}).get("ts") else "")
+                                 for r in automatik.routinen() if r["bot"] == caller["id"]) or "Keine Routinen."
+            elif name == "routine_aendern":
+                lst = automatik.routinen()
+                r = next((x for x in lst if x["id"] == a.get("id") and x["bot"] == caller["id"]), None)
+                if not r:
+                    raise ValueError("Diese Routine gibt es nicht.")
+                for k in ("name", "auftrag", "datum", "aktiv", "anruf"):
+                    if k in a:
+                        r[k] = a[k]
+                if a.get("cron"):
+                    r["cron"] = a["cron"]
+                elif a.get("zeiten") or a.get("tage"):
+                    r["cron"] = automatik.cron_aus(a.get("zeiten") or r.get("zeiten") or [], a.get("tage") or r.get("tage") or [], r.get("datum", ""))
+                r = next(x for x in automatik.set_routinen(lst) if x["id"] == r["id"])
+                text = f"Routine geändert: „{r['name']}“ – {automatik.cron_text(r['cron'], r['datum'])} · {'aktiv' if r['aktiv'] else 'aus'}."
             elif name == "routine_loeschen":
                 own = [r for r in automatik.routinen() if r["bot"] == caller["id"]]
                 if not any(r["id"] == a.get("id") for r in own):
-                    raise ValueError("Diese Routine gibt es nicht (oder sie gehört einem anderen Bot).")
+                    raise ValueError("Diese Routine gibt es nicht.")
                 automatik.set_routinen([r for r in automatik.routinen() if r["id"] != a.get("id")])
                 text = "Routine gelöscht."
             elif name == "erinnerung_anlegen":
@@ -250,31 +227,6 @@ def mcp_rpc(msg: dict, caller: dict):
                     raise ValueError("Diese Erinnerung gibt es nicht.")
                 automatik.set_erinnerungen([e for e in automatik.erinnerungen() if e["id"] != a.get("id")])
                 text = "Erinnerung gelöscht."
-            elif name in ("bot_anlegen", "bot_aendern"):
-                if not caller.get("kapitaen"):
-                    raise ValueError("Nur der Kapitän darf Bots anlegen oder ändern.")
-                felder = {k: a[k] for k in ("name", "rolle", "fokus", "persoenlichkeit", "modell", "farbe", "form") if a.get(k)}
-                if name == "bot_anlegen":
-                    import random
-                    felder.setdefault("farbe", random.choice(["#3B8CFF", "#2FBF71", "#F5A524", "#9B6BFF", "#14B8A6", "#EC4899"]))
-                    felder.setdefault("form", random.choice(["kreis", "wolke", "dreieck", "quadrat"]))
-                    if not felder.get("modell"):
-                        felder["modell"] = bots.bot_model(basis.read_json(bots.bot_cfg_path(caller), {}))
-                    nb = claude.create_bot(dict(felder, zugriffe=False))
-                    text = (f"Bot {nb['name']} (id {nb['id']}) ist angelegt und läuft in wenigen Sekunden – Modell {nb['modell']}, ohne Zugriffe. "
-                            "%NUTZER% kann Zugriffe, Wissen und Aussehen in der App unter dem Bot einstellen.")
-                else:
-                    nb = claude.update_bot(str(a.get("bot")), felder)
-                    text = f"{nb['name']} ist geändert und startet kurz neu."
-            elif name == "bots_liste":
-                text = "\n".join(f"- {b['id']}: {b['name']} – {b.get('rolle') or ''}. Fokus: {(b.get('fokus') or '').strip()[:300]}"
-                                 + ("" if home.rechte_teilmenge(home.rechte(b), home.rechte(caller)) else " (hat Zugriffe, die du nicht hast – nicht beauftragbar)")
-                                 for b in bots.bots() if b["id"] != caller["id"]) or "Keine anderen Bots."
-            elif name == "auftraege_verteilen":
-                if not caller.get("kapitaen"):
-                    raise ValueError("Nur der Kapitän verteilt Aufträge – nimm bot_fragen.")
-                gesundheit_sperre(caller)
-                text = team.verteilen(caller, a.get("auftraege") or [], str(a.get("ziel") or ""))
             elif name == "gesundheit":
                 if not home.rechte(caller).get("gesundheit"):
                     raise ValueError("Gesundheitsdaten sind für dich nicht freigegeben.")
@@ -347,38 +299,6 @@ def mcp_rpc(msg: dict, caller: dict):
                 v = vorschlaege.vorschlag_neu(caller["id"], str(a.get("text") or ""), str(a.get("aktion") or ""), str(a.get("grund") or ""), cs,
                                               "durchsicht" if cs.startswith(("intern-vorschlag-", "intern-rundblick-")) else "bot")
                 text = f"Vorschlag {v['id']} liegt %NUTZER% als Karte vor. Nicht selbst umsetzen – nach seinem Ja bekommst du den Auftrag."
-            elif name == "bot_fragen":
-                b = bots.bot(str(a.get("bot", "")))
-                if not b or b["id"] == caller["id"]:
-                    raise ValueError("Unbekannter Bot – siehe bots_liste.")
-                gesundheit_sperre(caller)
-                if not home.rechte_teilmenge(home.rechte(b), home.rechte(caller)):
-                    # Sonst holt sich ein Bot Mails/Slack/Daten, die er selbst nicht sehen darf, über einen anderen Bot
-                    raise ValueError(f"{b['name']} hat Zugriffe, die du nicht hast – solche Bots kannst du nicht beauftragen. "
-                                     "Sag %NUTZER%, dass er dir die Zugriffe in der App freischalten kann (Bot → Zugriffe).")
-                cs = caller_session(caller["id"]) or ""
-                if cs.startswith("auftrag-"):  # Schutz vor Ketten: wer gerade einen Auftrag erledigt, gibt keinen weiter
-                    raise ValueError("Du erledigst gerade selbst einen Auftrag – bitte ohne weitere Bots antworten.")
-                sid = f"auftrag-{b['id']}"
-                if not sitzungen.SESS.get(sid):
-                    sitzungen.SESS.create(b["id"], art="auftrag", sid=sid, titel="Aufträge aus dem Team")
-                # Dieselbe TEAM-Karte wie bei auftraege_verteilen – sonst sieht %NUTZER% nicht, dass der andere Bot gerade arbeitet
-                auftrag = str(a.get("auftrag") or "")
-                kid = "f" + secrets.token_hex(4)
-                teil = {"bot": b["id"], "name": b["name"], "auftrag": auftrag[:600], "status": "laeuft", "sitzung": sid}
-                if cs:
-                    sitzungen.SESS.upsert(cs, {"id": "auf-" + kid, "role": "info", "art": "auftraege", "ts": time.time(), "bot": caller["id"],
-                                               "text": f"{b['name']} gefragt", "ziel": "", "teile": [teil]})
-                try:
-                    text = sitzungen.ask_sync(b["id"], sid, f"[Auftrag von {caller['name']}]\n\n{auftrag}") or "(keine Antwort)"
-                    teil["status"] = "fertig"
-                except Exception:
-                    teil["status"] = "fehler"
-                    raise
-                finally:
-                    if cs:
-                        sitzungen.SESS.upsert(cs, {"id": "auf-" + kid, "teile": [teil]})
-                text = f"Antwort von {b['name']}:\n\n{text}"
             elif name == "python_ausfuehren":
                 text = rechner.python_ausfuehren(caller, str(a.get("code") or ""), caller_session(caller["id"]) or "")
             elif name == "arbeitsordner":

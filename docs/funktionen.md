@@ -9,7 +9,7 @@ Alle Bilder zeigen Demo-Daten. App links bzw. oben, Web-Oberfläche darunter.
   <img src="screenshots/app/chat.png" width="230" alt="Chat: Dienstplan als Tabelle, Sammelfreigabe als Karte">
 </p>
 
-- **Startseite:** oben der Kapitän, darunter die anderen Bots und die Runden. Unten steht die **Statuszeile** mit dem Verbrauch
+- **Start:** die App öffnet im Chat mit Reacher. Unter „Projekte“ steht unten die **Statuszeile** mit dem Verbrauch
   bei Ollama und Claude.
 - **Chat:** Antworten mit Tabellen, kleine Zeilen für die Werkzeuge („Dokument angesehen“). Freigaben erscheinen direkt als Karte
   mit *Ausführen / Ändern / Ablehnen*.
@@ -76,7 +76,8 @@ Alle Bilder zeigen Demo-Daten. App links bzw. oben, Web-Oberfläche darunter.
   <img src="screenshots/app/aktivitaet.png" width="230" alt="Aktivität mit Rückgängig">
 </p>
 
-- **Routinen:** Ein Bot erledigt etwas zu einer Uhrzeit, einmalig oder wiederkehrend. Mit **„Als Anruf“** ruft er an und liest vor.
+- **Routinen:** Reacher erledigt etwas nach Zeitplan (Cron) oder einmalig; das Ergebnis erscheint als Artikel unter „Routinen“.
+  Mit **„Als Anruf“** ruft er an und liest vor.
 - **Erinnerungen:** pünktlich als Wecker auf dem Handy. Die Bots stellen sie auch selbst.
 - **Auslöser:** Neue Mail zu einer Gmail-Suche, neue Slack-Nachricht, geänderte Webseite oder neuer Paketstatus. Dann bekommt ein Bot
   einen Auftrag mit allen neuen Treffern.
@@ -106,17 +107,6 @@ Alle Bilder zeigen Demo-Daten. App links bzw. oben, Web-Oberfläche darunter.
 - **Wissen und Abläufe, die ein Bot selbst ändert**, übernimmt der Adapter in seine Ablage – sie überstehen jeden Neustart.
 
 ![Web: Auslöser](screenshots/web/ausloeser.png)
-
-## Team: Runden und Aufträge
-
-<p><img src="screenshots/app/runde-neu.png" width="230" alt="Neue Runde mit Gesprächs-Option"></p>
-
-- **Runde:** Mehrere Bots beantworten dieselbe Frage aus ihrer Rolle, der Kapitän fasst zusammen.
-- **Miteinander reden** (optional, 1–2 Runden): Jeder sieht nur die neuen Beiträge der anderen und antwortet in höchstens
-  4 Sätzen oder sagt „PASSE“. Sagen alle „PASSE“, ist früher Schluss.
-- **Aufträge verteilen:** Der Kapitän gibt bis zu vier Bots gleichzeitig je einen Teilauftrag. Im Chat steht eine Karte mit dem Stand.
-
-![Web: Runde mit Gespräch und Zusammenfassung](screenshots/web/runde.png)
 
 ## Pi-Rechner und Arbeitsordner
 
@@ -179,15 +169,22 @@ Angelehnt an Claude Duet und Meta Muse.
 - **Live-Karten:** bis zu 4 angepinnte Karten oben in einer Unterhaltung (`karte_anpinnen`, gleicher Titel = dieselbe Karte) mit kurzem Stand,
   bis zu 4 Werten und „aktualisiert 9:41“. Regelmäßig aktualisieren: eine Routine. In der App „abnehmen“.
 - **Rechte auf Zeit:** Beim Stellen einer Regel auf *frei* fragt die App „1 Tag · 1 Woche · Immer“. Danach wird automatisch wieder gefragt.
-- **Meldungen:** Einstellungen → Benachrichtigungen: je Thema an/aus (Antworten, Rundblick, Vorschläge, Runden) und eine Ruhezeit.
+- **Meldungen:** Einstellungen → Benachrichtigungen: je Thema an/aus (Antworten, Routinen, Rundblick, Vorschläge) und eine Ruhezeit.
   Freigaben kommen immer.
 
-## Team-Bericht: Reacher ist die Anlaufstelle (ab 0.24.0)
+## Ein Bot: Chat, Projekte, Routinen als Zeitung (ab 0.25.0)
 
-- Die Unter-Bots melden sich nicht mehr selbst. Ergebnisse aus ihren Routinen und Auslösern sammelt der Adapter; nach 10 Minuten
-  (oder bei 6 Ergebnissen) fasst Reacher sie zusammen – Karte **„Aus dem Team“** in seinem Chat (mit Knöpfen zu den Bots) und eine
-  Benachrichtigung von ihm. Ist nichts wichtig, bleibt er still (`TEAM_OK`).
-- Sofort, aber von Reacher: Freigaben eines Unter-Bots, seine Vorschläge und Antworten, wenn du ihm selbst geschrieben hast.
-- Direkt mit den Unter-Bots chatten und ihnen etwas beibringen geht weiter. Fragst du Reacher, gibt er es mit `bot_fragen`
-  an den passenden Bot weiter und sagt, wer geantwortet hat.
-- Abschaltbar in `config.json` (`"teambericht": {"aktiv": false}`); das Thema „Team-Bericht“ unter Einstellungen → Meldungen.
+NookBot hat nur noch einen Bot, Reacher. Unter-Bots, Runden, `bot_fragen`, `auftraege_verteilen` und der Team-Bericht sind weg.
+Die Leiste unten hat vier Bereiche:
+
+- **Chat:** die normale Unterhaltung mit Reacher.
+- **Projekte:** eigene Chats, die sich nur um ein Thema kümmern – mit Ziel, Statuszeile, Plan und Live-Karten oben. „+“ legt eins an,
+  lange drücken beendet es.
+- **Routinen:** jede Routine ist ein **Artikel** mit ihrem letzten Ergebnis und dem Zeitpunkt („Aktualisiert · Heute 09:02“).
+  - **Gelesen** blendet den Artikel aus, bis die Routine das nächste Mal läuft. **Jetzt ausführen** startet sie von Hand.
+  - Die Reihenfolge stellst du selbst ein (Symbol oben rechts, „Nach oben“ im Menü des Artikels).
+  - Jede Routine hat einen **Zeitplan im Cron-Format** (`Minute Stunde Tag Monat Wochentag`). In der App reicht es meist,
+    Uhrzeiten und Tage anzutippen (mehrere Uhrzeiten mit gleicher Minute = eine Routine); für alles andere gibt es das Feld „Cron“.
+  - Routinen laufen in ihrer eigenen Unterhaltung (`rt-<id>`, „Verlauf ansehen“) und schreiben nicht mehr in den Chat.
+    Die Benachrichtigung zeigt den Anfang des Ergebnisses; Läufe mit Gesundheitsdaten nur „neuer Stand“.
+- **Aufgaben:** was auf dich wartet (Freigaben), was gerade läuft und was heute geplant ist.

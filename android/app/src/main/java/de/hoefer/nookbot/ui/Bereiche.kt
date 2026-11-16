@@ -37,21 +37,9 @@ fun MehrScreen(vm: NookViewModel) {
     Column(Modifier.fillMaxSize()) {
         TopBar("Menü", { vm.back() })
         Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
-            Entry("🤖", "Bots", "${bots.size} im Team – Name, Modell, Persönlichkeit, Fokus, Wissen") { }
-            bots.forEach { b ->
-                Row(Modifier.fillMaxWidth().clickable { vm.go(Route.BotEdit(b.id)) }.padding(start = 40.dp, top = 6.dp, bottom = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically) {
-                    BotFigure(b, 30.dp)
-                    Text(b.name, color = P.fg, fontSize = 15.sp, modifier = Modifier.padding(start = 10.dp))
-                    Text("  ${b.rolle} · ${b.modell}", color = P.mut, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-            }
-            Row(Modifier.fillMaxWidth().clickable { vm.go(Route.BotEdit(null)) }.padding(start = 40.dp, top = 6.dp, bottom = 10.dp)) {
-                Text("+ Neuer Bot", color = A.accent, fontSize = 15.sp)
-            }
+            bots.firstOrNull { it.kapitaen }?.let { k -> Entry("🤖", k.name, "Modell, Persönlichkeit, Fokus, Zugriffe, Regeln, Stimme, Wissen") { vm.go(Route.BotEdit(k.id)) } }
             Entry("✅", "Freigaben", "${fr.count { it.offen }} warten") { vm.go(Route.Freigaben) }
-            Entry("👥", "Neue Runde", "Mehrere Bots zu einer Frage, der Kapitän fasst zusammen") { vm.go(Route.RundeNeu) }
-            Entry("⏰", "Routinen", "${routinen.count { it.aktiv }} aktiv – Aufgaben, die ein Bot zu einer Zeit erledigt") { vm.go(Route.Routinen) }
+            Entry("⏰", "Routinen", "${routinen.count { it.aktiv }} aktiv – Ergebnisse als Artikel") { vm.zuRoutinen() }
             val al by vm.ausloeser.collectAsState()
             Entry("⚡", "Auslöser", "${al.count { it.aktiv }} aktiv" + (al.count { it.fehler.isNotBlank() }.takeIf { it > 0 }?.let { " · $it mit Fehler" } ?: "") +
                 " – bei neuer Mail, Slack-Nachricht, Änderung arbeitet ein Bot") { vm.go(Route.Ausloeser) }
@@ -109,73 +97,6 @@ fun FreigabenScreen(vm: NookViewModel) {
     }
 }
 
-// ── Runde ─────────────────────────────────────────────────────────
-
-@Composable
-fun RundeNeuScreen(vm: NookViewModel) {
-    val bots by vm.bots.collectAsState()
-    var frage by remember { mutableStateOf("") }
-    var sel by remember { mutableStateOf(bots.map { it.id }.toSet()) }
-    var kap by remember { mutableStateOf(bots.firstOrNull { it.kapitaen }?.id ?: "") }
-    var gespraech by remember { mutableStateOf(0) }
-    Column(Modifier.fillMaxSize()) {
-        TopBar("Neue Runde", { vm.back() })
-        Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
-            Hint("Jeder ausgewählte Bot antwortet aus seiner Rolle, danach fasst der Kapitän zusammen: wo Einigkeit, wo nicht, was er empfiehlt.")
-            Field("Frage an die Runde", frage, lines = 5) { frage = it }
-            Section("Wer ist dabei?")
-            bots.forEach { b ->
-                Row(Modifier.fillMaxWidth().clickable { sel = if (b.id in sel) sel - b.id else sel + b.id }.padding(vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(b.id in sel, { sel = if (it) sel + b.id else sel - b.id })
-                    BotFigure(b, 30.dp)
-                    Text("${b.name}", color = P.fg, fontSize = 15.sp, modifier = Modifier.padding(start = 8.dp))
-                    Text("  ${b.rolle}", color = P.mut, fontSize = 13.sp)
-                }
-            }
-            Section("Danach miteinander reden?", "Jeder sieht nur die neuen Beiträge der anderen und antwortet in höchstens 4 Sätzen oder passt. " +
-                "Sagen alle „passe“, ist früher Schluss – so bleibt es kurz und günstig.")
-            Row { Chip("Nein", gespraech == 0) { gespraech = 0 }; Chip("1 Runde", gespraech == 1) { gespraech = 1 }; Chip("Bis zu 2", gespraech == 2) { gespraech = 2 } }
-            Section("Wer fasst zusammen?")
-            androidx.compose.foundation.layout.FlowRow { bots.forEach { b -> Chip(b.name, kap == b.id) { kap = b.id } } }
-            Row(Modifier.padding(vertical = 20.dp)) {
-                MainButton("Runde starten", enabled = frage.isNotBlank() && sel.size >= 2) { vm.startRunde(frage, sel.toList(), kap, gespraech) }
-            }
-            if (sel.size < 2) Hint("Mindestens zwei Bots auswählen.")
-        }
-    }
-}
-
-// ── Routinen ──────────────────────────────────────────────────────
-
-@Composable
-fun RoutinenScreen(vm: NookViewModel) {
-    val routinen by vm.routinen.collectAsState()
-    Column(Modifier.fillMaxSize()) {
-        TopBar("Routinen", { vm.back() }) { MainButton("+ Neu") { vm.go(Route.RoutineEdit(null)) } }
-        LazyColumn(Modifier.weight(1f).padding(horizontal = 16.dp)) {
-            item { Hint("Feste Aufträge mit Zeitplan – z. B. „Mo–Fr 7:45: Was steht heute an, was ist in Slack für mich los?“. " +
-                "Das Ergebnis landet in einer eigenen Unterhaltung, dazu eine Benachrichtigung.", Modifier.padding(bottom = 10.dp)) }
-            if (routinen.isEmpty()) item { Hint("Noch keine Routinen.", Modifier.padding(vertical = 8.dp)) }
-            items(routinen, key = { it.id }) { r ->
-                val b = vm.bot(r.bot)
-                Card(Modifier.padding(vertical = 5.dp), onClick = { vm.go(Route.RoutineEdit(r.id)) }) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        BotFigure(b, 34.dp)
-                        Column(Modifier.weight(1f).padding(start = 10.dp)) {
-                            Text(r.name, color = P.fg, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                            Text((if (r.einmalig) "einmalig ${datumText(r.datum)} ${r.zeit}" else "${r.zeit} · ${tageText(r.tage)}") +
-                                " · ${b?.name ?: r.bot}" + (if (r.sitzung.isNotBlank()) " · im Chat" else ""), color = P.mut, fontSize = 12.sp)
-                        }
-                        Switch(r.aktiv, { on -> vm.saveRoutinen(routinen.map { if (it.id == r.id) it.copy(aktiv = on) else it }) },
-                            colors = SwitchDefaults.colors(checkedTrackColor = A.accent))
-                    }
-                }
-            }
-        }
-    }
-}
-
 fun datumText(d: String): String = runCatching { d.substring(8, 10) + "." + d.substring(5, 7) + "." }.getOrDefault(d)
 
 fun tageText(t: List<Int>): String = when (t.sorted()) {
@@ -183,56 +104,6 @@ fun tageText(t: List<Int>): String = when (t.sorted()) {
     listOf(1, 2, 3, 4, 5) -> "Mo–Fr"
     listOf(6, 7) -> "Wochenende"
     else -> t.sorted().joinToString(", ") { TAGE[it - 1] }
-}
-
-@Composable
-fun RoutineEditScreen(vm: NookViewModel, id: String?) {
-    val routinen by vm.routinen.collectAsState()
-    val bots by vm.bots.collectAsState()
-    val r = routinen.firstOrNull { it.id == id }
-    var name by remember { mutableStateOf(r?.name ?: "") }
-    var bot by remember { mutableStateOf(r?.bot ?: bots.firstOrNull { it.kapitaen }?.id ?: "") }
-    var zeit by remember { mutableStateOf(r?.zeit ?: "07:45") }
-    var tage by remember { mutableStateOf(r?.tage?.toSet() ?: setOf(1, 2, 3, 4, 5)) }
-    var einmalig by remember { mutableStateOf(r?.einmalig ?: false) }
-    var datum by remember { mutableStateOf(r?.datum?.takeIf { it.isNotBlank() } ?: java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.GERMANY).format(java.util.Date(System.currentTimeMillis() + 86_400_000))) }
-    val datumOk = !einmalig || Regex("^\\d{4}-\\d{2}-\\d{2}$").matches(datum)
-    var auftrag by remember { mutableStateOf(r?.auftrag ?: "") }
-    var anruf by remember { mutableStateOf(r?.anruf ?: false) }
-    val zeitOk = Regex("^([01]\\d|2[0-3]):[0-5]\\d$").matches(zeit)
-    Column(Modifier.fillMaxSize()) {
-        TopBar(if (r == null) "Neue Routine" else r.name, { vm.back() })
-        Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
-            Field("Name", name) { name = it }
-            Section("Wer?")
-            androidx.compose.foundation.layout.FlowRow { bots.forEach { b -> Chip(b.name, bot == b.id) { bot = b.id } } }
-            Section("Wann?")
-            Row { Chip("Wiederkehrend", !einmalig) { einmalig = false }; Chip("Einmalig", einmalig) { einmalig = true } }
-            Row {
-                if (einmalig) Field("Datum (JJJJ-MM-TT)", datum, modifier = Modifier.width(180.dp).padding(end = 10.dp)) { datum = it.take(10) }
-                Field("Uhrzeit (HH:MM)", zeit, modifier = Modifier.width(160.dp)) { zeit = it.take(5) }
-            }
-            if (!zeitOk || !datumOk) Hint("Format 2026-10-20 und 07:45")
-            if (!einmalig) Row(Modifier.padding(top = 6.dp)) {
-                TAGE.forEachIndexed { i, t -> Chip(t, (i + 1) in tage) { tage = if ((i + 1) in tage) tage - (i + 1) else tage + (i + 1) } }
-            }
-            if (r?.sitzung?.isNotBlank() == true) Hint("Das Ergebnis kommt in die Unterhaltung, aus der die Routine angelegt wurde.", Modifier.padding(top = 6.dp))
-            Section("Auftrag", "So, als würdest du ihn dem Bot schreiben. Er bekommt Datum und Uhrzeit dazu.")
-            Field("z. B. Was steht heute in meinem Kalender, und was ist in Slack für mich los? Kurz, als Liste.", auftrag, lines = 8) { auftrag = it }
-            AnrufSchalter(anruf) { anruf = it }
-            Row(Modifier.padding(vertical = 20.dp), verticalAlignment = Alignment.CenterVertically) {
-                MainButton("Speichern", enabled = name.isNotBlank() && auftrag.isNotBlank() && zeitOk && datumOk && (einmalig || tage.isNotEmpty()) && bot.isNotBlank()) {
-                    val neu = Routine(r?.id ?: "", name, bot, auftrag, zeit, tage.sorted(), if (einmalig) true else r?.aktiv ?: true, r?.letzterLauf ?: 0,
-                        if (einmalig) datum else "", r?.sitzung ?: "", anruf)
-                    vm.saveRoutinen(if (r == null) routinen + neu else routinen.map { if (it.id == r.id) neu else it }) { vm.back() }
-                }
-                Spacer(Modifier.width(10.dp))
-                if (r != null) SideButton("Jetzt ausführen") { vm.runRoutine(r.id) }
-            }
-            if (r != null) TextButton({ vm.saveRoutinen(routinen.filterNot { it.id == r.id }) { vm.back() } }) { Text("Routine löschen", color = A.accent) }
-            Spacer(Modifier.height(24.dp))
-        }
-    }
 }
 
 // ── Datenbanken ───────────────────────────────────────────────────

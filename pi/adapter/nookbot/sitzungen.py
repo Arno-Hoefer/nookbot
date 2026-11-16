@@ -154,22 +154,24 @@ class Sessions:
         r["done"].set()
         b = bots.bot(r.get("bot") or "")
         txt = self.final_text(sid)
-        if b and s.get("art") in ("chat", "routine") and teambericht.ueber_kapitaen(b):
-            # Unter-Bots melden sich über den Kapitän: Freigaben und Antworten im Gespräch sofort (von ihm), Hintergrund gesammelt
-            if FREIGABE_RE.findall(txt):
-                teambericht.melden_sofort(b, "braucht deine Freigabe – " + txt[:300], sid, prio="high", tags="warning")
-            elif r.get("von_dir"):
-                teambericht.melden_sofort(b, (txt or error or "fertig")[:300], sid)
-            else:
-                teambericht.vormerken(b, sid, txt or error or "")
-        elif b and s.get("art") in ("chat", "routine"):
+        if b and s.get("art") == "routine":
+            # Routinen schreiben nicht in den Chat, sondern einen Artikel im Bereich „Routinen“
+            privat = bool(r.get("gesundheit"))
+            neu = automatik.routine_fertig(sid, txt, error, privat)
+            if neu:
+                kopf = f"⏰ {neu['name']}: "
+                if neu["freigabe"]:
+                    dienste.push(b["name"], kopf + "wartet auf deine Freigabe" + ("" if privat else " – " + txt[:250]), sid, prio="high", tags="warning", bot=b)
+                else:
+                    dienste.push(b["name"], kopf + ("neuer Stand" if privat or not txt else txt[:280]) if txt or privat else kopf + (error or "fertig")[:200],
+                                 sid, tags="routine", bot=b, ntfy=True)
+        elif b and s.get("art") in ("chat", "projekt"):
             fids = FREIGABE_RE.findall(txt)
             if fids:
                 dienste.push(b["name"], "Freigabe wartet – " + txt[:300], sid, prio="high", tags="warning", bot=b)
             else:  # die App entscheidet, ob sie es zeigt (nicht, wenn die Unterhaltung gerade offen ist)
                 # Titel nur der Name – der Titel der Unterhaltung (oft die allererste Frage) verwirrte hinter dem Namen
-                dienste.push(b["name"], (txt or error or "fertig")[:300], sid, bot=b,
-                     ntfy=s.get("art") == "routine" or ereignisse.EV.clients == 0)
+                dienste.push(b["name"], (txt or error or "fertig")[:300], sid, bot=b, ntfy=ereignisse.EV.clients == 0)
         for bid in list(bots._pending_restart):
             if not any(self.running(x) for x in self.ids_for_bot(bid)):
                 bb = bots.bot(bid)
@@ -369,4 +371,4 @@ def watchdog():
 from . import gedaechtnis, automatik  # noqa: E402
 
 
-from . import projekte, teambericht  # noqa: E402
+from . import projekte  # noqa: E402

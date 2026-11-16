@@ -34,22 +34,10 @@ class Abschottung(unittest.TestCase):
         s.SESS.start_turn(self.sv, "scout", von_dir=True)
         s.SESS.start_turn(self.sk, "reacher", von_dir=True)
 
-    def test_gesundheits_bot_ohne_team(self):
-        w = werkzeuge(self.vital)
-        self.assertNotIn("bot_fragen", w)
-        self.assertNotIn("bots_liste", w)
-        self.assertIn("bot_fragen", werkzeuge(self.kap))
-        t, err = rufe(self.vital, "bot_fragen", {"bot": "reacher", "auftrag": "Mein Puls war 120"})
-        self.assertTrue(err)
-        self.assertIn("Gesundheitsdaten", t)
-
-    def test_kapitaen_nach_abfrage_gesperrt(self):
+    def test_kapitaen_nach_abfrage_abgeschottet(self):
         self.assertFalse(rechner.abgeschottet(self.kap, self.sk))
         sitzungen.SESS.rt[self.sk]["gesundheit"] = True  # so setzt es das Werkzeug gesundheit
         self.assertTrue(rechner.abgeschottet(self.kap, self.sk))
-        t, err = rufe(self.kap, "bot_fragen", {"bot": "scout", "auftrag": "x"})
-        self.assertIn("Gesundheitsdaten", t)
-        self.assertTrue(err)
         s.SESS.start_turn(self.sk, "reacher", von_dir=True)  # nächster Lauf: wieder frei
         self.assertFalse(rechner.abgeschottet(self.kap, self.sk))
 

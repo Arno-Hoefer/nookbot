@@ -36,7 +36,6 @@ sealed class Route {
     data object Home : Route()
     data class Chat(val sid: String) : Route()
     data class BotEdit(val id: String?) : Route()
-    data object RundeNeu : Route()
     data object Freigaben : Route()
     data object Datenbanken : Route()
     data class DatenbankEdit(val index: Int) : Route()
@@ -166,6 +165,7 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
     /** Leiste unten: „Chat“ = Unterhaltung mit dem Kapitän, „Aufgaben“ = was wartet und läuft. */
     fun zumKapitaen() { bots.value.firstOrNull { it.kapitaen }?.let { k -> stack.value = listOf(Route.Home); openBot(k.id) } }
     fun zuAufgaben() { stack.value = listOf(Route.Home, Route.Aufgaben); refreshFreigaben() }
+    fun zuRoutinen() { stack.value = listOf(Route.Home, Route.Routinen) }
     /** Beim Start gleich in den Chat mit dem Kapitän (wie Duet) – einmal pro App-Start. */
     private var gestartet = false
     private fun startChat() {
@@ -314,8 +314,8 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
         io { api.delete("/api/sessions/$sid/karten/${k.id}") }
     }
 
-    fun projektAnlegen(titel: String) = io {
-        val s = Sitzung.from(api.post("/api/projekte", JSONObject().put("titel", titel.trim())))
+    fun projektAnlegen(titel: String, ziel: String = "") = io {
+        val s = Sitzung.from(api.post("/api/projekte", JSONObject().put("titel", titel.trim()).put("ziel", ziel.trim())))
         withContext(Dispatchers.Main) {
             sitzungen.value = listOf(s) + sitzungen.value.filterNot { it.id == s.id }
             openChat(s.id)
@@ -547,16 +547,6 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
         withContext(Dispatchers.Main) { sitzungen.value = sitzungen.value.filterNot { it.id == sid } }
     }
 
-    fun startRunde(frage: String, teilnehmer: List<String>, kapitaen: String, gespraech: Int = 0) = io {
-        val s = Sitzung.from(api.post("/api/runden", JSONObject().put("frage", frage).put("bots", JSONArray(teilnehmer)).put("kapitaen", kapitaen)
-            .put("gespraech", gespraech)))
-        withContext(Dispatchers.Main) {
-            sitzungen.value = listOf(s) + sitzungen.value.filterNot { it.id == s.id }
-            stack.value = listOf(Route.Home)
-            openChat(s.id)
-        }
-    }
-
     // ── Bots ──
 
     fun bot(id: String?): Bot? = bots.value.firstOrNull { it.id == id }
@@ -614,8 +604,33 @@ class NookViewModel(app: Application) : AndroidViewModel(app) {
 
     fun runRoutine(id: String) = io {
         val r = api.post("/api/routinen/$id/jetzt")
-        withContext(Dispatchers.Main) { toast.value = "Routine läuft"; openChat(r.optString("session")) }
+        withContext(Dispatchers.Main) {
+            toast.value = "Läuft – das Ergebnis erscheint unter Routinen"
+            busy.value = busy.value + r.optString("session")
+        }
     }
+
+    private fun routinenAntwort(r: JSONObject) { routinen.value = arr(r.optJSONArray("routinen")).map { Routine.from(it) } }
+
+    fun routineGelesen(id: String, ja: Boolean) = io {
+        withContext(Dispatchers.Main) { routinen.value = routinen.value.map { if (it.id == id) it.copy(gelesen = ja) else it } }
+        val r = api.post("/api/routinen/$id/gelesen", JSONObject().put("gelesen", ja))
+        withContext(Dispatchers.Main) { routinenAntwort(r) }
+    }
+
+    /** Eine Routine um [d] Plätze verschieben (negativ = nach oben). */
+    fun routinenSchieben(id: String, d: Int) = io {
+        val l = routinen.value.toMutableList()
+        val i = l.indexOfFirst { it.id == id }
+        if (i < 0) return@io
+        val r = l.removeAt(i)
+        l.add((i + d).coerceIn(0, l.size), r)
+        withContext(Dispatchers.Main) { routinen.value = l }
+        val a = api.put("/api/routinen/reihenfolge", JSONObject().put("ids", JSONArray(l.map { it.id })))
+        withContext(Dispatchers.Main) { routinenAntwort(a) }
+    }
+
+    fun routineAktiv(id: String, an: Boolean) = saveRoutinen(routinen.value.map { if (it.id == id) it.copy(aktiv = an) else it })
 
     // ── Auslöser und Aktivität ──
 

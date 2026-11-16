@@ -256,22 +256,22 @@ function ereignis(e) {
 function nav() {
   const sess = (id) => S.sessions.find((x) => x.id === id);
   const a = S.ansicht;
-  let h = '<div class="gruppe">Bots</div>';
+  let h = '<div class="gruppe">Chat</div>';
   for (const b of S.bots) {
     const s = sess(b.sitzung) || {};
     h += `<div class="eintrag ${a.art === 'chat' && a.id === b.sitzung ? 'aktiv' : a.art === 'bot' && a.id === b.id ? 'aktiv' : ''}" data-chat="${esc(b.sitzung)}">${ava(b)}
-      <div class="t"><div class="n">${esc(b.name)} <span class="mut">${esc(b.rolle || '')}</span></div><div class="s">${esc(s.letzte || '')}</div></div>
+      <div class="t"><div class="n">${esc(b.name)}</div><div class="s">${esc(s.letzte || '')}</div></div>
       ${s.laeuft ? '<span class="lauf"></span>' : s.ungelesen ? `<span class="badge">${s.ungelesen}</span>` : ''}<span class="zahn" data-bot-edit="${esc(b.id)}" title="Einstellungen von ${esc(b.name)}">⚙</span></div>`;
   }
-  h += `<div class="eintrag ${a.art === 'bot' && !a.id ? 'aktiv' : ''}" data-seite="bot"><span class="ava" style="background:var(--line);color:var(--text)">+</span><div class="t"><div class="n">Neuer Bot</div></div></div>`;
-  const runden = S.sessions.filter((x) => x.art === 'runde').slice(0, 8);
-  h += '<div class="gruppe">Runden</div>';
-  h += `<div class="eintrag" data-seite="runde"><span class="ava" style="background:var(--violet)">+</span><div class="t"><div class="n">Neue Runde</div></div></div>`;
-  for (const r of runden) h += `<div class="eintrag ${a.id === r.id ? 'aktiv' : ''}" data-chat="${esc(r.id)}"><span class="ava" style="background:var(--violet)">R</span><div class="t"><div class="n">${esc(r.titel)}</div><div class="s">${esc(r.letzte)}</div></div>${r.laeuft ? '<span class="lauf"></span>' : ''}</div>`;
+  const projekte = S.sessions.filter((x) => x.art === 'projekt');
+  h += '<div class="gruppe">Projekte</div>';
+  for (const p of projekte) h += `<div class="eintrag ${a.id === p.id ? 'aktiv' : ''}" data-chat="${esc(p.id)}"><span class="ava" style="background:var(--violet)">${esc((p.titel || 'P')[0])}</span><div class="t"><div class="n">${esc(p.titel)}</div><div class="s">${esc(p.status || p.letzte || '')}</div></div>${p.laeuft ? '<span class="lauf"></span>' : p.ungelesen ? `<span class="badge">${p.ungelesen}</span>` : ''}</div>`;
+  h += `<div class="eintrag" data-seite="projekt"><span class="ava" style="background:var(--line);color:var(--text)">+</span><div class="t"><div class="n">Neues Projekt</div></div></div>`;
+  const neueRoutinen = (S.routinen || []).filter((r) => r.ergebnis && !r.gelesen).length;
   const entw = S.ablaeufe.filter((x) => x.status === 'entwurf').length;
   h += '<div class="gruppe">Mehr</div>';
   const offenF = Object.values(S.freigaben).filter((f) => f && f.status === 'offen').length;
-  for (const [k, n, z] of [['bots', 'Bots verwalten', 0], ['suche', 'Suche', 0], ['freigaben', 'Freigaben', offenF], ['ablaeufe', 'Abläufe', entw], ['routinen', 'Routinen', 0],
+  for (const [k, n, z] of [['routinen', 'Routinen', neueRoutinen], ['freigaben', 'Freigaben', offenF], ['suche', 'Suche', 0], ['ablaeufe', 'Abläufe', entw],
     ['ausloeser', 'Auslöser', (S.ausloeser || []).filter((x) => x.fehler).length], ['aktivitaet', 'Aktivität', 0], ['arbeit', 'Arbeitsordner', 0], ['erinnerungen', 'Erinnerungen', 0], ['gedaechtnis', 'Gedächtnis', 0], ['wissen', 'Wissen', 0], ['datenbanken', 'Datenbanken', 0],
     ['archiv', 'Ältere Unterhaltungen', 0], ['zugriffe', 'Zugriffe', 0], ['einstellungen', 'Einstellungen', 0]]) {
     h += `<div class="eintrag ${a.art === k ? 'aktiv' : ''}" data-seite="${k}"><div class="t"><div class="n">${n}</div></div>${z ? `<span class="badge">${z}</span>` : ''}</div>`;
@@ -300,7 +300,7 @@ async function zeigen() {
   S.bearbeitet = false;
   if (a.art === 'chat') return chatOeffnen(a.id || S.bots[0]?.sitzung);
   S.offen = null;
-  ({ablaeufe: seiteAblaeufe, gedaechtnis: seiteGedaechtnis, freigaben: seiteFreigaben, routinen: seiteRoutinen, runde: seiteRunde, ausloeser: seiteAusloeser, aktivitaet: seiteAktivitaet, arbeit: seiteArbeit,
+  ({ablaeufe: seiteAblaeufe, gedaechtnis: seiteGedaechtnis, freigaben: seiteFreigaben, routinen: seiteRoutinen, projekt: seiteProjektNeu, ausloeser: seiteAusloeser, aktivitaet: seiteAktivitaet, arbeit: seiteArbeit,
     bot: () => seiteBot(a.id), bots: seiteBots, suche: seiteSuche, archiv: seiteArchiv, erinnerungen: seiteErinnerungen, wissen: seiteWissen,
     datenbanken: seiteDatenbanken, zugriffe: seiteZugriffe, einstellungen: seiteEinstellungen}[a.art] || (() => {}))();
 }
@@ -612,27 +612,14 @@ async function seiteFreigaben() {
   $('#haupt').innerHTML = kopf('Freigaben', 'Schreibaktionen der Bots') + `<div class="seite"><div class="bl">${l.map((f) => freigabeKarte(f.id)).join('') || '<div class="box mut">Keine Freigaben.</div>'}</div></div>`;
 }
 
-// ── Routinen (alte Ansicht, ersetzt durch seiteRoutinen weiter unten) ──
-function seiteRoutinenAlt() {
-  const tage = ['', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  $('#haupt').innerHTML = kopf('Routinen', 'Zeitpläne der Bots') + `<div class="seite"><div class="bl">${S.routinen.map((r) => `<div class="box"><h3>${esc(r.name)} <span class="mut">· ${esc(botName(r.bot))} · ${r.datum ? 'am ' + esc(r.datum) : (r.tage || []).map((t) => tage[t]).join(' ')} ${esc(r.zeit)}${r.aktiv ? '' : ' · aus'}</span></h3>
-    <div class="mut" style="white-space:pre-wrap">${esc(r.auftrag)}</div><div class="zeilen" style="margin-top:8px"><button class="klein" data-rjetzt="${r.id}">Jetzt ausführen</button></div></div>`).join('') || '<div class="box mut">Keine Routinen.</div>'}
-    <p class="mut">Anlegen und ändern geht in der App oder per Chat („mach das jeden Montag um 8“).</p></div></div>`;
-  $('#haupt').querySelectorAll('[data-rjetzt]').forEach((b) => b.onclick = async () => { try { await api('POST', `/api/routinen/${b.dataset.rjetzt}/jetzt`); toast('Läuft'); } catch (e) { toast(e.message); } });
-}
-
-// ── Runde ──
-function seiteRunde() {
-  $('#haupt').innerHTML = kopf('Neue Runde', 'mehrere Bots, eine Frage') + `<div class="seite"><div class="bl"><div class="box">
-    <textarea id="rF" rows="4" placeholder="Frage an die Runde …"></textarea>
-    <div class="zeilen" style="margin:10px 0">${S.bots.filter((b) => !b.kapitaen).map((b) => `<label><input type="checkbox" value="${b.id}" checked style="width:auto"> ${esc(b.name)}</label>`).join('')}</div>
-    <label class="zeilen" style="margin:0 0 10px">Danach miteinander reden: <select id="rG" style="width:auto">
-      <option value="0">nein</option><option value="1">1 Runde</option><option value="2">bis zu 2 Runden</option></select></label>
-    <button class="pri" id="rOk">Runde starten</button><p class="mut">Jeder Bot antwortet aus seiner Rolle. Beim Reden sieht jeder nur die neuen Beiträge der anderen,
-      antwortet in höchstens 4 Sätzen oder passt – sagen alle „passe“, ist früher Schluss. Dann fasst der Kapitän zusammen.</p></div></div></div>`;
-  $('#rOk').onclick = async () => {
-    const bots = [...document.querySelectorAll('#haupt input[type=checkbox]:checked')].map((x) => x.value);
-    try { const s = await api('POST', '/api/runden', {frage: $('#rF').value, bots, gespraech: +$('#rG').value}); S.ansicht = {art: 'chat', id: s.id}; await laden(); nav(); zeigen(); } catch (e) { toast(e.message); }
+// ── Neues Projekt ──
+function seiteProjektNeu() {
+  $('#haupt').innerHTML = kopf('Neues Projekt', 'ein eigener Chat für ein Thema') + `<div class="seite"><div class="bl"><div class="box">
+    ${feld('Titel', '<input id="pT" placeholder="z. B. Umzug, Steuer 2026, Urlaub Dänemark">')}
+    ${feld('Ziel (optional)', '<textarea id="pZ" rows="3" placeholder="Was soll am Ende stehen?"></textarea>')}
+    <button class="pri" id="pOk">Projekt anlegen</button><p class="mut">Im Projekt-Chat geht es nur um dieses Thema – mit Ziel, Plan und Live-Karten oben.</p></div></div></div>`;
+  $('#pOk').onclick = async () => {
+    try { const p = await api('POST', '/api/projekte', {titel: $('#pT').value, ziel: $('#pZ').value}); S.ansicht = {art: 'chat', id: p.id}; await laden(); nav(); zeigen(); } catch (e) { toast(e.message); }
   };
 }
 
@@ -898,34 +885,57 @@ document.addEventListener('click', async (ev) => {
 // ── Routinen (anlegen, ändern, an/aus) ──
 const TAGE = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 function seiteRoutinen() {
-  $('#haupt').innerHTML = kopf('Routinen', 'Aufgaben, die ein Bot zu einer Zeit erledigt', '<button class="pri klein" id="rNeu">+ Neu</button>') + `<div class="seite"><div class="bl">${S.routinen.map((r) => `<div class="box"><div class="zeilen" style="justify-content:space-between">
-    <h3 style="margin:0">${esc(r.name)} <span class="mut">· ${esc(botName(r.bot))} · ${r.datum ? 'einmalig am ' + esc(r.datum) : (r.tage || []).map((t) => TAGE[t - 1]).join(' ')} ${esc(r.zeit)}</span></h3>
-    <label class="zeilen"><input type="checkbox" data-r-aktiv="${r.id}" ${r.aktiv ? 'checked' : ''} style="width:auto"> aktiv</label></div>
-    <div class="mut" style="white-space:pre-wrap;margin:6px 0">${esc(r.auftrag)}</div>
-    <div class="zeilen"><button class="klein" data-r-edit="${r.id}">Ändern</button><button class="klein" data-r-jetzt="${r.id}">Jetzt ausführen</button><button class="klein text" data-r-weg="${r.id}">Löschen</button></div></div>`).join('') || '<div class="box mut">Keine Routinen.</div>'}
-    <p class="mut">Oder per Chat: „mach das jeden Montag um 8“.</p></div></div>`;
+  const offen = S.routinen.filter((r) => !r.gelesen), gelesen = S.routinen.filter((r) => r.gelesen);
+  const artikel = (r) => {
+    const e = r.ergebnis;
+    return `<div class="box artikel ${r.aktiv ? '' : 'mut'}"><div class="zeilen" style="justify-content:space-between;align-items:baseline">
+      <h3 style="margin:0;font-family:Georgia,serif;font-size:21px">${esc(r.name)}</h3>
+      <span class="mut">${r.laeuft ? '<span class="lauf"></span> läuft … ' : ''}${e ? 'aktualisiert ' + uhrzeit(e.ts) : 'noch kein Ergebnis'}</span></div>
+      <div class="mut" style="font-size:13px;margin:2px 0 8px">${esc(r.beschreibung || '')}${r.aktiv ? '' : ' · aus'}</div>
+      ${e ? `<div class="md">${e.fehler && !e.text ? esc(e.fehler) : md(e.text || '')}</div>` : ''}
+      <div class="zeilen" style="margin-top:10px">${e ? `<button class="klein" data-r-gel="${r.id}" data-wert="${r.gelesen ? 0 : 1}">${r.gelesen ? 'Wieder zeigen' : 'Gelesen'}</button>` : ''}
+        <button class="klein" data-r-jetzt="${r.id}" ${r.laeuft ? 'disabled' : ''}>Jetzt ausführen</button>
+        <button class="klein text" data-r-hoch="${r.id}">↑</button><button class="klein text" data-r-runter="${r.id}">↓</button>
+        <button class="klein text" data-r-edit="${r.id}">Ändern</button><button class="klein text" data-chat-auf="${esc(r.sitzung)}">Verlauf</button></div></div>`;
+  };
+  $('#haupt').innerHTML = kopf('Routinen', 'die Ergebnisse, wie Zeitungsartikel', '<button class="pri klein" id="rNeu">+ Neu</button>') + `<div class="seite"><div class="bl">
+    ${offen.map(artikel).join('') || '<div class="box mut">Alles gelesen. Neue Ergebnisse erscheinen hier.</div>'}
+    ${gelesen.length ? `<details style="margin-top:14px"><summary class="mut">Gelesen (${gelesen.length}) – erscheinen beim nächsten Stand wieder</summary>${gelesen.map(artikel).join('')}</details>` : ''}
+    <p class="mut">Oder per Chat: „schau ab jetzt jeden Werktag um 8 und 12 in Slack“.</p></div></div>`;
   const speichern = async (l, msg) => { try { await api('PUT', '/api/routinen', {routinen: l}); await laden(); seiteRoutinen(); if (msg) toast(msg); } catch (e) { toast(e.message); } };
+  const tun = async (f) => { try { await f(); await laden(); seiteRoutinen(); } catch (e) { toast(e.message); } };
+  const schieben = (id, d) => { const ids = S.routinen.map((r) => r.id); const i = ids.indexOf(id), j = i + d; if (j < 0 || j >= ids.length) return; [ids[i], ids[j]] = [ids[j], ids[i]]; tun(() => api('PUT', '/api/routinen/reihenfolge', {ids})); };
   $('#rNeu').onclick = () => routineDialog(null, speichern);
-  $('#haupt').querySelectorAll('[data-r-aktiv]').forEach((c) => c.onchange = () => speichern(S.routinen.map((r) => r.id === c.dataset.rAktiv ? {...r, aktiv: c.checked} : r)));
-  $('#haupt').querySelectorAll('[data-r-edit]').forEach((c) => c.onclick = () => routineDialog(S.routinen.find((r) => r.id === c.dataset.rEdit), speichern));
-  $('#haupt').querySelectorAll('[data-r-weg]').forEach((c) => c.onclick = () => { if (confirm('Routine löschen?')) speichern(S.routinen.filter((r) => r.id !== c.dataset.rWeg), 'Gelöscht'); });
-  $('#haupt').querySelectorAll('[data-r-jetzt]').forEach((c) => c.onclick = async () => { try { const o = await api('POST', `/api/routinen/${c.dataset.rJetzt}/jetzt`); toast('Läuft'); } catch (e) { toast(e.message); } });
+  const h = $('#haupt');
+  h.querySelectorAll('[data-r-gel]').forEach((c) => c.onclick = () => tun(() => api('POST', `/api/routinen/${c.dataset.rGel}/gelesen`, {gelesen: c.dataset.wert === '1'})));
+  h.querySelectorAll('[data-r-hoch]').forEach((c) => c.onclick = () => schieben(c.dataset.rHoch, -1));
+  h.querySelectorAll('[data-r-runter]').forEach((c) => c.onclick = () => schieben(c.dataset.rRunter, 1));
+  h.querySelectorAll('[data-r-edit]').forEach((c) => c.onclick = () => routineDialog(S.routinen.find((r) => r.id === c.dataset.rEdit), speichern));
+  h.querySelectorAll('[data-chat-auf]').forEach((c) => c.onclick = () => { S.ansicht = {art: 'chat', id: c.dataset.chatAuf}; nav(); zeigen(); });
+  h.querySelectorAll('[data-r-jetzt]').forEach((c) => c.onclick = () => tun(async () => { await api('POST', `/api/routinen/${c.dataset.rJetzt}/jetzt`); toast('Läuft – das Ergebnis erscheint hier'); }));
 }
 function routineDialog(r, speichern) {
-  const d = $('#dlg'); const morgen = new Date(Date.now() + 864e5).toISOString().slice(0, 10);
-  d.innerHTML = `<h3 style="margin-top:0">${r ? 'Routine ändern' : 'Neue Routine'}</h3>${feld('Name', `<input id="rN" value="${esc(r?.name || '')}">`)}
-    <div class="reihe">${feld('Bot', `<select id="rB">${S.bots.map((b) => `<option value="${b.id}" ${(r?.bot || S.bots.find((x) => x.kapitaen)?.id) === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select>`)}
-      ${feld('Uhrzeit', `<input type="time" id="rZ" value="${esc(r?.zeit || '07:45')}">`)}${feld('Einmalig am (leer = wiederkehrend)', `<input type="date" id="rD" value="${esc(r?.datum || '')}" placeholder="${morgen}">`)}</div>
-    <div class="zeilen" style="margin:6px 0">${TAGE.map((t, i) => `<label><input type="checkbox" value="${i + 1}" ${(r?.tage || [1, 2, 3, 4, 5]).includes(i + 1) ? 'checked' : ''} style="width:auto"> ${t}</label>`).join('')}</div>
-    ${feld('Auftrag – so, als würdest du ihn dem Bot schreiben', `<textarea id="rA" rows="7">${esc(r?.auftrag || '')}</textarea>`)}
-    <label class="zeilen" style="margin:4px 0 10px"><input type="checkbox" id="rAnruf" ${r?.anruf ? 'checked' : ''} style="width:auto"> 📞 Als Anruf – das Handy klingelt, der Bot liest sein Ergebnis vor</label>
-    <div class="zeilen"><button class="pri" id="rOk">Speichern</button><button onclick="this.closest('dialog').close()">Abbrechen</button></div>`;
+  const d = $('#dlg');
+  const einfach = !r || (r.zeiten || []).length > 0;
+  d.innerHTML = `<h3 style="margin-top:0">${r ? 'Routine ändern' : 'Neue Routine'}</h3>${feld('Name (Überschrift des Artikels)', `<input id="rN" value="${esc(r?.name || '')}">`)}
+    <div class="reihe">${feld('Uhrzeiten (mehrere mit Komma)', `<input id="rZ" value="${esc((r?.zeiten || ['07:45']).join(', '))}" placeholder="08:00, 12:00, 16:00">`)}
+      ${feld('Einmalig am (leer = wiederkehrend)', `<input type="date" id="rD" value="${esc(r?.datum || '')}">`)}</div>
+    <div class="zeilen" style="margin:6px 0" id="rTage">${TAGE.map((t, i) => `<label><input type="checkbox" value="${i + 1}" ${(r?.tage?.length ? r.tage : [1, 2, 3, 4, 5, 6, 7]).includes(i + 1) ? 'checked' : ''} style="width:auto"> ${t}</label>`).join('')}</div>
+    ${feld('Oder Cron (Minute Stunde Tag Monat Wochentag) – hat Vorrang', `<input id="rC" value="${esc(einfach ? '' : r?.cron || '')}" placeholder="*/30 8-18 * * 1-5">`)}
+    ${feld('Auftrag – so, als würdest du ihn Reacher schreiben', `<textarea id="rA" rows="7">${esc(r?.auftrag || '')}</textarea>`)}
+    <label class="zeilen" style="margin:4px 0 10px"><input type="checkbox" id="rAnruf" ${r?.anruf ? 'checked' : ''} style="width:auto"> 📞 Als Anruf – das Handy klingelt, das Ergebnis wird vorgelesen</label>
+    <div class="zeilen">${r ? `<label class="zeilen"><input type="checkbox" id="rAktiv" ${r.aktiv ? 'checked' : ''} style="width:auto"> aktiv</label>` : ''}
+      <button class="pri" id="rOk">Speichern</button><button onclick="this.closest('dialog').close()">Abbrechen</button>${r ? '<button class="text" id="rWeg">Löschen</button>' : ''}</div>`;
   $('#rOk').onclick = () => {
-    const n = {...(r || {}), name: $('#rN').value.trim(), bot: $('#rB').value, zeit: $('#rZ').value, datum: $('#rD').value, auftrag: $('#rA').value.trim(), anruf: $('#rAnruf').checked,
-      tage: [...d.querySelectorAll('.zeilen input[type=checkbox]:checked:not(#rAnruf)')].map((x) => +x.value), aktiv: r ? r.aktiv : true};
-    if (!n.name || !n.auftrag || !n.zeit) return toast('Name, Uhrzeit und Auftrag nötig');
+    const cron = $('#rC').value.trim();
+    const n = {...(r || {}), name: $('#rN').value.trim(), datum: $('#rD').value, auftrag: $('#rA').value.trim(), anruf: $('#rAnruf').checked,
+      zeiten: $('#rZ').value.split(/[ ,;]+/).filter(Boolean).map((z) => z.padStart(5, '0')), cron,
+      tage: [...d.querySelectorAll('#rTage input:checked')].map((x) => +x.value), aktiv: r ? $('#rAktiv').checked : true};
+    if (!cron) delete n.cron;
+    if (!n.name || !n.auftrag || (!cron && !n.zeiten.length)) return toast('Name, Uhrzeit (oder Cron) und Auftrag nötig');
     d.close(); speichern(r ? S.routinen.map((x) => x.id === r.id ? n : x) : [...S.routinen, n], 'Gespeichert');
   };
+  if (r) $('#rWeg').onclick = () => { if (confirm('Routine löschen?')) { d.close(); speichern(S.routinen.filter((x) => x.id !== r.id), 'Gelöscht'); } };
   d.showModal();
 }
 

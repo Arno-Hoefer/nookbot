@@ -4,7 +4,7 @@ Kontext für Claude-Sitzungen in diesem Repo. Ausführliche Doku: [docs/](docs/R
 
 ## Was ist das?
 
-NookBot ist ein kleines Team aus KI-Bots auf einem Raspberry Pi 5 zu Hause, mit eigener Android-App und Web-Oberfläche.
+NookBot ist ein KI-Assistent (ein Bot, Reacher) auf einem Raspberry Pi 5 zu Hause, mit eigener Android-App und Web-Oberfläche: Chat, Projekt-Chats und Routinen, deren Ergebnisse wie Zeitungsartikel erscheinen.
 Je Bot läuft ein [PicoClaw](https://github.com/sipeed/picoclaw)-Prozess. Dazwischen sitzt der **Adapter** (Python, nur Standardbibliothek).
 Er speichert den Verlauf und steuert Rechte, Regeln, Routinen, Auslöser, Anrufe und Stimmen.
 Kalender, Mail, Drive, Slack, GitLab und Datenbank kommen über einen eigenen MCP-Server (home-mcp). Der liegt in einem eigenen Repo: [home-mcp](https://github.com/Arno-Hoefer/home-mcp).
@@ -19,7 +19,7 @@ pi/adapter/nookbot/            der Adapter in Modulen (Ladereihenfolge in __init
   claude, gesundheit, stimmen      Claude-Proxy + Verbrauch, Health Connect, Phonon/Piper/Vorlesetext/Diktat
   wissen, home, bots               Wissen/Anhänge/Dokumente ansehen, Rechte + home-mcp-Proxy, Bots + AGENT.md/SOUL.md
   sitzungen, seiten, gedaechtnis   Verlauf + Bot-Verbindungen, Seiten lesen, Gedächtnis + Abläufe
-  rechner, automatik, team         Arbeitsordner/Python/Seitenbild/Regeln, Routinen/Erinnerungen/Auslöser/Aktivität/Anrufe, Runden/Aufträge
+  rechner, automatik               Arbeitsordner/Python/Seitenbild/Regeln, Routinen (Cron, Artikel)/Erinnerungen/Auslöser/Aktivität/Anrufe
   vorschlaege, aufraeumen          Vorschläge der Bots, Muster ohne Modell, tägliche Durchsicht; Gedächtnis aufräumen (wöchentlich)
   rundblick                        Kapitän sieht sich zu festen Zeiten um (HEARTBEAT.md, HEARTBEAT_OK = still), 👍/👎, Tageslimit
   mcp, schnittstelle, start        MCP-Werkzeuge der Bots, HTTP-Handler, main()

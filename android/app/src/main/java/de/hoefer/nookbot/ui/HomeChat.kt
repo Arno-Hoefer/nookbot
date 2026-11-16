@@ -63,31 +63,23 @@ fun HomeScreen(vm: NookViewModel) {
     val fehler by vm.fehler.collectAsState()
     val guthaben by vm.guthaben.collectAsState()
     val claude by vm.claude.collectAsState()
-    var plus by remember { mutableStateOf(false) }
+    val kap = bots.firstOrNull { it.kapitaen }
     var loeschen by remember { mutableStateOf<Sitzung?>(null) }
+    var neu by remember { mutableStateOf(false) }
     var suchen by rememberSaveable { mutableStateOf(false) }
     var q by rememberSaveable { mutableStateOf("") }
     val treffer by vm.treffer.collectAsState()
-    val kap = bots.firstOrNull { it.kapitaen }
-    val offen = fr.count { it.offen }
-    val kapSitz = sitz.firstOrNull { it.id == kap?.sitzung }
+    val projekte = sitz.filter { it.art == "projekt" }.sortedByDescending { it.aktualisiert }
 
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             RoundIcon(Icons.Default.Menu, "Menü") { vm.go(Route.Mehr) }
             Spacer(Modifier.weight(1f))
-            Text("NookBot", color = P.fg, fontSize = 24.sp, fontFamily = Serif, fontWeight = FontWeight.Medium)
+            Text("Projekte", color = P.fg, fontSize = 24.sp, fontFamily = Serif, fontWeight = FontWeight.Medium)
             Spacer(Modifier.weight(1f))
             RoundIcon(Icons.Default.Search, "Suchen") { suchen = !suchen; if (!suchen) { q = ""; vm.suche("") } }
             Spacer(Modifier.width(10.dp))
-            Box {
-                RoundIcon(Icons.Default.Add, "Neu") { plus = true }
-                DropdownMenu(plus, { plus = false }, containerColor = P.card) {
-                    DropdownMenuItem({ Text("Neuer Bot", color = P.fg) }, { plus = false; vm.go(Route.BotEdit(null)) })
-                    if (bots.size >= 2) DropdownMenuItem({ Text("Neue Runde", color = P.fg) }, { plus = false; vm.go(Route.RundeNeu) })
-                    kap?.let { k -> DropdownMenuItem({ Text("Bot von ${k.name} anlegen lassen", color = P.fg) }, { plus = false; vm.openBot(k.id) }) }
-                }
-            }
+            RoundIcon(Icons.Default.Add, "Neues Projekt") { neu = true }
         }
 
         if (suchen) {
@@ -99,7 +91,7 @@ fun HomeScreen(vm: NookViewModel) {
                         Row(Modifier.fillMaxWidth().clickable { suchen = false; vm.openChat(t.optString("s")) }.padding(horizontal = 20.dp, vertical = 10.dp)) {
                             BotFigure(vm.bot(t.optString("bot")), 36.dp)
                             Column(Modifier.padding(start = 12.dp)) {
-                                Text(vm.bot(t.optString("bot"))?.name ?: t.optString("titel"), color = P.fg, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
+                                Text(t.optString("titel").ifBlank { vm.bot(t.optString("bot"))?.name ?: "" }, color = P.fg, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
                                     overflow = TextOverflow.Ellipsis)
                                 Text(t.optString("auszug"), color = P.fg2, fontSize = 13.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
                             }
@@ -110,70 +102,36 @@ fun HomeScreen(vm: NookViewModel) {
             return@Column
         }
 
-        // Kapitän groß
-        Column(Modifier.fillMaxWidth().clickable { kap?.let { vm.openBot(it.id) } }.padding(top = 14.dp, bottom = 14.dp),
-            horizontalAlignment = Alignment.CenterHorizontally) {
-            BotFigure(kap, 112.dp)
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
-                Text(kap?.name ?: "…", color = P.fg, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                Text("  ${kap?.rolle ?: ""}", color = P.mut, fontSize = 13.sp)
-                if ((kapSitz?.ungelesen ?: 0) > 0) Box(Modifier.padding(start = 8.dp).size(9.dp).clip(CircleShape).background(A.blue))
-            }
-            Text(when {
-                kapSitz?.id in busy -> "arbeitet …"
-                !kapSitz?.letzte.isNullOrBlank() -> vorschau(kapSitz!!.letzte)
-                else -> "Tippen zum Schreiben"
-            }, color = if (kapSitz?.id in busy) A.green else P.mut, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 3.dp, start = 30.dp, end = 30.dp))
-        }
-
-        if (offen > 0) {
-            Card(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), border = A.amber.copy(alpha = 0.5f), onClick = { vm.go(Route.Freigaben) }) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Badge("FREIGABE", A.amber)
-                    Text(if (offen == 1) "1 Aktion wartet auf dich" else "$offen Aktionen warten auf dich", color = P.fg, fontSize = 14.sp,
-                        modifier = Modifier.padding(start = 10.dp))
+        LazyColumn(Modifier.weight(1f), contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 10.dp)) {
+            if (projekte.isEmpty()) item {
+                Card(Modifier.padding(vertical = 6.dp)) {
+                    Text("Ein Projekt-Chat kümmert sich nur um ein Thema", color = P.fg, fontSize = 19.sp, fontFamily = Serif)
+                    Text("Umzug, Steuer, Urlaub, ein Antrag: ${kap?.name ?: "Reacher"} hält dort Ziel, Plan und Live-Karten oben fest – "
+                        + "getrennt vom normalen Chat.", color = P.fg2, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
+                    Spacer(Modifier.size(12.dp))
+                    MainButton("Projekt starten") { neu = true }
                 }
             }
-        }
-
-        // Liste: je Bot eine Zeile (seine Unterhaltung) + Runden – zuletzt aktiv zuerst
-        data class Eintrag(val key: String, val sitzung: Sitzung?, val bot: de.hoefer.nookbot.data.Bot?, val runde: Boolean, val zeit: Long)
-        val eintraege = (bots.filter { !it.kapitaen }.map { b -> sitz.firstOrNull { it.id == b.sitzung }.let { s -> Eintrag("b-" + b.id, s, b, false, s?.aktualisiert ?: 0) } } +
-            sitz.filter { it.art == "runde" }.map { Eintrag("r-" + it.id, it, vm.bot(it.bot), true, it.aktualisiert) }).sortedByDescending { it.zeit }
-        LazyColumn(Modifier.weight(1f)) {
-            item(key = "projekte") { ProjekteListe(vm, sitz.filter { it.art == "projekt" }.sortedByDescending { it.aktualisiert }) }
-            if (eintraege.isEmpty()) item {
-                Hint("Noch keine weiteren Bots. Beschreib ${kap?.name ?: "dem Kapitän"}, was ein neuer Bot können soll – er legt ihn an. Oder „+“ → Neuer Bot.",
-                    Modifier.padding(20.dp))
-            }
-            items(eintraege, key = { it.key }) { e ->
-                val s = e.sitzung
-                Row(Modifier.fillMaxWidth().combinedClickable(
-                    onClick = { if (e.runde) s?.let { vm.openChat(it.id) } else e.bot?.let { vm.openBot(it.id) } },
-                    onLongClick = { if (e.runde) loeschen = s else e.bot?.let { vm.go(Route.BotEdit(it.id)) } })
-                    .padding(horizontal = 20.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
-                    if (e.runde) Box(Modifier.size(46.dp)) {
-                        Box(Modifier.align(Alignment.TopStart)) { BotFigure(e.bot, 30.dp) }
-                        Box(Modifier.align(Alignment.BottomEnd)) { BotFigure(vm.bot(s?.teilnehmer?.firstOrNull { it != s.bot } ?: ""), 28.dp) }
-                    } else BotFigure(e.bot, 46.dp)
-                    Column(Modifier.weight(1f).padding(start = 12.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(if (e.runde) (s?.titel ?: "Runde") else e.bot?.name ?: "", color = P.fg, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
-                                maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-                            Tag(if (e.runde) "Runde" else e.bot?.rolle?.ifBlank { "Bot" } ?: "Bot")
-                            Spacer(Modifier.weight(1f))
-                            Text(whenText(e.zeit), color = P.mut, fontSize = 12.sp, modifier = Modifier.padding(start = 8.dp))
+            items(projekte, key = { it.id }) { s ->
+                val laeuft = s.id in busy
+                Card(Modifier.padding(vertical = 6.dp).combinedClickable(onClick = { vm.openChat(s.id) }, onLongClick = { loeschen = s })) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(s.titel, color = P.fg, fontSize = 20.sp, fontFamily = Serif, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                        if (s.brauchtDich > 0) Box(Modifier.padding(start = 8.dp).size(22.dp).clip(CircleShape).background(A.accent), contentAlignment = Alignment.Center) {
+                            Text("${s.brauchtDich}", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                         }
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 3.dp)) {
-                            val laeuft = s?.id in busy
-                            Text(if (laeuft) "arbeitet …" else s?.letzte?.ifBlank { null }?.let { vorschau(it) } ?: "Noch nichts geschrieben", color = if (laeuft) A.green else P.fg2,
-                                fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                            if ((s?.ungelesen ?: 0) > 0) Box(Modifier.padding(start = 8.dp).size(9.dp).clip(CircleShape).background(A.blue))
-                        }
+                        if (s.ungelesen > 0) Box(Modifier.padding(start = 8.dp).size(9.dp).clip(CircleShape).background(A.blue))
+                    }
+                    Text(s.status.ifBlank { s.plan.ifBlank { "noch kein Plan" } }, color = P.fg2, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 3.dp))
+                    Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(if (laeuft) "arbeitet …" else s.letzte.ifBlank { null }?.let { vorschau(it) } ?: "Noch nichts geschrieben",
+                            color = if (laeuft) A.green else P.mut, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                        Text(whenText(s.aktualisiert), color = P.mut, fontSize = 12.sp, modifier = Modifier.padding(start = 8.dp))
                     }
                 }
             }
+            if (projekte.isNotEmpty()) item { Hint("Lange drücken, um ein Projekt zu beenden.", Modifier.padding(vertical = 10.dp)) }
         }
 
         Row(Modifier.padding(start = 20.dp, end = 20.dp, bottom = 14.dp).fillMaxWidth().clip(RoundedCornerShape(16.dp))
@@ -189,13 +147,29 @@ fun HomeScreen(vm: NookViewModel) {
                 color = P.fg2, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(start = 10.dp).weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text("Tailnet", color = P.mut, fontSize = 13.sp)
         }
-        Leiste(vm, Tab.BOTS)
+        Leiste(vm, Tab.PROJEKTE)
+    }
+
+    if (neu) {
+        var titel by remember { mutableStateOf("") }
+        var ziel by remember { mutableStateOf("") }
+        AlertDialog(onDismissRequest = { neu = false }, containerColor = P.card,
+            title = { Text("Neues Projekt", color = P.fg, fontFamily = Serif) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Ein eigener Chat mit ${kap?.name ?: "Reacher"} nur für dieses Thema.", color = P.fg2, fontSize = 14.sp)
+                    Field("Titel, z. B. „Umzug März“", titel) { titel = it }
+                    Field("Ziel (optional)", ziel, lines = 2) { ziel = it }
+                }
+            },
+            confirmButton = { TextButton({ neu = false; vm.projektAnlegen(titel, ziel) }, enabled = titel.isNotBlank()) { Text("Anlegen", color = P.fg) } },
+            dismissButton = { TextButton({ neu = false }) { Text("Abbrechen", color = P.fg2) } })
     }
 
     loeschen?.let { s ->
         AlertDialog(onDismissRequest = { loeschen = null }, containerColor = P.card,
-            title = { Text("Runde löschen?", color = P.fg) },
-            text = { Text("„${s.titel}“ wird gelöscht – auch auf dem Pi.", color = P.fg2) },
+            title = { Text("Projekt beenden?", color = P.fg) },
+            text = { Text("„${s.titel}“ wird mit Plan und Karten gelöscht – auch auf dem Pi.", color = P.fg2) },
             confirmButton = { TextButton({ vm.deleteSession(s.id); loeschen = null }) { Text("Löschen", color = A.accent) } },
             dismissButton = { TextButton({ loeschen = null }) { Text("Abbrechen", color = P.fg2) } })
     }
@@ -441,7 +415,7 @@ fun ChatScreen(vm: NookViewModel, sid: String) {
                 Icon(Icons.AutoMirrored.Filled.Send, "Senden", tint = if (can) P.onInk else P.mut, modifier = Modifier.size(20.dp))
             }
         }
-        if (!runde && s?.art != "intern" && s?.art != "archiv") Leiste(vm, if (b?.kapitaen == true) Tab.CHAT else Tab.BOTS)
+        if (!runde && s?.art != "intern" && s?.art != "archiv") Leiste(vm, when (s?.art) { "projekt" -> Tab.PROJEKTE; "routine" -> Tab.ROUTINEN; else -> Tab.CHAT })
     }
     ChatDialoge(vm, b, neu, notiz, { neu = false }, { notiz = false })
     if (sprache) Sprachmodus(vm, sid, b) { sprache = false }

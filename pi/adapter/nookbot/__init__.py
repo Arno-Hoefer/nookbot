@@ -5,9 +5,9 @@ NookBot-Adapter – sitzt zwischen der App und den Bots (je ein PicoClaw-Prozess
 - App-Schnittstelle: JSON + Server-Sent Events auf 127.0.0.1:8795 (im Tailnet über tailscale serve :8444).
   Anmeldung mit demselben Chat-Token wie der PicoClaw-Kanal (Authorization: Bearer nb_…).
 - Bots anlegen/ändern (Name, Rolle, Farbe, Modell – Ollama oder Claude, Persönlichkeit, Fokus, Zugriffe), Wissen (global + je Bot),
-  Datenbank-Bibliothek (als Skill für Bots mit Zugriffen), Routinen (Zeitplan), Runden (mehrere Bots + Zusammenfassung),
+  Datenbank-Bibliothek (als Skill für Bots mit Zugriffen), Routinen (Cron-Zeitplan, Ergebnisse als Artikel),
   Benachrichtigungen über ntfy, Ollama-Guthaben, Zugriffs-Übersicht.
-- MCP-Endpunkt /mcp/<bot> für die Bots: Routinen, Erinnerungen, Team (bot_fragen, auftraege_verteilen), Bots anlegen (Kapitän),
+- MCP-Endpunkt /mcp/<bot>: Routinen, Erinnerungen, Projekte, Werkzeuge (Kapitän),
   Seiten lesen (ohne Anmeldung), Pakete (aus Home), Gedächtnis (merken/vergessen), Abläufe (Vorschlag → Bestätigung in der App),
   Vorschläge der Bots (im Gespräch oder aus der täglichen Durchsicht, umgesetzt erst nach Ja), wöchentliches Aufräumen des Gedächtnisses (als Vorschlag),
   Rundblick (der Kapitän sieht sich zu festen Zeiten um und meldet sich nur, wenn es etwas gibt).
@@ -15,9 +15,9 @@ NookBot-Adapter – sitzt zwischen der App und den Bots (je ein PicoClaw-Prozess
 
 Läuft als Benutzer picoclaw. Nur Standardbibliothek.
 
-Aufgeteilt in Module (Reihenfolge = Ladereihenfolge): basis, ereignisse, dienste, claude, gesundheit, stimmen, wissen, home, bots, sitzungen, seiten, gedaechtnis, rechner, automatik, team, vorschlaege, aufraeumen, projekte, rundblick, mcp, schnittstelle, start.
+Aufgeteilt in Module (Reihenfolge = Ladereihenfolge): basis, ereignisse, dienste, claude, gesundheit, stimmen, wissen, home, bots, sitzungen, seiten, gedaechtnis, rechner, automatik, vorschlaege, aufraeumen, projekte, rundblick, mcp, schnittstelle, start.
 - Projekte mit Statuszeile, Plänen (Checkliste) und angepinnten Live-Karten (projekte.py).
-- Team-Bericht: Unter-Bots melden sich über den Kapitän, der Hintergrund-Ergebnisse zusammenfasst (teambericht.py).
+- Ein Bot (Reacher): normaler Chat plus Projekt-Chats; Routinen laufen nach Cron-Zeitplan und liefern Artikel für den Bereich „Routinen“.
 """
 import os
 import sys
@@ -27,7 +27,7 @@ _HIER = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _HIER not in sys.path:
     sys.path.insert(0, _HIER)
 
-from . import basis, ereignisse, dienste, claude, gesundheit, stimmen, wissen, home, bots, sitzungen, seiten, gedaechtnis, rechner, automatik, team, vorschlaege, aufraeumen, projekte, teambericht, rundblick, mcp, schnittstelle, start  # noqa: E402,F401
+from . import basis, ereignisse, dienste, claude, gesundheit, stimmen, wissen, home, bots, sitzungen, seiten, gedaechtnis, rechner, automatik, vorschlaege, aufraeumen, projekte, rundblick, mcp, schnittstelle, start  # noqa: E402,F401
 
 # Welcher Name in welchem Modul wohnt – für nookbot_server.py (alte Namen, Monkeypatching in Tests)
 HERKUNFT = {
@@ -62,7 +62,6 @@ HERKUNFT = {
     'MAIN_HOME': 'basis',
     'MCP_TOOLS': 'mcp',
     'MEHRERE_KONTEN': 'home',
-    'PASSE_RE': 'team',
     'PIPER': 'stimmen',
     'PORT': 'basis',
     'PY_SPEICHER': 'rechner',
@@ -73,7 +72,6 @@ HERKUNFT = {
     'REGEL_NIE_FREI': 'rechner',
     'REGEL_WERKZEUGE': 'rechner',
     'ROUTINE_SCHEMA': 'mcp',
-    'RUNDE_GESPRAECH_MAX': 'team',
     'SEITE_MAX': 'seiten',
     'SESS': 'sitzungen',
     'SICHT_MODELL': 'wissen',
@@ -83,7 +81,6 @@ HERKUNFT = {
     'STIMMEN': 'stimmen',
     'Sessions': 'sitzungen',
     'VERSION': 'basis',
-    'VERTEILEN_MAX': 'team',
     'WHISPER_BIN': 'stimmen',
     'WHISPER_MODELL': 'stimmen',
     'WIEDERHOLUNG': 'automatik',
@@ -236,7 +233,6 @@ HERKUNFT = {
     'routinen': 'automatik',
     'rtf_text': 'wissen',
     'run_routine': 'automatik',
-    'runde': 'team',
     'save_bots': 'bots',
     'scheduler': 'automatik',
     'seite_ansehen': 'rechner',
@@ -270,7 +266,6 @@ HERKUNFT = {
     'vorschlag_neu': 'vorschlaege',
     'VORSCHLAG_MAX_TAG': 'vorschlaege',
     'aufraeumer': 'aufraeumen',
-    'verteilen': 'team',
     'waechter': 'automatik',
     'watchdog': 'sitzungen',
     'wissen_del': 'wissen',

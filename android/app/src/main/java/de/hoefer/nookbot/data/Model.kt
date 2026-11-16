@@ -149,23 +149,46 @@ data class Merk(val id: String, val text: String, val fuer: String, val von: Str
     }
 }
 
+/** Eine frühere Fassung des Artikels einer Routine. */
+data class RoutinenStand(val text: String, val ts: Long)
+
+/**
+ * Routine: Auftrag mit Zeitplan (Cron). Ihr Ergebnis ist ein „Artikel“ im Bereich Routinen – mit Zeitstempel, gelesen/ungelesen
+ * und den letzten Ständen. Die Reihenfolge der Liste bestimmt die App.
+ */
 data class Routine(
-    val id: String, val name: String, val bot: String, val auftrag: String, val zeit: String, val tage: List<Int>,
-    val aktiv: Boolean, val letzterLauf: Long, val datum: String = "", val sitzung: String = "", val anruf: Boolean = false,
+    val id: String, val name: String, val bot: String, val auftrag: String, val zeiten: List<String>, val tage: List<Int>,
+    val aktiv: Boolean, val letzterLauf: Long, val datum: String = "", val anruf: Boolean = false,
+    val cron: String = "", val beschreibung: String = "", val sitzung: String = "", val laeuft: Boolean = false,
+    val text: String = "", val ts: Long = 0, val fehler: String = "", val freigabe: Boolean = false, val privat: Boolean = false,
+    val gelesen: Boolean = false, val verlauf: List<RoutinenStand> = emptyList(),
 ) {
     /** einmalig an einem Datum (statt wiederkehrend) */
     val einmalig: Boolean get() = datum.isNotBlank()
+    val zeit: String get() = zeiten.firstOrNull() ?: ""
+    val hatErgebnis: Boolean get() = ts > 0
 
-    fun json(): JSONObject = JSONObject().put("id", id).put("name", name).put("bot", bot).put("auftrag", auftrag).put("zeit", zeit)
-        .put("tage", JSONArray(tage)).put("aktiv", aktiv).put("letzter_lauf", letzterLauf / 1000.0).put("datum", datum).put("sitzung", sitzung).put("anruf", anruf)
+    /** Für den Pi. Ein leeres cron heißt: aus Uhrzeiten und Tagen bauen. */
+    fun json(): JSONObject = JSONObject().put("id", id).put("name", name).put("bot", bot).put("auftrag", auftrag)
+        .put("zeiten", JSONArray(zeiten)).put("tage", JSONArray(tage)).put("aktiv", aktiv).put("letzter_lauf", letzterLauf / 1000.0)
+        .put("datum", datum).put("anruf", anruf).apply { if (cron.isNotBlank()) put("cron", cron) }
 
     companion object {
-        fun from(o: JSONObject) = Routine(
-            o.optString("id"), o.optString("name"), o.optString("bot"), o.optString("auftrag"), o.optString("zeit", "08:00"),
-            o.optJSONArray("tage")?.let { a -> (0 until a.length()).map { a.getInt(it) } } ?: listOf(1, 2, 3, 4, 5),
-            o.optBoolean("aktiv", true), (o.optDouble("letzter_lauf", 0.0) * 1000).toLong(), o.optString("datum"), o.optString("sitzung"),
-            o.optBoolean("anruf"),
-        )
+        fun from(o: JSONObject): Routine {
+            val e = o.optJSONObject("ergebnis")
+            val zeiten = o.optJSONArray("zeiten")?.let { a -> (0 until a.length()).map { a.getString(it) } }
+                ?: listOfNotNull(o.optString("zeit").takeIf { it.isNotBlank() })
+            return Routine(
+                o.optString("id"), o.optString("name"), o.optString("bot"), o.optString("auftrag"), zeiten,
+                o.optJSONArray("tage")?.let { a -> (0 until a.length()).map { a.getInt(it) } } ?: listOf(1, 2, 3, 4, 5, 6, 7),
+                o.optBoolean("aktiv", true), (o.optDouble("letzter_lauf", 0.0) * 1000).toLong(), o.optString("datum"), o.optBoolean("anruf"),
+                o.optString("cron"), o.optString("beschreibung"), o.optString("sitzung"), o.optBoolean("laeuft"),
+                e?.optString("text").orEmpty(), ((e?.optDouble("ts", 0.0) ?: 0.0) * 1000).toLong(), e?.optString("fehler").orEmpty(),
+                e?.optBoolean("freigabe") ?: false, e?.optBoolean("privat") ?: false, o.optBoolean("gelesen"),
+                o.optJSONArray("verlauf")?.let { a -> (0 until a.length()).map { a.getJSONObject(it) }.map { RoutinenStand(it.optString("text"), (it.optDouble("ts", 0.0) * 1000).toLong()) } }
+                    ?: emptyList(),
+            )
+        }
     }
 }
 
